@@ -5,8 +5,8 @@ type BackMode = "arrow" | "swipe";
 
 function isAppRoot(pathname: string) {
   const path = pathname.replace(/\/+$/, "");
-  const base = "/LG-Main-App";
-  return path === "" || path === base || path === `${base}/`;
+  const base = "/";
+  return path === "" || path === base;
 }
 
 function canGoBack() {
