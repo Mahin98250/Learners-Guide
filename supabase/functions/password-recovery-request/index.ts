@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
     if (!email) return json({ message: genericMessage });
     const publicClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const base = Deno.env.get("PUBLIC_APP_URL") || "https://mahin98250.github.io/LG-Main-App/";
+    const base = Deno.env.get("PUBLIC_APP_URL") || "https://lg-main-app.vercel.app/";
     const redirectTo = new URL("reset-password", base.endsWith("/") ? base : `${base}/`).toString();
     const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo });
     if (resetError) console.error("password-recovery-request reset error", resetError.message);
