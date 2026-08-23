@@ -103,12 +103,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       {
         rel: "icon",
-        href: "/LG-Main-App/pwa-icon.svg",
+        href: "/pwa-icon.svg",
         type: "image/svg+xml",
       },
       {
         rel: "apple-touch-icon",
-        href: "/LG-Main-App/pwa-icon.svg",
+        href: "/pwa-icon.svg",
       },
     ],
   }),
