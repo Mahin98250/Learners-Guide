@@ -34,15 +34,15 @@ Deno.serve(async (req) => {
         if (idError) throw idError;
         student = studentById;
       }
-      if (!student && sid !== identifier) {
-        const { data: students, error } = await admin.from("students").select("id,sid,status").limit(20);
+      if (!student) {
+        const { data: students, error } = await admin.from("students").select("id,sid,status").limit(1000);
         if (error) throw error;
         student = (students || []).find((row) => normalizeId(row.sid) === sid || normalizeId(row.id) === sid);
       }
       if (student && normalize(student.status) === "active") {
-        const { data: users, error: userError } = await admin.from("users").select("email,auth_id,role,ref,status").eq("role", "student").eq("ref", String(student.id)).limit(5);
+        const { data: users, error: userError } = await admin.from("users").select("email,auth_id,role,ref,status").eq("role", "student").limit(1000);
         if (userError) throw userError;
-        const account = (users || []).find((row) => row.auth_id && normalize(row.status) === "active" && emailPattern.test(normalize(row.email)) && !normalize(row.email).endsWith("@learnersguide.in"));
+        const account = (users || []).find((row) => row.auth_id && normalize(row.status) === "active" && normalize(row.ref) === normalize(String(student.id)) && emailPattern.test(normalize(row.email)) && !normalize(row.email).endsWith("@learnersguide.in"));
         email = normalize(account?.email);
       }
     } else {
