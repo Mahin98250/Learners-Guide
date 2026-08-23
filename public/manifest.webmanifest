@@ -2,8 +2,8 @@
   "name": "Learner's Guide",
   "short_name": "Learner's Guide",
   "description": "Learner's Guide connects classrooms with timetables, attendance, homework, notes, marks and fees.",
-  "start_url": "/LG-Main-App/",
-  "scope": "/LG-Main-App/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
@@ -11,13 +11,13 @@
   "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "/LG-Main-App/learner-guide-icon.svg",
+      "src": "/learner-guide-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/LG-Main-App/learner-guide-icon.svg",
+      "src": "/learner-guide-icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
