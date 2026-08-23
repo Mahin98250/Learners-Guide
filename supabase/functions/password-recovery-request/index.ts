@@ -26,23 +26,14 @@ Deno.serve(async (req) => {
     let email = "";
     if (role === "student") {
       const sid = normalizeId(identifier);
-      const { data: studentBySid, error: sidError } = await admin.from("students").select("id,sid,status").eq("sid", identifier).maybeSingle();
-      if (sidError) throw sidError;
-      let student = studentBySid;
-      if (!student) {
-        const { data: studentById, error: idError } = await admin.from("students").select("id,sid,status").eq("id", identifier).maybeSingle();
-        if (idError) throw idError;
-        student = studentById;
-      }
-      if (!student) {
-        const { data: students, error } = await admin.from("students").select("id,sid,status").limit(1000);
-        if (error) throw error;
-        student = (students || []).find((row) => normalizeId(row.sid) === sid || normalizeId(row.id) === sid);
-      }
+      const { data: students, error: studentError } = await admin.from("students").select("id,sid,status").limit(1000);
+      if (studentError) throw studentError;
+      const student = (students || []).find((row) => normalizeId(row.sid) === sid || normalizeId(row.id) === sid);
       if (student && normalize(student.status) === "active") {
+        const studentRefs = new Set([normalize(String(student.id)), normalize(String(student.sid))]);
         const { data: users, error: userError } = await admin.from("users").select("email,auth_id,role,ref,status").eq("role", "student").limit(1000);
         if (userError) throw userError;
-        const account = (users || []).find((row) => row.auth_id && normalize(row.status) === "active" && normalize(row.ref) === normalize(String(student.id)) && emailPattern.test(normalize(row.email)) && !normalize(row.email).endsWith("@learnersguide.in"));
+        const account = (users || []).find((row) => row.auth_id && normalize(row.status) === "active" && studentRefs.has(normalize(row.ref)) && emailPattern.test(normalize(row.email)) && !normalize(row.email).endsWith("@learnersguide.in"));
         email = normalize(account?.email);
       }
     } else {
