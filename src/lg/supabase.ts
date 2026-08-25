@@ -42,10 +42,6 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 });
 
-// Handle stale persisted sessions before they cascade into repeated 400
-// refresh-token requests. Auth events can surface an error through the SDK's
-// internal session manager, so callers can also invoke this helper when a
-// request reports refresh_token_not_found.
 export function clearInvalidAuthSession() {
   if (recoveryInProgress) return;
   recoveryInProgress = true;
@@ -57,7 +53,8 @@ export function clearInvalidAuthSession() {
 }
 
 export function isInvalidRefreshTokenError(error: unknown) {
-  const message = String(error?.message || error || "").toLowerCase();
+  const candidate = error as { message?: unknown } | null;
+  const message = String(candidate && typeof candidate === "object" ? candidate.message || "" : error || "").toLowerCase();
   return message.includes("invalid refresh token") ||
     message.includes("refresh_token_not_found") ||
     message.includes("refresh token not found");
