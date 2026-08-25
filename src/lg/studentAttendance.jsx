@@ -14,24 +14,23 @@ export function STAttendanceFixed({ student }) {
       setLoading(true); setError("");
       try {
         const studentId = String(student?.id || "");
-        const sid = String(student?.sid || "");
-        if (!studentId && !sid) { setRows([]); return; }
-        // Attendance is historically keyed by students.sid. Read by SID first;
-        // only fall back to the database id for legacy rows.
-        const primary = sid ? await supabase.from("attendance").select("id,sid,date,status,by,created_at").eq("sid", sid).order("date", { ascending: false }).order("created_at", { ascending: false }) : { data: [], error: null };
-        if (primary.error) throw primary.error;
-        let data = primary.data || [];
-        if (!data.length && studentId && studentId !== sid) {
-          const legacy = await supabase.from("attendance").select("id,sid,date,status,by,created_at").eq("sid", studentId).order("date", { ascending: false }).order("created_at", { ascending: false });
-          if (legacy.error) throw legacy.error;
-          data = legacy.data || [];
-        }
-        if (live) setRows(data);
-      } catch (e) { if (live) setError(e instanceof Error ? e.message : "Unable to load attendance."); }
-      finally { if (live) setLoading(false); }
+        if (!studentId) { setRows([]); return; }
+        const { data, error: queryError } = await supabase
+          .from("attendance")
+          .select("id,sid,date,status,by,created_at")
+          .eq("sid", studentId)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false });
+        if (queryError) throw queryError;
+        if (live) setRows(data || []);
+      } catch (e) {
+        if (live) setError(e instanceof Error ? e.message : "Unable to load attendance.");
+      } finally {
+        if (live) setLoading(false);
+      }
     })();
     return () => { live = false; };
-  }, [student?.id, student?.sid]);
+  }, [student?.id]);
 
   const present = rows.filter((r) => String(r.status || "").toLowerCase() === "present").length;
   const absent = rows.filter((r) => String(r.status || "").toLowerCase() === "absent").length;
