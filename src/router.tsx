@@ -4,11 +4,13 @@ import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
+  const configuredBase = String(import.meta.env.BASE_URL || "/");
+  const basepath = configuredBase === "/" ? "/" : configuredBase.replace(/\/$/, "");
 
   const router = createRouter({
     routeTree,
     context: { queryClient },
-    basepath: "/LG-Main-App",
+    basepath,
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
   });
