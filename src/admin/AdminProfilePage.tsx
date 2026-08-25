@@ -45,7 +45,7 @@ export function AdminProfilePage({ onBack }: { onBack?: () => void }) {
         <div><h2 style={{ margin: 0 }}>🔎 User Profiles</h2><div style={{ fontSize: 12, color: Cx.sub }}>Live profiles from Supabase.</div></div>
         {onBack && <button type="button" onClick={onBack}>← Back</button>}
       </div>
-      {error && <Card style={{ color: Cx.red, marginBottom: 12 }}>{error}</Card>}
+      {error && <Card onClick={() => {}} style={{ color: Cx.red, marginBottom: 12 }}>{error}</Card>}
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {(["student", "teacher", "parent"] as ProfileType[]).map((t) => <button key={t} type="button" onClick={() => { setType(t); setSelected(null); setQuery(""); }}>{t} {t === type ? `(${rows.length})` : ""}</button>)}
       </div>
@@ -81,9 +81,9 @@ function ProfileDetail({ type, profile, onBack }: { type: ProfileType; profile: 
     <div>
       <button type="button" onClick={onBack}>← Back</button>
       <h2>{profile.name || "Profile"}</h2>
-      {type === "parent" ? <Card>Parent profile · {profile.email || profile.phone || "No contact"}</Card> : (
+      {type === "parent" ? <Card onClick={() => {}}>Parent profile · {profile.email || profile.phone || "No contact"}</Card> : (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))" }}>
-          <Card>Attendance: {attendance.length}</Card><Card>Results: {results.length}</Card><Card>Fees: {fees.length}</Card>
+          <Card onClick={() => {}}>Attendance: {attendance.length}</Card><Card onClick={() => {}}>Results: {results.length}</Card><Card onClick={() => {}}>Fees: {fees.length}</Card>
         </div>
       )}
     </div>
