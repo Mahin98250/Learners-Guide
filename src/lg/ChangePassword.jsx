@@ -35,18 +35,10 @@ export default function ChangePassword({ compact = false }) {
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user?.email) throw new Error("Your active login session could not be verified. Please sign in again.");
-
-      // Verify the old password before changing anything. This keeps the requested
-      // current → new → confirm flow while never storing the old password.
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: userData.user.email,
-        password: currentPassword,
-      });
+      const { error: verifyError } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: currentPassword });
       if (verifyError) throw new Error("Current password is incorrect.");
-
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw new Error(updateError.message || "Unable to change your password.");
-
       setSuccess("Password changed successfully. Your current session remains active.");
       setCurrentPassword("");
       setNewPassword("");
@@ -63,6 +55,8 @@ export default function ChangePassword({ compact = false }) {
       <button
         type="button"
         onClick={() => { setOpen(true); setError(""); setSuccess(""); }}
+        aria-label="Change password"
+        title="Change password"
         style={compact ? {
           border: "1px solid rgba(255,255,255,.2)",
           background: "rgba(255,255,255,.06)",
@@ -75,25 +69,32 @@ export default function ChangePassword({ compact = false }) {
           marginBottom: 8,
         } : {
           position: "fixed",
-          right: 18,
-          bottom: 18,
-          zIndex: 80,
-          border: 0,
-          background: "#fff",
+          top: "calc(env(safe-area-inset-top, 0px) + 10px)",
+          right: "calc(env(safe-area-inset-right, 0px) + 12px)",
+          zIndex: 90,
+          width: 44,
+          height: 44,
+          minWidth: 44,
+          minHeight: 44,
+          border: "1px solid rgba(67,87,232,.12)",
+          background: "rgba(255,255,255,.96)",
           color: "#25306b",
-          borderRadius: 999,
-          padding: "11px 16px",
+          borderRadius: 13,
+          padding: 0,
           fontWeight: 800,
           cursor: "pointer",
-          boxShadow: "0 8px 28px rgba(15,27,61,.18)",
+          boxShadow: "0 6px 22px rgba(15,27,61,.16)",
+          display: "grid",
+          placeItems: "center",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
-        🔑 Change Password
+        <span aria-hidden="true" style={{ fontSize: 20, lineHeight: 1 }}>🔑</span>
       </button>
 
       {open && (
-        <div role="dialog" aria-modal="true" aria-labelledby="change-password-title" style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(8,12,30,.58)", display: "grid", placeItems: "center", padding: 18 }}>
-          <form onSubmit={changePassword} style={{ width: "min(430px, 100%)", background: "#fff", borderRadius: 20, padding: 24, boxShadow: "0 24px 70px rgba(0,0,0,.25)" }}>
+        <div role="dialog" aria-modal="true" aria-labelledby="change-password-title" style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(8,12,30,.58)", display: "grid", placeItems: "center", padding: "calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px))" }}>
+          <form onSubmit={changePassword} style={{ width: "min(430px, 100%)", maxHeight: "calc(100dvh - 36px)", overflowY: "auto", background: "#fff", borderRadius: 20, padding: 24, boxShadow: "0 24px 70px rgba(0,0,0,.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <div>
                 <div id="change-password-title" style={{ fontSize: 20, fontWeight: 850, color: "#17214d" }}>Change Password</div>
@@ -101,17 +102,14 @@ export default function ChangePassword({ compact = false }) {
               </div>
               <button type="button" onClick={close} disabled={busy} aria-label="Close" style={{ border: 0, background: "#f3f5fa", borderRadius: 10, width: 34, height: 34, cursor: "pointer", fontSize: 18 }}>×</button>
             </div>
-
             {error && <div role="alert" style={{ background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3", borderRadius: 10, padding: 10, fontSize: 12, marginBottom: 12 }}>{error}</div>}
             {success && <div role="status" style={{ background: "#ecfdf3", color: "#067647", border: "1px solid #abefc6", borderRadius: 10, padding: 10, fontSize: 12, marginBottom: 12 }}>{success}</div>}
-
             {[['Current password', currentPassword, setCurrentPassword], ['New password', newPassword, setNewPassword], ['Confirm new password', confirmPassword, setConfirmPassword]].map(([label, value, setter]) => (
               <label key={label} style={{ display: "block", marginBottom: 12 }}>
                 <span style={{ display: "block", fontSize: 12, fontWeight: 750, color: "#4f5874", marginBottom: 6 }}>{label}</span>
                 <input type="password" autoComplete={label === "Current password" ? "current-password" : "new-password"} value={value} onChange={(e) => setter(e.target.value)} disabled={busy} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", border: "1px solid #d8ddea", borderRadius: 11, background: "#f8faff", color: "#17214d" }} />
               </label>
             ))}
-
             <div style={{ fontSize: 11, color: "#68708a", marginBottom: 16 }}>Minimum 8 characters. The current password is verified by Supabase Auth and is never stored by the app.</div>
             <div style={{ display: "flex", gap: 10 }}>
               <button type="button" onClick={close} disabled={busy} style={{ flex: 1, border: "1px solid #d8ddea", background: "#fff", borderRadius: 11, padding: 11, fontWeight: 750, cursor: "pointer" }}>Cancel</button>
