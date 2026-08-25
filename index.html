@@ -15,6 +15,26 @@
     <link rel="icon" type="image/svg+xml" sizes="any" href="%BASE_URL%learner-guide-icon.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%learner-guide-icon.svg" />
     <title>Learner's Guide</title>
+    <script>
+      // Recover clients trapped behind an older service worker/app-shell cache.
+      // This only removes this site's browser cache; it never touches Supabase data.
+      (function () {
+        try {
+          var key = "lg-pwa-recovery-v2";
+          if (localStorage.getItem(key) !== "done" && "serviceWorker" in navigator) {
+            localStorage.setItem(key, "done");
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+              return Promise.all(registrations.map(function (registration) { return registration.unregister(); }));
+            }).then(function () {
+              if (!("caches" in window)) return;
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.filter(function (name) { return name.indexOf("learners-guide-") === 0; }).map(function (name) { return caches.delete(name); }));
+              });
+            }).catch(function () {});
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
