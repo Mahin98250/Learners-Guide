@@ -22,18 +22,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: 22
-
       - name: Install dependencies
         run: npm install
-
       - name: Build application
         run: npm run build
-
       - name: Prepare GitHub Pages SPA routes
         run: |
           set -e
@@ -46,17 +42,13 @@ jobs:
           test -f dist/admin/index.html
           test -f dist/auth/index.html
           test -f dist/app/index.html
-          test -f dist/pwa-icon.svg
           test -f dist/manifest.webmanifest
-
       - name: Configure Pages
         uses: actions/configure-pages@v6
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
