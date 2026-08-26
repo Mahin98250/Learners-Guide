@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
@@ -12,12 +12,12 @@ const title="My Dashboard — Learner's Guide";
 const description="Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
 export const Route=createFileRoute("/app")({head:()=>({meta:[{title},{name:"description",content:description},{property:"og:title",content:title},{property:"og:description",content:description},{name:"robots",content:"noindex"}]}),component:AppShell});
 type SessionUser={id:string;name:string;phone:string;role:string;ref:string|null};
-function Splash({label,action}:{label:string;action?:ReactNode}){return <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:"linear-gradient(160deg,#1a1060 0%,#2d1b8e 45%,#0e0a3a 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:28}}><style>{GLOBAL_CSS}</style><div className="logo-float"><LGLogo size={72} showText={false} light/></div><div style={{color:"rgba(255,255,255,.7)",fontSize:13,fontWeight:600}}>{label}</div>{action}</div>}
+function Splash({label,retry}:{label:string;retry?:()=>void}){return <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:"linear-gradient(160deg,#1a1060 0%,#2d1b8e 45%,#0e0a3a 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:28}}><style>{GLOBAL_CSS}</style><div className="logo-float"><LGLogo size={72} showText={false} light/></div><div style={{color:"rgba(255,255,255,.7)",fontSize:13,fontWeight:600}}>{label}</div>{retry&&<button onClick={retry} style={{border:0,borderRadius:12,padding:"10px 16px",fontWeight:700,cursor:"pointer"}}>Retry</button>}</div>}
 function AppShell(){const navigate=useNavigate(),[user,setUser]=useState<SessionUser|null>(null),[ready,setReady]=useState(false),[loadError,setLoadError]=useState<string|null>(null);
-  const load=useCallback(async()=>{setLoadError(null);const current=await getCurrentUser() as SessionUser|null;if(!current){clearCache();setUser(null);setReady(false);navigate({to:"/",replace:true});return}setUser(current);setReady(true)},[navigate]);
+  const load=useCallback(async()=>{setLoadError(null);try{const current=await getCurrentUser() as SessionUser|null;if(!current){clearCache();setUser(null);setReady(false);navigate({to:"/",replace:true});return}setUser(current);setReady(true)}catch(error){setLoadError(error instanceof Error?error.message:"Unable to load your session")}},[navigate]);
   useEffect(()=>{void load()},[load]);
   useEffect(()=>{const{data}=onAuthStateChange((event:string,nextUser:SessionUser|null)=>{if(!nextUser){clearCache();setUser(null);setReady(false);navigate({to:"/",replace:true});return}if(["SIGNED_IN","USER_UPDATED"].includes(event)){setUser(nextUser);setReady(true)}});return()=>data.subscription.unsubscribe()},[navigate]);
-  if(loadError)return <Splash label={loadError} action={<button onClick={()=>void load()} style={{border:0,borderRadius:12,padding:"10px 16px",fontWeight:700,cursor:"pointer"}}>Retry</button}/>;
+  if(loadError)return <Splash label={loadError} retry={()=>void load()}/>;
   if(!ready||!user)return <Splash label="Loading your dashboard…"/>;
   const logout=async()=>{clearCache();await signOut();setUser(null);navigate({to:"/",replace:true});};
   return <div style={{minHeight:"100vh"}}>{user.role==="teacher"&&<TeacherAppWithHomeworkFiles user={user} onLogout={logout}/>} {user.role==="student"&&<StudentApp user={user} onLogout={logout}/>} {user.role==="parent"&&<ParentApp user={user} onLogout={logout}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
