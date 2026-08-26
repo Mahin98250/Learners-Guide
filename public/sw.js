@@ -1,5 +1,5 @@
-const CACHE = "learners-guide-v14";
-const APP_SHELL = ["./", "./manifest.webmanifest"];
+const CACHE = "learners-guide-v15";
+const APP_SHELL = ["./", "./manifest.webmanifest", "./favicon.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 
 function appUrl(value) {
