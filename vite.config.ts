@@ -4,12 +4,13 @@ import { tanstackRouter as tanstackRouterPlugin } from "@tanstack/router-plugin/
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
+// GitHub Pages serves this repository below /LG-Main-App/, while Vercel serves
+// the project from /. Keep both deployments correct from the same source tree.
+const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === "true";
+
 export default defineConfig({
-  // Vercel serves the application from the project root. Keep the production
-  // base root-relative so assets and the router resolve correctly there.
-  base: "/",
+  base: isGitHubPagesBuild ? "/LG-Main-App/" : "/",
   plugins: [
-    // TanStack Router's file-based route plugin must run before React.
     tanstackRouterPlugin({
       target: "react",
       autoCodeSplitting: true,
