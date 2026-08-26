@@ -2,8 +2,8 @@
   "name": "Learner's Guide",
   "short_name": "Learner's Guide",
   "description": "Learner's Guide connects classrooms with timetables, attendance, homework, notes, marks and fees.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
@@ -11,16 +11,10 @@
   "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "/learner-guide-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "favicon.png",
+      "sizes": "499x500",
+      "type": "image/png",
       "purpose": "any maskable"
-    },
-    {
-      "src": "/learner-guide-icon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
     }
   ]
 }
