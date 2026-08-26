@@ -12,9 +12,9 @@
   "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "learner-guide-icon.svg?v=4",
+      "src": "learner-guide-logo.jpg?v=1",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ]
