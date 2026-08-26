@@ -1,5 +1,5 @@
-const CACHE = "learners-guide-v16";
-const APP_SHELL = ["./", "./manifest.webmanifest", "./favicon.png"];
+const CACHE = "learners-guide-v17";
+const APP_SHELL = ["./", "./manifest.webmanifest", "./learner-guide-icon.svg?v=4"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
 
@@ -16,7 +16,7 @@ async function putInCache(request, response) {
     const copy = response.clone();
     const cache = await caches.open(CACHE);
     await cache.put(request, copy);
-  } catch { /* Cache failures must never break the app. */ }
+  } catch {}
   return response;
 }
 
@@ -49,15 +49,10 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes("/rest/v1/") || url.pathname.includes("/auth/v1/") || url.pathname.includes("/functions/v1/")) return;
 
-  // Vite's hashed JS/CSS/image/font files are immutable once deployed. Serve
-  // those from cache first and fetch only on a first visit, which makes repeat
-  // launches and tab switches much faster without risking stale API data.
   if (STATIC_DESTINATIONS.has(request.destination)) {
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => putInCache(request, response))));
     return;
   }
 
-  // HTML, manifest and other documents stay network-first so new deployments
-  // become visible promptly; cached content is only the offline fallback.
   event.respondWith(fetch(request, { cache: "no-cache" }).then((response) => putInCache(request, response)).catch(() => caches.match(request).then((cached) => cached || caches.match("./"))));
 });
