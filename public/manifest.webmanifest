@@ -12,10 +12,10 @@
   "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "learner-guide-icon.svg?v=3",
+      "src": "learner-guide-icon.svg?v=4",
       "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
