@@ -22,3 +22,12 @@ html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}html
 /* The old Messages control has no active handler. Hide it everywhere so the
    working Change Password control can occupy the top-right action area. */
 button[title="Messages"]{display:none!important}
+
+/* Mobile portal navigation: keep the seven-section bar visible while the
+   dashboard content scrolls. The Shell already renders it after the scroll
+   container, so this selector only promotes that specific nav to a fixed app
+   control and leaves all other buttons/layout untouched. */
+div:has(> .nav-tab){position:fixed!important;left:50%!important;bottom:0!important;transform:translateX(-50%)!important;width:min(430px,100vw)!important;z-index:1000!important;padding-bottom:env(safe-area-inset-bottom)!important;box-sizing:border-box!important;background:#fff!important}
+div:has(> .nav-tab) button{min-height:58px!important}
+div:has(> div > .nav-tab) > div:nth-child(2){padding-bottom:calc(82px + env(safe-area-inset-bottom))!important}
+@media (display-mode: standalone){div:has(> .nav-tab){padding-bottom:max(env(safe-area-inset-bottom),8px)!important}}
