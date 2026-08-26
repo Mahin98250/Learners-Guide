@@ -12,7 +12,7 @@
   "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "learner-guide-pwa-icon.svg?v=2",
+      "src": "learner-guide-icon.svg?v=3",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
