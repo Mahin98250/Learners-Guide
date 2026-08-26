@@ -1,12 +1,23 @@
-const CACHE = "learners-guide-v15";
+const CACHE = "learners-guide-v16";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./favicon.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
+const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
 
 function appUrl(value) {
   const raw = String(value || "app");
   if (/^https?:\/\//i.test(raw)) return raw;
   const relative = raw.replace(/^\/+/, "");
   return new URL(relative || "app", APP_SCOPE).href;
+}
+
+async function putInCache(request, response) {
+  if (!response || !response.ok || response.type !== "basic") return response;
+  try {
+    const copy = response.clone();
+    const cache = await caches.open(CACHE);
+    await cache.put(request, copy);
+  } catch { /* Cache failures must never break the app. */ }
+  return response;
 }
 
 self.addEventListener("install", (event) => {
@@ -37,8 +48,16 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes("/rest/v1/") || url.pathname.includes("/auth/v1/") || url.pathname.includes("/functions/v1/")) return;
-  event.respondWith(fetch(request, { cache: "no-cache" }).then((response) => {
-    if (response.ok && response.type === "basic") { const copy = response.clone(); caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {}); }
-    return response;
-  }).catch(() => caches.match(request).then((cached) => cached || caches.match("./"))));
+
+  // Vite's hashed JS/CSS/image/font files are immutable once deployed. Serve
+  // those from cache first and fetch only on a first visit, which makes repeat
+  // launches and tab switches much faster without risking stale API data.
+  if (STATIC_DESTINATIONS.has(request.destination)) {
+    event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => putInCache(request, response))));
+    return;
+  }
+
+  // HTML, manifest and other documents stay network-first so new deployments
+  // become visible promptly; cached content is only the offline fallback.
+  event.respondWith(fetch(request, { cache: "no-cache" }).then((response) => putInCache(request, response)).catch(() => caches.match(request).then((cached) => cached || caches.match("./"))));
 });
