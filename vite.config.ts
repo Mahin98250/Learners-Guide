@@ -4,23 +4,17 @@ import { tanstackRouter as tanstackRouterPlugin } from "@tanstack/router-plugin/
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// GitHub Pages serves this repository below /LG-Main-App/, while Vercel serves
-// the project from /. Keep both deployments correct from the same source tree.
+// GitHub Pages serves this repository below /Learners-Guide/, while Vercel
+// serves the project from /. Keep both deployments correct from one source.
 const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === "true";
 
 export default defineConfig({
-  base: isGitHubPagesBuild ? "/LG-Main-App/" : "/",
+  base: isGitHubPagesBuild ? "/Learners-Guide/" : "/",
   plugins: [
-    tanstackRouterPlugin({
-      target: "react",
-      autoCodeSplitting: true,
-    }),
+    tanstackRouterPlugin({ target: "react", autoCodeSplitting: true }),
     react(),
     tailwindcss(),
     tsconfigPaths(),
   ],
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-  },
+  build: { outDir: "dist", emptyOutDir: true },
 });
