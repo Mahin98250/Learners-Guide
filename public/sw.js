@@ -1,5 +1,5 @@
-const CACHE = "learners-guide-v17";
-const APP_SHELL = ["./", "./manifest.webmanifest", "./learner-guide-icon.svg?v=4"];
+const CACHE = "learners-guide-v18";
+const APP_SHELL = ["./", "./manifest.webmanifest", "./learner-guide-logo.jpg?v=1"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
 
@@ -48,11 +48,9 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes("/rest/v1/") || url.pathname.includes("/auth/v1/") || url.pathname.includes("/functions/v1/")) return;
-
   if (STATIC_DESTINATIONS.has(request.destination)) {
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => putInCache(request, response))));
     return;
   }
-
   event.respondWith(fetch(request, { cache: "no-cache" }).then((response) => putInCache(request, response)).catch(() => caches.match(request).then((cached) => cached || caches.match("./"))));
 });
