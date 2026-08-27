@@ -1,17 +1,33 @@
 import { useEffect, useState } from "react";
 
+type InstallEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+const isStandalone = () =>
+  window.matchMedia?.("(display-mode: standalone)").matches ||
+  Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+
 export default function InstallAppPrompt() {
-  const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [prompt, setPrompt] = useState<InstallEvent | null>(null);
 
   useEffect(() => {
+    if (isStandalone()) return;
+
     const handler = (event: Event) => {
       event.preventDefault();
-      setPrompt(event as BeforeInstallPromptEvent);
+      setPrompt(event as InstallEvent);
     };
+    const installed = () => setPrompt(null);
 
     window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", installed);
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installed);
+    };
   }, []);
 
   if (!prompt) return null;
@@ -19,9 +35,15 @@ export default function InstallAppPrompt() {
   return (
     <button
       type="button"
+      aria-label="Install Learner's Guide app"
       onClick={async () => {
-        await prompt.prompt();
+        const current = prompt;
+        await current.prompt();
+        const choice = await current.userChoice;
         setPrompt(null);
+        if (choice.outcome === "accepted") {
+          window.dispatchEvent(new Event("learner-guide-installed"));
+        }
       }}
       style={{
         position: "fixed",
@@ -38,11 +60,4 @@ export default function InstallAppPrompt() {
       Install App
     </button>
   );
-}
-
-declare global {
-  interface BeforeInstallPromptEvent extends Event {
-    prompt: () => Promise<void>;
-    userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-  }
 }
