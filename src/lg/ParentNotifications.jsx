@@ -9,7 +9,7 @@ export function ParentNotifications({onClose}){
     try{
       const{data:{user},error:authError}=await supabase.auth.getUser();
       if(authError||!user)throw new Error("Your session has expired. Please log in again.");
-      const{data,error:queryError}=await supabase.from("notifications").select("*").eq("uid",user.id).order("created_at",{ascending:false});
+      const{data,error:queryError}=await supabase.from("notifications").select("id,title,desc,time,read,created_at").eq("uid",user.id).order("created_at",{ascending:false});
       if(queryError)throw queryError;
       setNotifs(Array.isArray(data)?data:[]);
     }catch(e){setError(e instanceof Error?e.message:"Unable to load notifications.");setNotifs([])}finally{setLoading(false)}
