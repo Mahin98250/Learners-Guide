@@ -18,16 +18,31 @@ function AdminRoute() {
   const syncAdmin = useCallback(async (current: AdminRouteUser) => {
     if (syncLock.current) return;
     syncLock.current = true;
+    // Render the authenticated shell immediately. Data synchronization is deliberately
+    // background work so a large institute dataset cannot block first paint.
+    setUser(current);
+    setChecking(false);
     setSyncing(true);
-    try { await hydrateForRole("admin"); setUser(current); lastSync.current = Date.now(); }
-    catch (error) { console.warn("Admin background sync skipped:", error instanceof Error ? error.message : error); }
-    finally { syncLock.current = false; setSyncing(false); setChecking(false); }
+    try {
+      await hydrateForRole("admin");
+      lastSync.current = Date.now();
+    } catch (error) {
+      console.warn("Admin background sync skipped:", error instanceof Error ? error.message : error);
+    } finally {
+      syncLock.current = false;
+      setSyncing(false);
+    }
   }, []);
 
   const load = useCallback(async () => {
     setChecking(true);
     const current = (await getCurrentUser()) as AdminRouteUser | null;
-    if (!current || current.role !== "admin") { clearCache(); setUser(null); setChecking(false); return; }
+    if (!current || current.role !== "admin") {
+      clearCache();
+      setUser(null);
+      setChecking(false);
+      return;
+    }
     await syncAdmin(current);
   }, [syncAdmin]);
 
@@ -35,7 +50,12 @@ function AdminRoute() {
 
   useEffect(() => {
     const { data } = onAuthStateChange((event: string, nextUser: AdminRouteUser | null) => {
-      if (!nextUser || nextUser.role !== "admin") { clearCache(); setUser(null); setChecking(false); return; }
+      if (!nextUser || nextUser.role !== "admin") {
+        clearCache();
+        setUser(null);
+        setChecking(false);
+        return;
+      }
       if (["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) void syncAdmin(nextUser);
     });
     return () => { data.subscription.unsubscribe(); };
@@ -57,6 +77,6 @@ function AdminRoute() {
   }, [syncAdmin, user]);
 
   if (checking && !user) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>;
-  if (!user) return <AdminLogin onSuccess={(admin) => { setUser(admin); void syncAdmin(admin as AdminRouteUser); }} />;
+  if (!user) return <AdminLogin onSuccess={(admin) => { setUser(admin as AdminRouteUser); void syncAdmin(admin as AdminRouteUser); }} />;
   return <><AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />{syncing && <div aria-live="polite" style={{ position: "fixed", right: 14, bottom: 14, zIndex: 999, background: "#0F1B3D", color: "#fff", borderRadius: 14, padding: "10px 14px", fontSize: 12, fontWeight: 700 }}>Syncing data…</div>}</>;
 }
