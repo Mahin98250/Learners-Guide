@@ -23,14 +23,5 @@ export default defineConfig({
     sourcemap: false,
     reportCompressedSize: false,
     chunkSizeWarningLimit: 700,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          react: ["react", "react-dom"],
-          router: ["@tanstack/react-router"],
-          supabase: ["@supabase/supabase-js"],
-        },
-      },
-    },
   },
 });
