@@ -12,27 +12,9 @@
     <meta name="apple-mobile-web-app-title" content="Learner's Guide" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
-    <link rel="icon" type="image/jpeg" href="%BASE_URL%learner-guide-logo.jpg?v=1" />
-    <link rel="apple-touch-icon" href="%BASE_URL%learner-guide-logo.jpg?v=1" />
+    <link rel="icon" type="image/png" href="%BASE_URL%file_00000000451c82118020d2baea54f76b.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%file_00000000451c82118020d2baea54f76b.png" />
     <title>Learner's Guide</title>
-    <script>
-      (function () {
-        try {
-          var key = "lg-pwa-recovery-v5";
-          if (localStorage.getItem(key) !== "done" && "serviceWorker" in navigator) {
-            localStorage.setItem(key, "done");
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-              return Promise.all(registrations.map(function (registration) { return registration.unregister(); }));
-            }).then(function () {
-              if (!("caches" in window)) return;
-              return caches.keys().then(function (keys) {
-                return Promise.all(keys.filter(function (name) { return name.indexOf("learners-guide-") === 0; }).map(function (name) { return caches.delete(name); }));
-              });
-            }).catch(function () {});
-          }
-        } catch (_) {}
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
