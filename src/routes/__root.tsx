@@ -14,20 +14,52 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+    <div
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{
+        background:
+          "radial-gradient(circle at 15% 20%, rgba(67,97,238,.16), transparent 35%), radial-gradient(circle at 85% 80%, rgba(139,92,246,.14), transparent 35%), #F0F4FF",
+      }}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl border bg-white p-8 text-center shadow-2xl"
+        style={{ borderColor: "#E2E8F0" }}
+      >
+        <div
+          className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl"
+          style={{ background: "#EEF2FF" }}
+          aria-hidden="true"
+        >
+          🎓
+        </div>
+        <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: "#4361EE" }}>
+          Learner's Guide
         </p>
-        <div className="mt-6">
+        <h1 className="mt-3 text-7xl font-black tracking-tight" style={{ color: "#0F1B3D" }}>
+          404
+        </h1>
+        <h2 className="mt-2 text-xl font-extrabold" style={{ color: "#0F1B3D" }}>
+          Page not found
+        </h2>
+        <p className="mt-2 text-sm leading-6" style={{ color: "#64748B" }}>
+          This page does not exist, or the link may be outdated. Go back to the Learner's Guide home page.
+        </p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5"
+            style={{ background: "#4361EE" }}
           >
-            Go home
+            ← Go home
           </Link>
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-extrabold transition-colors hover:bg-slate-50"
+            style={{ borderColor: "#CBD5E1", color: "#0F1B3D", background: "#fff" }}
+          >
+            Go back
+          </button>
         </div>
       </div>
     </div>
