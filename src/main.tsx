@@ -6,6 +6,7 @@ import InstallAppPrompt from "./InstallAppPrompt";
 import StartupMinimal from "./StartupMinimal";
 import DatabaseActivityOverlay from "./DatabaseActivityOverlay";
 import { LOGO_IMG_SRC } from "@/lg/ui";
+import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -26,6 +27,10 @@ document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-tou
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => { void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error)); });
 }
+
+// Cache successful study-material downloads so the normal Materials section can
+// reopen them later when the device is offline. No separate offline section is needed.
+installOfflineMaterialCache();
 
 let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
