@@ -6,22 +6,22 @@
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
   "orientation": "portrait-primary",
-  "background_color": "#FFFFFF",
-  "theme_color": "#FFFFFF",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
-      "src": "learner-guide-logo.jpg?v=1",
+      "src": "file_00000000451c82118020d2baea54f76b.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "learner-guide-logo.jpg?v=1",
+      "src": "file_00000000451c82118020d2baea54f76b.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
