@@ -16,5 +16,21 @@ export default defineConfig({
     tailwindcss(),
     tsconfigPaths(),
   ],
-  build: { outDir: "dist", emptyOutDir: true },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+    cssCodeSplit: true,
+    sourcemap: false,
+    reportCompressedSize: false,
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          router: ["@tanstack/react-router"],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
+  },
 });
