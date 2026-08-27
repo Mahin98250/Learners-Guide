@@ -15,6 +15,21 @@
     <link rel="icon" type="image/png" href="%BASE_URL%file_00000000451c82118020d2baea54f76b.png" />
     <link rel="apple-touch-icon" href="%BASE_URL%file_00000000451c82118020d2baea54f76b.png" />
     <title>Learner's Guide</title>
+    <script>
+      // Mobile browsers can block window.open() when it is called after an
+      // async file fetch. Blob URLs are our own generated file previews, so
+      // safely open those in the current tab instead of showing a popup error.
+      (() => {
+        const nativeOpen = window.open.bind(window);
+        window.open = (url, target, features) => {
+          if (typeof url === "string" && url.startsWith("blob:")) {
+            window.location.assign(url);
+            return { closed: false };
+          }
+          return nativeOpen(url, target, features);
+        };
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
