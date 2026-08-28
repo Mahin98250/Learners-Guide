@@ -48,13 +48,14 @@ export default function InstallAppPrompt() {
       style={{
         position: "fixed",
         right: 20,
-        bottom: 20,
-        zIndex: 9999,
+        bottom: "max(108px, calc(env(safe-area-inset-bottom) + 108px))",
+        zIndex: 999,
         border: 0,
         borderRadius: 14,
         padding: "12px 18px",
         fontWeight: 700,
         cursor: "pointer",
+        boxShadow: "0 8px 24px rgba(0,0,0,.18)",
       }}
     >
       Install App
