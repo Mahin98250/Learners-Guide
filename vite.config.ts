@@ -23,5 +23,8 @@ export default defineConfig({
     sourcemap: false,
     reportCompressedSize: false,
     chunkSizeWarningLimit: 700,
+    modulePreload: {
+      polyfill: false,
+    },
   },
 });
