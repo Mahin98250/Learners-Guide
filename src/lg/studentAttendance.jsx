@@ -13,16 +13,26 @@ export function STAttendanceFixed({ student }) {
     (async () => {
       setLoading(true); setError("");
       try {
-        const studentId = String(student?.id || "");
-        if (!studentId) { setRows([]); return; }
+        // Attendance has historically used both the student's UUID and SID in
+        // different records. Read both identifiers so older and newer records
+        // remain visible, then de-duplicate them by attendance row id.
+        const identifiers = [...new Set(
+          [student?.id, student?.sid]
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean),
+        )];
+        if (!identifiers.length) { setRows([]); return; }
+
         const { data, error: queryError } = await supabase
           .from("attendance")
           .select("id,sid,date,status,by,created_at")
-          .eq("sid", studentId)
+          .in("sid", identifiers)
           .order("date", { ascending: false })
           .order("created_at", { ascending: false });
         if (queryError) throw queryError;
-        if (live) setRows(data || []);
+
+        const uniqueRows = [...new Map((data || []).map((row) => [String(row.id), row])).values()];
+        if (live) setRows(uniqueRows);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Unable to load attendance.");
       } finally {
@@ -30,7 +40,7 @@ export function STAttendanceFixed({ student }) {
       }
     })();
     return () => { live = false; };
-  }, [student?.id]);
+  }, [student?.id, student?.sid]);
 
   const present = rows.filter((r) => String(r.status || "").toLowerCase() === "present").length;
   const absent = rows.filter((r) => String(r.status || "").toLowerCase() === "absent").length;
