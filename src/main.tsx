@@ -24,14 +24,6 @@ if (!root) throw new Error("Learner's Guide: #root element was not found.");
 
 document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-touch-icon"]').forEach(link => { link.href = LOGO_IMG_SRC; });
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => { void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error)); });
-}
-
-// Cache successful study-material downloads so the normal Materials section can
-// reopen them later when the device is offline. No separate offline section is needed.
-installOfflineMaterialCache();
-
 let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
 try { router = getRouter(); } catch (error) { bootstrapError = error instanceof Error ? error : new Error(String(error)); console.error("Learner's Guide router bootstrap failed", error); }
@@ -39,3 +31,15 @@ try { router = getRouter(); } catch (error) { bootstrapError = error instanceof 
 const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router={router} /><InstallAppPrompt /><DatabaseActivityOverlay /></AppErrorBoundary> : <AppErrorBoundary><main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><div style={{ maxWidth: 430, textAlign: "center", fontFamily: "Poppins,sans-serif" }}><h1>Learner's Guide</h1><p>We couldn't start the application. Please reload once.</p><button type="button" onClick={() => window.location.reload()}>Reload app</button><pre style={{ whiteSpace: "pre-wrap", marginTop: 16, fontSize: 11, color: "#667085" }}>{bootstrapError?.message || "Router startup failed"}</pre></div></main></AppErrorBoundary>;
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
+
+// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
+  }, { once: true });
+}
+
+if (typeof window !== "undefined") {
+  const defer = window.requestIdleCallback ?? ((callback: IdleRequestCallback) => window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 } as IdleDeadline), 1));
+  defer(() => installOfflineMaterialCache());
+}
