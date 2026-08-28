@@ -1,13 +1,14 @@
-import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import React, { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
-import InstallAppPrompt from "./InstallAppPrompt";
 import StartupMinimal from "./StartupMinimal";
-import DatabaseActivityOverlay from "./DatabaseActivityOverlay";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
+
+const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
+const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -28,7 +29,8 @@ let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
 try { router = getRouter(); } catch (error) { bootstrapError = error instanceof Error ? error : new Error(String(error)); console.error("Learner's Guide router bootstrap failed", error); }
 
-const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router={router} /><InstallAppPrompt /><DatabaseActivityOverlay /></AppErrorBoundary> : <AppErrorBoundary><main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><div style={{ maxWidth: 430, textAlign: "center", fontFamily: "Poppins,sans-serif" }}><h1>Learner's Guide</h1><p>We couldn't start the application. Please reload once.</p><button type="button" onClick={() => window.location.reload()}>Reload app</button><pre style={{ whiteSpace: "pre-wrap", marginTop: 16, fontSize: 11, color: "#667085" }}>{bootstrapError?.message || "Router startup failed"}</pre></div></main></AppErrorBoundary>;
+const secondaryUi = <Suspense fallback={null}><InstallAppPrompt /><DatabaseActivityOverlay /></Suspense>;
+const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router={router} />{secondaryUi}</AppErrorBoundary> : <AppErrorBoundary><main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><div style={{ maxWidth: 430, textAlign: "center", fontFamily: "Poppins,sans-serif" }}><h1>Learner's Guide</h1><p>We couldn't start the application. Please reload once.</p><button type="button" onClick={() => window.location.reload()}>Reload app</button><pre style={{ whiteSpace: "pre-wrap", marginTop: 16, fontSize: 11, color: "#667085" }}>{bootstrapError?.message || "Router startup failed"}</pre></div></main></AppErrorBoundary>;
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
 
