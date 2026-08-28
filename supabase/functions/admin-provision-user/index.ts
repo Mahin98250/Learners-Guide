@@ -102,7 +102,8 @@ Deno.serve(async (req) => {
     if (recoveryEmail && !isEmail(recoveryEmail)) return json({ error: "Enter a valid recovery email address." }, 400);
     const email = authEmail(role, loginId, recoveryEmail);
     const existingByEmail = email ? await findUser(admin, email) : null;
-    const password = action === "create" ? (DEFAULT_PASSWORDS[role] || suppliedPassword) : suppliedPassword;
+    // On create, honor an explicitly supplied password; otherwise fall back to the role default.
+    const password = action === "create" ? (suppliedPassword || DEFAULT_PASSWORDS[role] || "") : suppliedPassword;
 
     if (action === "delete") {
       let user = await getUser(admin, authId);
