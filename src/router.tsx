@@ -23,6 +23,7 @@ export const getRouter = () => {
     context: { queryClient },
     basepath,
     scrollRestoration: true,
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 30_000,
   });
 };
