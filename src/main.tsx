@@ -1,13 +1,13 @@
-import React, { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from "react";
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
+import InstallAppPrompt from "./InstallAppPrompt";
 import StartupMinimal from "./StartupMinimal";
+import DatabaseActivityOverlay from "./DatabaseActivityOverlay";
 import { LOGO_IMG_SRC } from "@/lg/ui";
+import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
-
-const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
-const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -28,26 +28,18 @@ let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
 try { router = getRouter(); } catch (error) { bootstrapError = error instanceof Error ? error : new Error(String(error)); console.error("Learner's Guide router bootstrap failed", error); }
 
-const deferredStartup = typeof window !== "undefined" ? (() => {
-  const run = (callback: () => void) => {
-    const ric = window.requestIdleCallback;
-    if (ric) ric(callback, { timeout: 2000 });
-    else window.setTimeout(callback, 0);
-  };
-  run(() => {
-    if ("serviceWorker" in navigator && import.meta.env.PROD) {
-      window.addEventListener("load", () => {
-        void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
-      }, { once: true });
-    }
-    void import("@/lg/offlineMaterials").then(({ installOfflineMaterialCache }) => installOfflineMaterialCache()).catch(error => console.warn("Learner's Guide: offline cache initialization failed", error));
-  });
-  return true;
-})() : false;
-
-void deferredStartup;
-
-const secondaryUi = <Suspense fallback={null}><InstallAppPrompt /><DatabaseActivityOverlay /></Suspense>;
-const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router={router} />{secondaryUi}</AppErrorBoundary> : <AppErrorBoundary><main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><div style={{ maxWidth: 430, textAlign: "center", fontFamily: "Poppins,sans-serif" }}><h1>Learner's Guide</h1><p>We couldn't start the application. Please reload once.</p><button type="button" onClick={() => window.location.reload()}>Reload app</button><pre style={{ whiteSpace: "pre-wrap", marginTop: 16, fontSize: 11, color: "#667085" }}>{bootstrapError?.message || "Router startup failed"}</pre></div></AppErrorBoundary>;
+const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router={router} /><InstallAppPrompt /><DatabaseActivityOverlay /></AppErrorBoundary> : <AppErrorBoundary><main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><div style={{ maxWidth: 430, textAlign: "center", fontFamily: "Poppins,sans-serif" }}><h1>Learner's Guide</h1><p>We couldn't start the application. Please reload once.</p><button type="button" onClick={() => window.location.reload()}>Reload app</button><pre style={{ whiteSpace: "pre-wrap", marginTop: 16, fontSize: 11, color: "#667085" }}>{bootstrapError?.message || "Router startup failed"}</pre></div></main></AppErrorBoundary>;
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
+
+// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
+  }, { once: true });
+}
+
+if (typeof window !== "undefined") {
+  const defer = window.requestIdleCallback ?? ((callback: IdleRequestCallback) => window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 } as IdleDeadline), 1));
+  defer(() => installOfflineMaterialCache());
+}
