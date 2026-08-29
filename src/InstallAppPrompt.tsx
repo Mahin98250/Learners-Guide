@@ -5,6 +5,8 @@ type InstallEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+const INSTALLED_KEY = "learner-guide-pwa-installed";
+
 const isStandalone = () =>
   window.matchMedia?.("(display-mode: standalone)").matches ||
   Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
@@ -13,13 +15,18 @@ export default function InstallAppPrompt() {
   const [prompt, setPrompt] = useState<InstallEvent | null>(null);
 
   useEffect(() => {
-    if (isStandalone()) return;
+    if (isStandalone() || localStorage.getItem(INSTALLED_KEY) === "1") return;
 
     const handler = (event: Event) => {
+      if (isStandalone() || localStorage.getItem(INSTALLED_KEY) === "1") return;
       event.preventDefault();
       setPrompt(event as InstallEvent);
     };
-    const installed = () => setPrompt(null);
+
+    const installed = () => {
+      localStorage.setItem(INSTALLED_KEY, "1");
+      setPrompt(null);
+    };
 
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", installed);
@@ -30,7 +37,7 @@ export default function InstallAppPrompt() {
     };
   }, []);
 
-  if (!prompt) return null;
+  if (!prompt || isStandalone() || localStorage.getItem(INSTALLED_KEY) === "1") return null;
 
   return (
     <button
@@ -42,6 +49,7 @@ export default function InstallAppPrompt() {
         const choice = await current.userChoice;
         setPrompt(null);
         if (choice.outcome === "accepted") {
+          localStorage.setItem(INSTALLED_KEY, "1");
           window.dispatchEvent(new Event("learner-guide-installed"));
         }
       }}
