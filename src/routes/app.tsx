@@ -8,6 +8,7 @@ import { StudentApp } from "@/lg/student";
 import { ParentApp } from "@/lg/parentWorkflows";
 import { PushNotificationPrompt } from "@/lg/pushNotifications";
 import ChangePassword from "@/lg/ChangePassword";
+import { LeaveAccess } from "@/lg/LeaveAccess";
 const title="My Dashboard — Learner's Guide";
 const description="Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
 export const Route=createFileRoute("/app")({head:()=>({meta:[{title},{name:"description",content:description},{property:"og:title",content:title},{property:"og:description",content:description},{name:"robots",content:"noindex"}]}),component:AppShell});
@@ -17,8 +18,8 @@ function AppShell(){const navigate=useNavigate(),[user,setUser]=useState<Session
   const load=useCallback(async()=>{setLoadError(null);try{const current=await getCurrentUser() as SessionUser|null;if(!current){clearCache();setUser(null);setReady(false);navigate({to:"/",replace:true});return}setUser(current);setReady(true)}catch(error){setLoadError(error instanceof Error?error.message:"Unable to load your session")}},[navigate]);
   useEffect(()=>{void load()},[load]);
   useEffect(()=>{const{data}=onAuthStateChange((event:string,nextUser:SessionUser|null)=>{if(!nextUser){clearCache();setUser(null);setReady(false);navigate({to:"/",replace:true});return}if(["SIGNED_IN","USER_UPDATED"].includes(event)){setUser(nextUser);setReady(true)}});return()=>data.subscription.unsubscribe()},[navigate]);
-  if(loadError)return <Splash label={loadError} retry={()=>void load()}/>;
+  if(loadError)return <Splash label={loadError} retry={()=>void load}/>;
   if(!ready||!user)return <Splash label="Loading your dashboard…"/>;
   const logout=async()=>{clearCache();await signOut();setUser(null);navigate({to:"/",replace:true});};
-  return <div style={{minHeight:"100vh"}}>{user.role==="teacher"&&<TeacherAppWithHomeworkFiles user={user} onLogout={logout}/>} {user.role==="student"&&<StudentApp user={user} onLogout={logout}/>} {user.role==="parent"&&<ParentApp user={user} onLogout={logout}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
+  return <div style={{minHeight:"100vh"}}>{user.role==="teacher"&&<TeacherAppWithHomeworkFiles user={user} onLogout={logout}/>} {user.role==="student"&&<StudentApp user={user} onLogout={logout}/>} {user.role==="parent"&&<ParentApp user={user} onLogout={logout}/>} {(user.role==="student"||user.role==="parent")&&<LeaveAccess user={user} student={null}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
 }
