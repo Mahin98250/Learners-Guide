@@ -8,24 +8,35 @@ export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: 
   const [leaveOpen, setLeaveOpen] = useState(false);
 
   useEffect(() => {
-    const mountLeaveNavigation = () => {
-      const containers = Array.from(document.querySelectorAll<HTMLElement>(".navrow, .side")).filter((el) => !el.closest(".admin-leave-dialog"));
-      containers.forEach((container) => {
-        if (container.querySelector(".admin-leave-nav")) return;
-        const buttons = Array.from(container.querySelectorAll<HTMLElement>("button"));
-        if (!buttons.some((button) => /attendance/i.test(button.textContent || "") || /homework/i.test(button.textContent || ""))) return;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "nav admin-leave-nav";
-        button.setAttribute("aria-label", "Leave Requests");
-        button.innerHTML = "<span aria-hidden=\"true\">🏖️</span><span>Leave Requests</span>";
-        button.style.cssText = "border:0;background:transparent;color:#ffffff8c;width:100%;padding:11px 14px;margin:3px 0;border-radius:12px;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer;font:inherit;";
-        button.addEventListener("click", () => setLeaveOpen(true));
-        container.appendChild(button);
+    const mountAdminNavigation = () => {
+      const nav = document.querySelector<HTMLElement>(".navrow");
+      if (!nav) return;
+
+      Array.from(nav.querySelectorAll<HTMLElement>(".nav")).forEach((item) => {
+        if ((item.textContent || "").trim().includes("Messages")) {
+          const active = item.classList.contains("active");
+          item.style.display = "none";
+          if (active) {
+            Array.from(nav.querySelectorAll<HTMLElement>(".nav")).find((x) =>
+              (x.textContent || "").trim().includes("Dashboard"),
+            )?.click();
+          }
+        }
       });
+
+      if (nav.querySelector(".admin-leave-nav")) return;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nav admin-leave-nav";
+      button.setAttribute("aria-label", "Open leave requests");
+      button.innerHTML = "<span aria-hidden=\"true\">🏖️</span><span>Leave Requests</span>";
+      button.style.cssText = "border:0;background:transparent;color:#ffffff8c;width:100%;padding:11px 14px;margin:3px 0;border-radius:12px;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer;font:inherit;";
+      button.addEventListener("click", () => setLeaveOpen(true));
+      nav.appendChild(button);
     };
-    mountLeaveNavigation();
-    const observer = new MutationObserver(mountLeaveNavigation);
+
+    mountAdminNavigation();
+    const observer = new MutationObserver(mountAdminNavigation);
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
