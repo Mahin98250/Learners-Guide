@@ -1,39 +1,36 @@
-import React from "react";
+import React,{useMemo}from"react";
 
-export function ParentAnalytics({ attendance, results, homework, tests, fees, materials }) {
-  const total = attendance.length;
-  const present = attendance.filter((a) => String(a.status).toLowerCase() === "present").length;
-  const attendanceRate = total ? Math.round((present / total) * 100) : null;
-  const marks = results.map((r) => Number(r.marks)).filter(Number.isFinite);
-  const average = marks.length ? Math.round(marks.reduce((a, b) => a + b, 0) / marks.length) : null;
-  const pendingFees = fees.filter((f) => !["paid", "completed"].includes(String(f.status || "").toLowerCase()));
-  const upcoming = tests.filter((t) => !t.test_date || new Date(t.test_date) >= new Date()).length;
-
-  return (
-    <section className="pa-card" aria-label="Student analytics">
-      <div className="pa-head">
-        <div>
-          <div className="pa-eyebrow">Student analytics</div>
-          <h3>Learning snapshot</h3>
-        </div>
-        <span className="pa-live">LIVE</span>
-      </div>
-      <div className="pa-kpis">
-        <div className="pa-kpi"><span>✓</span><strong>{attendanceRate == null ? "—" : `${attendanceRate}%`}</strong><small>Attendance</small></div>
-        <div className="pa-kpi"><span>🏆</span><strong>{average == null ? "—" : average}</strong><small>Avg. marks</small></div>
-        <div className="pa-kpi"><span>📝</span><strong>{homework.length}</strong><small>Homework</small></div>
-        <div className="pa-kpi"><span>📋</span><strong>{upcoming}</strong><small>Upcoming tests</small></div>
-      </div>
-      <div className="pa-progress-wrap">
-        <div className="pa-progress-label"><span>Attendance progress</span><b>{attendanceRate == null ? "No data" : `${present}/${total} days present`}</b></div>
-        <div className="pa-progress"><i style={{ width: `${attendanceRate == null ? 0 : Math.min(100, Math.max(0, attendanceRate))}%` }} /></div>
-      </div>
-      <div className="pa-list">
-        <div><span>💰</span><b>Fees</b><small>{pendingFees.length ? `${pendingFees.length} pending item${pendingFees.length > 1 ? "s" : ""}` : "No pending fees"}</small></div>
-        <div><span>📚</span><b>Materials</b><small>{materials.length} learning resource{materials.length === 1 ? "" : "s"}</small></div>
-        <div><span>🎯</span><b>Tests</b><small>{results.length ? `${results.length} results recorded` : "No results recorded yet"}</small></div>
-      </div>
-      <style>{`.pa-card{border:1px solid #e8eaf4;border-radius:20px;background:#fff;box-shadow:0 8px 24px rgba(31,39,79,.06);padding:15px}.pa-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:13px}.pa-eyebrow{font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#7c83a0}.pa-head h3{margin:3px 0 0;font-size:16px;color:#1b2345}.pa-live{font-size:8px;font-weight:800;letter-spacing:.08em;padding:5px 7px;border-radius:999px;background:#edf9f3;color:#16945a}.pa-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.pa-kpi{padding:11px;border-radius:14px;background:#f8f8fe;border:1px solid #efeff9}.pa-kpi span{font-size:13px}.pa-kpi strong{display:block;font-size:20px;color:#1b2345;margin-top:5px}.pa-kpi small{font-size:9px;color:#78809a;font-weight:700}.pa-progress-wrap{margin-top:13px}.pa-progress-label{display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#7a8198;margin-bottom:6px}.pa-progress-label b{color:#343b5b}.pa-progress{height:7px;border-radius:999px;background:#eceef7;overflow:hidden}.pa-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6357e8,#8b7ff4)}.pa-list{margin-top:12px;border-top:1px solid #f0f1f6}.pa-list>div{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #f0f1f6}.pa-list>div:last-child{border-bottom:0}.pa-list span{width:28px;height:28px;border-radius:9px;background:#f2f0ff;display:grid;place-items:center;font-size:13px}.pa-list b{font-size:10px;color:#202746}.pa-list small{font-size:9px;color:#7d849b;text-align:right}@media(max-width:360px){.pa-kpi strong{font-size:18px}.pa-list>div{grid-template-columns:26px 1fr}.pa-list small{grid-column:2;text-align:left}}`}</style>
-    </section>
-  );
+const money=n=>`₹${Number(n||0).toLocaleString("en-IN")}`;
+const status=s=>String(s||"").toLowerCase();
+export function ParentAnalytics({attendance=[],results=[],homework=[],tests=[],fees=[],materials=[]}){
+ const present=attendance.filter(a=>status(a.status)==="present").length;
+ const absent=attendance.filter(a=>status(a.status)==="absent").length;
+ const late=attendance.filter(a=>["late","half_day","half-day"].includes(status(a.status))).length;
+ const attendanceRate=attendance.length?Math.round(present/attendance.length*100):null;
+ const marks=results.map(r=>Number(r.marks)).filter(Number.isFinite);
+ const average=marks.length?Math.round(marks.reduce((a,b)=>a+b,0)/marks.length):null;
+ const maxMark=marks.length?Math.max(...marks):null;
+ const upcoming=tests.filter(t=>!t.test_date||new Date(t.test_date)>=new Date()).length;
+ const paid=fees.filter(f=>["paid","completed"].includes(status(f.status)));
+ const pending=fees.filter(f=>!["paid","completed"].includes(status(f.status)));
+ const paidTotal=paid.reduce((s,f)=>s+Number(f.amount||0),0);
+ const pendingTotal=pending.reduce((s,f)=>s+Number(f.amount||0),0);
+ const totalFees=paidTotal+pendingTotal;
+ const resultBars=useMemo(()=>results.slice(-7).map((r,i)=>({value:Math.max(0,Math.min(100,Number(r.marks)||0)),label:`${i+1}`})),[results]);
+ const sections=[
+  ["📅","Attendance",attendance.length?`${attendanceRate}% overall · ${present} present`:"No attendance data"],
+  ["🏆","Academic performance",average!=null?`Average ${average}${maxMark!=null?` · Best ${maxMark}`:""}`:"No results recorded"],
+  ["📝","Homework",`${homework.length} assignment${homework.length===1?"":"s"}`],
+  ["📋","Tests",`${upcoming} upcoming · ${results.length} results`],
+  ["📚","Study materials",`${materials.length} resource${materials.length===1?"":"s"}`],
+  ["💳","Fees",pendingTotal?`${money(pendingTotal)} pending`:"All recorded fees paid"],
+ ];
+ return <section className="pa-wrap" aria-label="Student analytics">
+  <style>{`.pa-wrap{display:grid;gap:12px}.pa-hero{position:relative;overflow:hidden;padding:18px;border-radius:21px;background:linear-gradient(135deg,#171d45,#39318d 62%,#695ee2);color:#fff;box-shadow:0 14px 32px rgba(48,43,130,.2)}.pa-hero:after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;right:-80px;top:-90px;background:rgba(255,255,255,.08)}.pa-kicker{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:900;opacity:.68}.pa-hero h2{margin:4px 0;font-size:20px;letter-spacing:-.4px}.pa-hero p{margin:0;font-size:11px;opacity:.75}.pa-money{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}.pa-money div{padding:11px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(255,255,255,.08)}.pa-money small{display:block;font-size:9px;opacity:.68}.pa-money b{display:block;margin-top:3px;font-size:17px}.pa-card{padding:15px;border-radius:19px;background:#fff;border:1px solid #e8eaf3;box-shadow:0 7px 22px rgba(31,39,79,.055)}.pa-title{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;margin-bottom:12px}.pa-title h3{margin:0;font-size:14px;color:#182044}.pa-title span{font-size:9px;color:#7b8299}.pa-ring{display:grid;grid-template-columns:92px 1fr;align-items:center;gap:15px}.pa-circle{width:86px;height:86px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#6357e8 var(--rate),#edf0f7 0)}.pa-circle:after{content:"";width:66px;height:66px;border-radius:50%;background:#fff;position:absolute}.pa-circle b{position:relative;z-index:1;font-size:18px;color:#202746}.pa-legend{display:grid;gap:7px}.pa-legend div{display:flex;align-items:center;gap:7px;font-size:10px;color:#606981}.pa-dot{width:7px;height:7px;border-radius:50%}.pa-bars{height:112px;display:flex;align-items:flex-end;gap:7px;padding:5px 2px 0}.pa-bar-col{height:100%;flex:1;display:flex;align-items:flex-end;justify-content:center}.pa-bar{width:100%;max-width:24px;border-radius:7px 7px 3px 3px;background:linear-gradient(180deg,#8c82f5,#6258df);min-height:4px}.pa-bar-col small{position:absolute;margin-top:125px;font-size:8px;color:#8a91a5}.pa-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.pa-kpi{padding:12px;border-radius:15px;background:#f8f8fd;border:1px solid #ededf6}.pa-kpi b{display:block;font-size:20px;color:#1d2548}.pa-kpi span{display:block;margin-top:3px;font-size:9px;color:#7b8299;font-weight:700}.pa-list{display:grid;gap:7px}.pa-item{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:9px;padding:11px;border-radius:14px;background:#fafbfe;border:1px solid #eef0f6}.pa-item-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#f0efff;font-size:14px}.pa-item b{display:block;font-size:10px;color:#202746}.pa-item small{display:block;margin-top:3px;font-size:9px;color:#7b8299}.pa-arrow{font-size:14px;color:#9aa1b4}.pa-empty{padding:18px;text-align:center;color:#7b8299;font-size:10px;background:#fafbfe;border-radius:14px}.pa-note{font-size:9px;color:#7b8299;line-height:1.5}@media(max-width:360px){.pa-ring{grid-template-columns:82px 1fr}.pa-circle{width:78px;height:78px}.pa-circle:after{width:60px;height:60px}}`}</style>
+  <div className="pa-hero"><div className="pa-kicker">Parent overview</div><h2>Student performance center</h2><p>A complete snapshot of attendance, academics, activity and finances.</p><div className="pa-money"><div><small>Pending fees</small><b>{money(pendingTotal)}</b></div><div><small>Total fees recorded</small><b>{money(totalFees)}</b></div></div></div>
+  <div className="pa-card"><div className="pa-title"><h3>Attendance health</h3><span>{attendance.length} records</span></div>{attendance.length?<div className="pa-ring"><div className="pa-circle" style={{"--rate":`${attendanceRate}%`}}><b>{attendanceRate}%</b></div><div className="pa-legend"><div><i className="pa-dot" style={{background:"#6357e8"}}/>Present · {present}</div><div><i className="pa-dot" style={{background:"#ef6b73"}}/>Absent · {absent}</div><div><i className="pa-dot" style={{background:"#f5ad42"}}/>Late/other · {late}</div></div></div>:<div className="pa-empty">Attendance records will appear here.</div>}</div>
+  <div className="pa-card"><div className="pa-title"><h3>Academic performance</h3><span>{results.length} results</span></div>{resultBars.length?<div className="pa-bars">{resultBars.map((b,i)=><div className="pa-bar-col" key={i}><div className="pa-bar" style={{height:`${Math.max(5,b.value)}%`}}/><small>{b.label}</small></div>)}</div>:<div className="pa-empty">No test results available yet.</div>}<div className="pa-kpis" style={{marginTop:14}}><div className="pa-kpi"><b>{average==null?"—":average}</b><span>Average marks</span></div><div className="pa-kpi"><b>{maxMark==null?"—":maxMark}</b><span>Best recorded mark</span></div></div></div>
+  <div className="pa-card"><div className="pa-title"><h3>Student summary</h3><span>All sections</span></div><div className="pa-list">{sections.map(([icon,title,text])=><div className="pa-item" key={title}><div className="pa-item-icon">{icon}</div><div><b>{title}</b><small>{text}</small></div><span className="pa-arrow">›</span></div>)}</div></div>
+  <div className="pa-card"><div className="pa-title"><h3>Fee status</h3><span>{pending.length} pending item{pending.length===1?"":"s"}</span></div><div className="pa-kpis"><div className="pa-kpi"><b>{money(pendingTotal)}</b><span>Pending</span></div><div className="pa-kpi"><b>{money(paidTotal)}</b><span>Paid</span></div></div>{pending.length?<div style={{marginTop:10}}>{pending.slice(0,5).map(f=><div key={f.id} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #f0f1f6",fontSize:10}}><span>{f.desc||"Fee"}<small style={{display:"block",color:"#8a91a5",marginTop:2}}>Due {f.due||"—"}</small></span><b>{money(f.amount)}</b></div>)}</div>:<div className="pa-note" style={{marginTop:10}}>There are no outstanding recorded fees.</div>}</div>
+ </section>;
 }
