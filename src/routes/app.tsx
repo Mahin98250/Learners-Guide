@@ -6,9 +6,9 @@ import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
 import { TeacherAppWithHomeworkFiles } from "@/lg/teacherHomeworkApp";
 import { StudentApp } from "@/lg/student";
 import { ParentApp } from "@/lg/parentWorkflows";
+import { LeaveAccess } from "@/lg/LeaveAccess";
 import { PushNotificationPrompt } from "@/lg/pushNotifications";
 import ChangePassword from "@/lg/ChangePassword";
-import { LeaveAccess } from "@/lg/LeaveAccess";
 const title="My Dashboard — Learner's Guide";
 const description="Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
 export const Route=createFileRoute("/app")({head:()=>({meta:[{title},{name:"description",content:description},{property:"og:title",content:title},{property:"og:description",content:description},{name:"robots",content:"noindex"}]}),component:AppShell});
@@ -21,5 +21,6 @@ function AppShell(){const navigate=useNavigate(),[user,setUser]=useState<Session
   if(loadError)return <Splash label={loadError} retry={()=>void load}/>;
   if(!ready||!user)return <Splash label="Loading your dashboard…"/>;
   const logout=async()=>{clearCache();await signOut();setUser(null);navigate({to:"/",replace:true});};
-  return <div style={{minHeight:"100vh"}}>{user.role==="teacher"&&<TeacherAppWithHomeworkFiles user={user} onLogout={logout}/>} {user.role==="student"&&<StudentApp user={user} onLogout={logout}/>} {user.role==="parent"&&<ParentApp user={user} onLogout={logout}/>} {(user.role==="student"||user.role==="parent")&&<LeaveAccess user={user} student={null}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
+  const portal=user.role==="teacher"?<TeacherAppWithHomeworkFiles user={user} onLogout={logout}/>:user.role==="student"?<StudentApp user={user} onLogout={logout}/>:user.role==="parent"?<ParentApp user={user} onLogout={logout}/>:null;
+  return <div style={{minHeight:"100vh"}}>{portal}{(user.role==="student"||user.role==="parent")&&<LeaveAccess user={user} student={null}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
 }
