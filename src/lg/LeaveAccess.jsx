@@ -4,23 +4,24 @@ import {LeaveRequests}from"@/lg/LeaveRequests";
 
 function findBottomNav(){
  if(typeof document==="undefined")return null;
- const attendance=[...document.querySelectorAll("button,a,[role=button]")].find(el=>/attend/i.test((el.textContent||"").trim()));
- if(attendance){let el=attendance;for(let i=0;i<7&&el;i++,el=el.parentElement){const controls=el.querySelectorAll("button,a,[role=button]");const r=el.getBoundingClientRect();const s=getComputedStyle(el);if(controls.length>=5&&r.width>280&&r.top>window.innerHeight-190&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"))return el}}
+ const nodes=[...document.querySelectorAll("button,a,[role=button],div,span")];
+ const attendance=nodes.find(el=>/^Attend\.?$/i.test((el.textContent||"").trim()));
+ if(attendance){let el=attendance;for(let i=0;i<9&&el;i++,el=el.parentElement){const controls=el.querySelectorAll("button,a,[role=button]");const text=(el.textContent||"").trim();const r=el.getBoundingClientRect();const s=getComputedStyle(el);if(controls.length>=5&&r.width>280&&r.top>window.innerHeight-220&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"||text.length<300))return el}}
  const candidates=[...document.querySelectorAll("nav,[role=\"navigation\"],div,section")];
- const matches=candidates.filter(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.position==="fixed"&&r.bottom<=4&&r.width>280&&r.height>=50&&r.height<=150&&r.top>window.innerHeight-200});
+ const matches=candidates.filter(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.position==="fixed"&&r.bottom<=8&&r.width>280&&r.height>=50&&r.height<=170&&r.top>window.innerHeight-220});
  matches.sort((a,b)=>b.querySelectorAll("button,a,[role=button]").length-a.querySelectorAll("button,a,[role=button]").length);
  return matches[0]||null;
 }
 function makeNavItem(onOpen){
  const button=document.createElement("button");button.type="button";button.setAttribute("data-lg-leave-nav","true");button.setAttribute("aria-label","Open leave requests");button.innerHTML='<span style="display:block;font-size:22px;line-height:1.05">🏖️</span><span style="display:block;font-size:11px;font-weight:800;margin-top:3px">Leave</span>';
- button.style.cssText="flex:1 1 0;min-width:52px;width:auto;height:100%;border:0;background:transparent;color:#64748b;padding:7px 2px calc(7px + env(safe-area-inset-bottom,0px));font:inherit;text-align:center;cursor:pointer;touch-action:manipulation;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center";
+ button.style.cssText="flex:1 1 0;min-width:0;width:auto;height:100%;border:0;background:transparent;color:#64748b;padding:7px 2px calc(7px + env(safe-area-inset-bottom,0px));font:inherit;text-align:center;cursor:pointer;touch-action:manipulation;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center";
  button.addEventListener("click",onOpen);return button;
 }
 function mountNavItem(onOpen){
  if(typeof document==="undefined")return()=>{};
  let button=null,observer=null;
- const mount=()=>{const nav=findBottomNav();if(!nav)return;if(nav.querySelector('[data-lg-leave-nav="true"]'))return;button=makeNavItem(onOpen);nav.appendChild(button)};
- mount();observer=new MutationObserver(mount);observer.observe(document.body,{childList:true,subtree:true});window.addEventListener("resize",mount,{passive:true});
+ const mount=()=>{const nav=findBottomNav();if(!nav)return;if(nav.querySelector('[data-lg-leave-nav="true"]'))return;button=makeNavItem(onOpen);const style=getComputedStyle(nav);if(style.display!=="flex"&&style.display!=="grid")nav.style.display="flex";nav.style.alignItems="stretch";nav.style.overflow="visible";nav.appendChild(button)};
+ let tries=0;const retry=()=>{mount();if(!button&&tries++<20)window.setTimeout(retry,150)};retry();observer=new MutationObserver(mount);observer.observe(document.body,{childList:true,subtree:true});window.addEventListener("resize",mount,{passive:true});
  return()=>{observer?.disconnect();window.removeEventListener("resize",mount);if(button){button.removeEventListener("click",onOpen);button.remove()}};
 }
 export function LeaveAccess({user,student,canReview=false}){
