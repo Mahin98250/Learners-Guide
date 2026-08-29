@@ -4,25 +4,18 @@ import {LeaveRequests}from"@/lg/LeaveRequests";
 
 function findBottomNav(){
  if(typeof document==="undefined")return null;
- const nodes=[...document.querySelectorAll("button,a,[role=button],div,span")];
- const attendance=nodes.find(el=>/^Attend\.?$/i.test((el.textContent||"").trim()));
- if(attendance){let el=attendance;for(let i=0;i<9&&el;i++,el=el.parentElement){const controls=el.querySelectorAll("button,a,[role=button]");const text=(el.textContent||"").trim();const r=el.getBoundingClientRect();const s=getComputedStyle(el);if(controls.length>=5&&r.width>280&&r.top>window.innerHeight-220&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"||text.length<300))return el}}
+ const attendance=[...document.querySelectorAll("button,a,[role=button],span")].find(el=>/^Attend\.?$/i.test((el.textContent||"").trim()));
+ if(attendance){let el=attendance;for(let i=0;i<10&&el;i++,el=el.parentElement){const r=el.getBoundingClientRect(),s=getComputedStyle(el),controls=el.querySelectorAll("button,a,[role=button]");if(controls.length>=6&&r.width>280&&r.top>window.innerHeight-230&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"))return el}}
  const candidates=[...document.querySelectorAll("nav,[role=\"navigation\"],div,section")];
- const matches=candidates.filter(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.position==="fixed"&&r.bottom<=8&&r.width>280&&r.height>=50&&r.height<=170&&r.top>window.innerHeight-220});
- matches.sort((a,b)=>b.querySelectorAll("button,a,[role=button]").length-a.querySelectorAll("button,a,[role=button]").length);
- return matches[0]||null;
-}
-function makeNavItem(onOpen){
- const button=document.createElement("button");button.type="button";button.setAttribute("data-lg-leave-nav","true");button.setAttribute("aria-label","Open leave requests");button.innerHTML='<span style="display:block;font-size:22px;line-height:1.05">🏖️</span><span style="display:block;font-size:11px;font-weight:800;margin-top:3px">Leave</span>';
- button.style.cssText="flex:1 1 0;min-width:0;width:auto;height:100%;border:0;background:transparent;color:#64748b;padding:7px 2px calc(7px + env(safe-area-inset-bottom,0px));font:inherit;text-align:center;cursor:pointer;touch-action:manipulation;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center";
- button.addEventListener("click",onOpen);return button;
+ const matches=candidates.filter(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el),n=el.querySelectorAll("button,a,[role=button]").length;return n>=6&&r.width>280&&r.top>window.innerHeight-230&&r.height>=45&&r.height<=180&&(s.position==="fixed"||s.display==="flex"||s.display==="grid")});
+ matches.sort((a,b)=>b.querySelectorAll("button,a,[role=button]").length-a.querySelectorAll("button,a,[role=button]").length);return matches[0]||null;
 }
 function mountNavItem(onOpen){
  if(typeof document==="undefined")return()=>{};
  let button=null,observer=null;
- const mount=()=>{const nav=findBottomNav();if(!nav)return;if(nav.querySelector('[data-lg-leave-nav="true"]'))return;button=makeNavItem(onOpen);const style=getComputedStyle(nav);if(style.display!=="flex"&&style.display!=="grid")nav.style.display="flex";nav.style.alignItems="stretch";nav.style.overflow="visible";nav.appendChild(button)};
- let tries=0;const retry=()=>{mount();if(!button&&tries++<20)window.setTimeout(retry,150)};retry();observer=new MutationObserver(mount);observer.observe(document.body,{childList:true,subtree:true});window.addEventListener("resize",mount,{passive:true});
- return()=>{observer?.disconnect();window.removeEventListener("resize",mount);if(button){button.removeEventListener("click",onOpen);button.remove()}};
+ const mount=()=>{const nav=findBottomNav();if(!nav)return;const existing=nav.querySelector('[data-lg-leave-nav="true"]');if(existing){button=existing;return}const controls=[...nav.querySelectorAll("button,a,[role=button]")].filter(x=>x!==nav);button=document.createElement("button");button.type="button";button.dataset.lgLeaveNav="true";button.setAttribute("aria-label","Open Leave");button.innerHTML='<span style="display:block;font-size:22px;line-height:1.05">🏖️</span><span style="display:block;font-size:11px;font-weight:800;margin-top:3px">Leave</span>';button.style.cssText="border:0;background:transparent;color:#64748b;padding:7px 2px calc(7px + env(safe-area-inset-bottom,0px));font:inherit;text-align:center;cursor:pointer;touch-action:manipulation;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1 1 0;min-width:0;width:auto;height:100%";button.addEventListener("click",onOpen);nav.appendChild(button);if(controls.length>=6){nav.style.overflow="visible"}};
+ let tries=0;const retry=()=>{mount();if(!button&&tries++<30)window.setTimeout(retry,150)};retry();observer=new MutationObserver(()=>{if(!document.querySelector('[data-lg-leave-nav="true"]'))retry()});observer.observe(document.body,{childList:true,subtree:true});window.addEventListener("resize",mount,{passive:true});
+ return()=>{observer?.disconnect();window.removeEventListener("resize",mount);if(button&&button.dataset?.lgLeaveNav){button.removeEventListener("click",onOpen);button.remove()}};
 }
 export function LeaveAccess({user,student,canReview=false}){
  const[open,setOpen]=useState(false),[resolvedStudent,setResolvedStudent]=useState(student||null);
