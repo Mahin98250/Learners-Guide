@@ -4,10 +4,15 @@ import {LeaveRequests}from"@/lg/LeaveRequests";
 
 function findBottomNav(){
  if(typeof document==="undefined")return null;
- const all=[...document.querySelectorAll("body *")];
- const candidates=all.filter(el=>{const r=el.getBoundingClientRect();const s=getComputedStyle(el);const controls=el.querySelectorAll("button,a,[role=button]");const text=(el.textContent||"").replace(/\s+/g," ").trim();return r.width>=280&&r.height>=48&&r.height<=180&&r.bottom>=window.innerHeight-12&&controls.length>=5&&text.includes("Home")&&/Attend\.?/i.test(text)&&(s.visibility!=="hidden")&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"||s.position==="sticky")});
- candidates.sort((a,b)=>a.getBoundingClientRect().height-b.getBoundingClientRect().height||b.querySelectorAll("button,a,[role=button]").length-a.querySelectorAll("button,a,[role=button]").length);
- return candidates[0]||null;
+ const labels=[...document.querySelectorAll("button,a,[role=button]")];
+ const attendance=labels.find(el=>/^Attend\.?$/i.test((el.textContent||"").replace(/\s+/g," ").trim()))||labels.find(el=>/Attend\.?/i.test((el.textContent||"").replace(/\s+/g," ").trim()));
+ if(!attendance)return null;
+ let node=attendance;
+ for(let i=0;i<7&&node;i++,node=node.parentElement){
+  const r=node.getBoundingClientRect(),s=getComputedStyle(node),controls=node.querySelectorAll("button,a,[role=button]");
+  if(r.width>=Math.min(window.innerWidth*.75,320)&&r.height>=55&&r.height<=180&&r.bottom>=window.innerHeight-24&&controls.length>=5&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"||s.position==="sticky"))return node;
+ }
+ return attendance.parentElement?.parentElement||null;
 }
 function makeNavItem(onOpen){
  const button=document.createElement("button");
@@ -21,17 +26,15 @@ function mountNavItem(onOpen){
  let button=null,observer=null;
  const mount=()=>{
   const nav=findBottomNav();if(!nav)return;
-  if(nav.querySelector('[data-lg-leave-nav="true"]')){button=nav.querySelector('[data-lg-leave-nav="true"]');return;}
+  const existing=nav.querySelector('[data-lg-leave-nav="true"]');if(existing){button=existing;return;}
   button=makeNavItem(onOpen);
   const style=getComputedStyle(nav);
-  if(style.display!=="flex"){nav.style.display="flex";nav.style.flexWrap="nowrap";}
-  nav.style.overflowX="auto";nav.style.overflowY="hidden";nav.style.alignItems="stretch";
+  nav.style.display="flex";nav.style.flexDirection="row";nav.style.flexWrap="nowrap";nav.style.alignItems="stretch";nav.style.overflowX="auto";nav.style.overflowY="hidden";nav.style.scrollbarWidth="none";
   [...nav.children].forEach(child=>{if(child instanceof HTMLElement){child.style.flex="1 1 0";child.style.minWidth="0";child.style.boxSizing="border-box"}});
   nav.appendChild(button);
  };
- let tries=0;const retry=()=>{mount();if(!button&&tries++<40)window.setTimeout(retry,150)};retry();
- observer=new MutationObserver(()=>{if(!navContainsLeave())mount()});
- const navContainsLeave=()=>!!document.querySelector('[data-lg-leave-nav="true"]');
+ let tries=0;const retry=()=>{mount();if(!button&&tries++<80)window.setTimeout(retry,200)};retry();
+ observer=new MutationObserver(()=>{if(!document.querySelector('[data-lg-leave-nav="true"]'))mount()});
  observer.observe(document.body,{childList:true,subtree:true});
  window.addEventListener("resize",mount,{passive:true});
  return()=>{observer?.disconnect();window.removeEventListener("resize",mount);if(button&&button.parentNode){button.removeEventListener("click",onOpen);button.remove()}};
