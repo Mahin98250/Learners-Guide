@@ -4,21 +4,25 @@ import {LeaveRequests}from"@/lg/LeaveRequests";
 
 function findBottomNav(){
  if(typeof document==="undefined")return null;
- const labels=[...document.querySelectorAll("button,a,[role=button]")];
- const attendance=labels.find(el=>/^Attend\.?$/i.test((el.textContent||"").replace(/\s+/g," ").trim()))||labels.find(el=>/Attend\.?/i.test((el.textContent||"").replace(/\s+/g," ").trim()));
+ const all=[...document.querySelectorAll("body *")];
+ const attendance=all.find(el=>/^Attend\.?$/i.test((el.textContent||"").replace(/\s+/g," ").trim()))||all.find(el=>/^(✅\s*)?Attend\.?$/i.test((el.textContent||"").replace(/\s+/g," ").trim()));
  if(!attendance)return null;
  let node=attendance;
- for(let i=0;i<7&&node;i++,node=node.parentElement){
-  const r=node.getBoundingClientRect(),s=getComputedStyle(node),controls=node.querySelectorAll("button,a,[role=button]");
-  if(r.width>=Math.min(window.innerWidth*.75,320)&&r.height>=55&&r.height<=180&&r.bottom>=window.innerHeight-24&&controls.length>=5&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"||s.position==="sticky"))return node;
+ for(let i=0;i<10&&node;i++,node=node.parentElement){
+  const r=node.getBoundingClientRect(),s=getComputedStyle(node),children=[...node.children];
+  const visibleControls=children.filter(c=>{const cr=c.getBoundingClientRect();return cr.width>0&&cr.height>0});
+  const nearBottom=r.bottom>=window.innerHeight-35;
+  const wide=r.width>=Math.min(window.innerWidth*.72,320);
+  const navLike=visibleControls.length>=5&&(s.display==="flex"||s.display==="grid"||s.position==="fixed"||s.position==="sticky");
+  if(wide&&r.height>=50&&r.height<=210&&nearBottom&&navLike)return node;
  }
- return attendance.parentElement?.parentElement||null;
+ return attendance.parentElement||null;
 }
 function makeNavItem(onOpen){
  const button=document.createElement("button");
  button.type="button";button.setAttribute("data-lg-leave-nav","true");button.setAttribute("aria-label","Open Leave");
- button.innerHTML='<span style="display:block;font-size:22px;line-height:1.05">🏖️</span><span style="display:block;font-size:11px;font-weight:800;margin-top:4px">Leave</span>';
- button.style.cssText="flex:1 1 0;min-width:0;width:auto;height:100%;border:0;border-left:1px solid #f0f2f7;background:transparent;color:#64748b;padding:7px 2px calc(7px + env(safe-area-inset-bottom,0px));font:inherit;text-align:center;cursor:pointer;touch-action:manipulation;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center";
+ button.innerHTML='<span style="display:block;font-size:22px;line-height:1">🏖️</span><span style="display:block;font-size:11px;font-weight:800;margin-top:4px;white-space:nowrap">Leave</span>';
+ button.style.cssText="appearance:none;-webkit-appearance:none;flex:1 1 0!important;min-width:0!important;width:0!important;max-width:none!important;height:100%;border:0;border-left:1px solid #f0f2f7;background:transparent;color:#64748b;padding:7px 1px calc(7px + env(safe-area-inset-bottom,0px));font:inherit;text-align:center;cursor:pointer;touch-action:manipulation;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden";
  button.addEventListener("click",onOpen);return button;
 }
 function mountNavItem(onOpen){
@@ -28,12 +32,11 @@ function mountNavItem(onOpen){
   const nav=findBottomNav();if(!nav)return;
   const existing=nav.querySelector('[data-lg-leave-nav="true"]');if(existing){button=existing;return;}
   button=makeNavItem(onOpen);
-  const style=getComputedStyle(nav);
-  nav.style.display="flex";nav.style.flexDirection="row";nav.style.flexWrap="nowrap";nav.style.alignItems="stretch";nav.style.overflowX="auto";nav.style.overflowY="hidden";nav.style.scrollbarWidth="none";
-  [...nav.children].forEach(child=>{if(child instanceof HTMLElement){child.style.flex="1 1 0";child.style.minWidth="0";child.style.boxSizing="border-box"}});
+  nav.style.setProperty("display","flex","important");nav.style.setProperty("flex-direction","row","important");nav.style.setProperty("flex-wrap","nowrap","important");nav.style.setProperty("align-items","stretch","important");nav.style.setProperty("overflow-x","hidden","important");nav.style.setProperty("overflow-y","hidden","important");
+  [...nav.children].forEach(child=>{if(child instanceof HTMLElement&&!child.matches('[data-lg-leave-nav="true"]')){child.style.setProperty("flex","1 1 0","important");child.style.setProperty("min-width","0","important");child.style.setProperty("width","0","important");child.style.setProperty("box-sizing","border-box","important")}});
   nav.appendChild(button);
  };
- let tries=0;const retry=()=>{mount();if(!button&&tries++<80)window.setTimeout(retry,200)};retry();
+ let tries=0;const retry=()=>{mount();if(!button&&tries++<100)window.setTimeout(retry,150)};retry();
  observer=new MutationObserver(()=>{if(!document.querySelector('[data-lg-leave-nav="true"]'))mount()});
  observer.observe(document.body,{childList:true,subtree:true});
  window.addEventListener("resize",mount,{passive:true});
