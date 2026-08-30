@@ -22,5 +22,6 @@ function AppShell(){const navigate=useNavigate(),[user,setUser]=useState<Session
   if(!ready||!user)return <Splash label="Loading your dashboard…"/>;
   const logout=async()=>{clearCache();await signOut();setUser(null);navigate({to:"/",replace:true});};
   const portal=user.role==="teacher"?<TeacherAppWithHomeworkFiles user={user} onLogout={logout}/>:user.role==="student"?<StudentApp user={user} onLogout={logout}/>:user.role==="parent"?<ParentApp user={user} onLogout={logout}/>:null;
-  return <div style={{minHeight:"100vh"}}>{portal}{(user.role==="student"||user.role==="parent")&&<LeaveAccess user={user} student={null}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
+  const portalClass=user.role==="admin"?"portal-admin":`portal-${user.role}`;
+  return <div className={`lg-app-shell ${portalClass}`} data-portal={user.role}>{portal}{(user.role==="student"||user.role==="parent")&&<LeaveAccess user={user} student={null}/>}<PushNotificationPrompt user={user}/><ChangePassword/></div>
 }
