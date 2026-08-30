@@ -1,67 +1,23 @@
-/* Learner's Guide responsive foundation.
-   Keep this layer intentionally small and scoped: portal components own their layout,
-   while this file handles viewport safety, touch targets and device adaptation. */
-html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}html{min-height:100%;background:#fff;overflow-y:auto}body{min-height:100%;background:#fff;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-y:auto;-webkit-font-smoothing:antialiased}#root{min-height:100dvh;min-height:100svh;overflow:visible!important;padding-bottom:env(safe-area-inset-bottom)}*,*::before,*::after{box-sizing:border-box}img,video,canvas,svg{max-width:100%;height:auto}button,input,select,textarea{max-width:100%;font:inherit}button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text}a{max-width:100%}.selectable,.selectable-content,.copyable{-webkit-user-select:text!important;user-select:text!important}
-
-/* Shared app shell: never allow a child component to create horizontal page overflow. */
-.lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden}.lg-app-shell>*{min-width:0;max-width:100%}
-
-/* Mobile/tablet grid safety. These are scoped to the actual portal root instead of
-   rewriting arbitrary inline styles across the entire application. */
+/* Learner's Guide responsive foundation. */
+html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}html{min-height:100%;background:#fff;overflow-y:auto}body{min-height:100%;background:#fff;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-y:auto;-webkit-font-smoothing:antialiased}#root{min-height:100dvh;min-height:100svh;overflow:visible!important;padding-bottom:env(safe-area-inset-bottom)}*,*::before,*::after{box-sizing:border-box}img,video,canvas,svg{max-width:100%;height:auto}button,input,select,textarea{max-width:100%;font:inherit}button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text}a{max-width:100%}.selectable,.selectable-content,.copyable{-webkit-user-select:text!important;user-select:text!important}.lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden}.lg-app-shell>*{min-width:0;max-width:100%}
 @media (max-width:700px){
   .portal-student,.portal-teacher,.portal-parent{width:100%;max-width:100%;overflow-x:hidden}
   .portal-student [style*="grid-template-columns"],.portal-teacher [style*="grid-template-columns"],.portal-parent [style*="grid-template-columns"]{min-width:0!important}
   .portal-student [style*="minWidth: 600"],.portal-student [style*="min-width: 600"],.portal-teacher [style*="minWidth: 600"],.portal-teacher [style*="min-width: 600"],.portal-parent [style*="minWidth: 600"],.portal-parent [style*="min-width: 600"]{min-width:0!important}
   .portal-student [style*="minWidth: 650"],.portal-student [style*="min-width: 650"],.portal-teacher [style*="minWidth: 650"],.portal-teacher [style*="min-width: 650"],.portal-parent [style*="minWidth: 650"],.portal-parent [style*="min-width: 650"]{min-width:0!important}
-
-  /* Long study-material filenames: keep the text in its column and keep actions tappable. */
   .portal-student div[style*="display:flex"]:has(> div > button),.portal-student div[style*="display: flex"]:has(> div > button),.portal-teacher div[style*="display:flex"]:has(> div > button),.portal-teacher div[style*="display: flex"]:has(> div > button),.portal-parent div[style*="display:flex"]:has(> div > button),.portal-parent div[style*="display: flex"]:has(> div > button){width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}
   .portal-student div[style*="display:flex"]:has(> div > button)>div:first-child,.portal-student div[style*="display: flex"]:has(> div > button)>div:first-child,.portal-teacher div[style*="display:flex"]:has(> div > button)>div:first-child,.portal-teacher div[style*="display: flex"]:has(> div > button)>div:first-child,.portal-parent div[style*="display:flex"]:has(> div > button)>div:first-child,.portal-parent div[style*="display: flex"]:has(> div > button)>div:first-child{min-width:0!important;max-width:100%!important;overflow:hidden!important}
   .portal-student div[style*="display:flex"]:has(> div > button)>div:first-child *,.portal-student div[style*="display: flex"]:has(> div > button)>div:first-child *,.portal-teacher div[style*="display:flex"]:has(> div > button)>div:first-child *,.portal-teacher div[style*="display: flex"]:has(> div > button)>div:first-child *,.portal-parent div[style*="display:flex"]:has(> div > button)>div:first-child *{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-
-  /* Fixed bottom navigation is shared by learner portals only. */
   .portal-student div:has(> .nav-tab),.portal-teacher div:has(> .nav-tab),.portal-parent div:has(> .nav-tab){position:fixed!important;left:50%!important;bottom:0!important;transform:translateX(-50%)!important;width:min(100vw,430px)!important;max-width:100vw!important;z-index:1000!important;padding-bottom:max(env(safe-area-inset-bottom),0px)!important;background:rgba(255,255,255,.97)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;border-top:1px solid rgba(20,25,60,.08)!important;box-shadow:0 -8px 30px rgba(31,39,79,.08)!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;display:flex!important;align-items:stretch!important;justify-content:flex-start!important;gap:0!important}
   .portal-student div:has(> .nav-tab)::-webkit-scrollbar,.portal-teacher div:has(> .nav-tab)::-webkit-scrollbar,.portal-parent div:has(> .nav-tab)::-webkit-scrollbar{display:none!important}
-  .portal-student div:has(> .nav-tab) .nav-tab,.portal-teacher div:has(> .nav-tab) .nav-tab,.portal-parent div:has(> .nav-tab) .nav-tab{flex:0 0 68px!important;width:68px!important;min-width:68px!important;min-height:64px!important;padding:7px 3px 5px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;white-space:nowrap!important;overflow:hidden!important}
+  .portal-student div:has(> .nav-tab) .nav-tab,.portal-teacher div:has(> .nav-tab) .nav-tab,.portal-parent div:has(> .nav-tab) .nav-tab{flex:1 0 68px!important;width:68px!important;min-width:68px!important;min-height:64px!important;padding:7px 3px 5px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;white-space:nowrap!important;overflow:hidden!important}
   .portal-student div:has(> .nav-tab) .nav-tab span,.portal-teacher div:has(> .nav-tab) .nav-tab span,.portal-parent div:has(> .nav-tab) .nav-tab span{display:block!important;max-width:64px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:10px!important;line-height:1.15!important}
-  .portal-student div:has(> div > .nav-tab) > div:nth-child(2),.portal-teacher div:has(> div > .nav-tab) > div:nth-child(2),.portal-parent div:has(> div > .nav-tab) > div:nth-child(2){padding-bottom:calc(82px + env(safe-area-inset-bottom))!important}
-
-  /* Parent dashboard: preserve the intentional two-column cards while preventing overflow. */
-  .portal-parent .parent-portal{width:100%;max-width:100%;min-width:0;overflow-x:hidden;padding-bottom:24px!important}
-  .portal-parent .pp-hero{width:100%;max-width:100%;overflow:hidden}
-  .portal-parent .pp-grid,.portal-parent .pp-home-actions,.portal-parent .pp-more-grid{width:100%;min-width:0}
-  .portal-parent .pp-stat,.portal-parent .pp-panel,.portal-parent .pp-home-action,.portal-parent .pp-more-card{min-width:0;max-width:100%}
-  .portal-parent .pp-row{min-width:0}
-  .portal-parent .pp-title,.portal-parent .pp-sub,.portal-parent .pp-note{overflow-wrap:anywhere}
-
-  /* Comfortable touch targets and readable form text on phones. */
-  .portal-student button,.portal-teacher button,.portal-parent button,.portal-student [role="button"],.portal-teacher [role="button"],.portal-parent [role="button"]{min-height:42px}
-  .portal-student input,.portal-student select,.portal-student textarea,.portal-teacher input,.portal-teacher select,.portal-teacher textarea,.portal-parent input,.portal-parent select,.portal-parent textarea{font-size:16px}
+  .portal-student div[style*="flex:1"][style*="overflowY:auto"],.portal-student div[style*="flex: 1"][style*="overflowY: auto"],.portal-teacher div[style*="flex:1"][style*="overflowY:auto"],.portal-teacher div[style*="flex: 1"][style*="overflowY: auto"],.portal-parent div[style*="flex:1"][style*="overflowY:auto"],.portal-parent div[style*="flex: 1"][style*="overflowY: auto"]{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+  .portal-parent .parent-portal{width:100%;max-width:100%;min-width:0;overflow-x:hidden;padding-bottom:24px!important}.portal-parent .pp-hero{width:100%;max-width:100%;overflow:hidden}.portal-parent .pp-grid,.portal-parent .pp-home-actions,.portal-parent .pp-more-grid{width:100%;min-width:0}.portal-parent .pp-stat,.portal-parent .pp-panel,.portal-parent .pp-home-action,.portal-parent .pp-more-card{min-width:0;max-width:100%}.portal-parent .pp-row{min-width:0}.portal-parent .pp-title,.portal-parent .pp-sub,.portal-parent .pp-note{overflow-wrap:anywhere}
+  .portal-student button,.portal-teacher button,.portal-parent button,.portal-student [role="button"],.portal-teacher [role="button"],.portal-parent [role="button"]{min-height:42px}.portal-student input,.portal-student select,.portal-student textarea,.portal-teacher input,.portal-teacher select,.portal-teacher textarea,.portal-parent input,.portal-parent select,.portal-parent textarea{font-size:16px}
 }
-
-@media (max-width:380px){
-  .portal-student div:has(> .nav-tab) .nav-tab,.portal-teacher div:has(> .nav-tab) .nav-tab,.portal-parent div:has(> .nav-tab) .nav-tab{flex-basis:64px!important;width:64px!important;min-width:64px!important}
-  .portal-student div:has(> .nav-tab) .nav-tab span,.portal-teacher div:has(> .nav-tab) .nav-tab span,.portal-parent div:has(> .nav-tab) .nav-tab span{font-size:9px!important}
-}
-
-/* Tablet: retain richer layouts but guarantee no fixed desktop width leaks. */
-@media (min-width:701px) and (max-width:1100px){
-  .lg-app-shell{width:100%;max-width:100%;overflow-x:hidden}
-  .portal-student,.portal-teacher,.portal-parent{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
-  .portal-student [style*="minWidth: 600"],.portal-student [style*="min-width: 600"],.portal-teacher [style*="minWidth: 600"],.portal-teacher [style*="min-width: 600"],.portal-parent [style*="minWidth: 600"],.portal-parent [style*="min-width: 600"]{min-width:0!important}
-  .portal-student table,.portal-teacher table,.portal-parent table{max-width:100%;overflow-x:auto}
-}
-
-/* Admin remains desktop/laptop-first; only constrain it when the viewport genuinely gets narrow. */
-@media (max-width:900px){
-  .portal-admin,.admin{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
-  .portal-admin .admin-content,.admin .admin-content{max-width:100%;min-width:0}
-  .portal-admin .responsive-card-grid,.admin .responsive-card-grid{min-width:0}
-  .portal-admin .responsive-table,.admin .responsive-table{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .portal-admin .responsive-modal,.admin .responsive-modal{width:min(100% - 24px,680px);max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}
-}
-
+@media (max-width:380px){.portal-student div:has(> .nav-tab) .nav-tab,.portal-teacher div:has(> .nav-tab) .nav-tab,.portal-parent div:has(> .nav-tab) .nav-tab{flex-basis:64px!important;width:64px!important;min-width:64px!important}.portal-student div:has(> .nav-tab) .nav-tab span,.portal-teacher div:has(> .nav-tab) .nav-tab span,.portal-parent div:has(> .nav-tab) .nav-tab span{font-size:9px!important}}
+@media (min-width:701px) and (max-width:1100px){.lg-app-shell{width:100%;max-width:100%;overflow-x:hidden}.portal-student,.portal-teacher,.portal-parent{width:100%;max-width:100%;min-width:0;overflow-x:hidden}.portal-student [style*="minWidth: 600"],.portal-student [style*="min-width: 600"],.portal-teacher [style*="minWidth: 600"],.portal-teacher [style*="min-width: 600"],.portal-parent [style*="minWidth: 600"],.portal-parent [style*="min-width: 600"]{min-width:0!important}.portal-student table,.portal-teacher table,.portal-parent table{max-width:100%;overflow-x:auto}}
+@media (max-width:900px){.portal-admin,.admin{width:100%;max-width:100%;min-width:0;overflow-x:hidden}.portal-admin .admin-content,.admin .admin-content{max-width:100%;min-width:0}.portal-admin .responsive-card-grid,.admin .responsive-card-grid{min-width:0}.portal-admin .responsive-table,.admin .responsive-table{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.portal-admin .responsive-modal,.admin .responsive-modal{width:min(100% - 24px,680px);max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}}
 @media (display-mode:standalone){html,body{width:100%;min-height:100%;overflow-x:hidden}body{margin:0}#root{min-height:100dvh;padding-bottom:env(safe-area-inset-bottom)}}
-
-/* The floating Messages shortcut is intentionally hidden in learner mobile shells. */
 .portal-student button[title="Messages"],.portal-teacher button[title="Messages"],.portal-parent button[title="Messages"]{display:none!important}
