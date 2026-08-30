@@ -54,7 +54,7 @@ export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: 
     {leaveOpen && <div className="admin-leave-dialog" role="dialog" aria-modal="true" aria-label="Leave Requests" onClick={() => setLeaveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(15,23,42,.52)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "min(760px,100%)", maxHeight: "90vh", overflowY: "auto", background: "#f8fafc", borderRadius: 22, padding: 18, boxShadow: "0 24px 70px rgba(15,23,42,.28)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}><div><div style={{ fontSize: 11, fontWeight: 800, color: "#635bdf", letterSpacing: 1, textTransform: "uppercase" }}>Attendance & Leave</div><h2 style={{ margin: "3px 0 0", fontSize: 22, color: "#182044" }}>Leave Requests</h2></div><button type="button" onClick={() => setLeaveOpen(false)} aria-label="Close leave requests" style={{ border: 0, borderRadius: 10, padding: "8px 11px", background: "#e9edf5", cursor: "pointer", fontSize: 16 }}>✕</button></div>
-        <LeaveRequests user={user} canReview />
+        <LeaveRequests user={user} student={null} canReview />
       </div>
     </div>}
   </>;
