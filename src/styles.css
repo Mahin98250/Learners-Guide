@@ -142,3 +142,16 @@
     color: var(--color-foreground);
   }
 }
+
+/* Keep long study-material filenames from pushing action buttons off-screen. */
+@media (max-width: 700px) {
+  div[style*="justify-content:space-between"] {
+    min-width: 0;
+  }
+
+  div[style*="justify-content:space-between"] > div:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
