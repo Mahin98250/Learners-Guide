@@ -4,20 +4,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
- */
-
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -56,7 +42,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 }
@@ -89,10 +74,9 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
 }
@@ -127,44 +111,69 @@
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
+  * { border-color: var(--color-border); }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
 }
 
-/* Responsive study-material cards: long PDF names must never push actions off-screen. */
+/* Study-material cards: prevent long PDF names from creating horizontal overflow. */
 @media (max-width: 700px) {
-  div[style*="justify-content: space-between"] {
-    min-width: 0;
-    max-width: 100%;
+  /* STMaterials outer row: the filename/content column must be allowed to shrink. */
+  div[style*="justify-content:space-between"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     flex-wrap: wrap !important;
+    overflow: hidden !important;
   }
 
-  div[style*="justify-content: space-between"] > div:first-child {
-    min-width: 0;
+  /* First column containing the PDF title/name. */
+  div[style*="justify-content:space-between"] > div:first-child {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: auto !important;
+    flex: 1 1 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  /* Long title and filename lines can break at any character. */
+  div[style*="justify-content:space-between"] > div:first-child > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+  }
+
+  /* Action buttons get their own full-width row. */
+  div[style*="justify-content:space-between"] > div:last-child {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box !important;
+    margin-top: 4px !important;
+  }
+
+  div[style*="justify-content:space-between"] > div:last-child button {
+    flex: 0 1 auto !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+  }
+
+  /* Never allow the document itself to become horizontally scrollable. */
+  html, body {
     max-width: 100%;
-    flex: 1 1 220px;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  div[style*="justify-content: space-between"] > div:last-child {
-    flex: 0 0 auto;
-    max-width: 100%;
-  }
-
-  div[style*="justify-content: flex-end"] {
-    min-width: 0;
+    overflow-x: hidden !important;
   }
 }
