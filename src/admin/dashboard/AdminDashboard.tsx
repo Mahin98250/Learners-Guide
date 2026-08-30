@@ -51,7 +51,12 @@ export default function AdminDashboard() {
       try {
         const [studentRows, teacherRows, attendanceRows, feeRows, announcementRows, homeworkRows] = await Promise.all([gdb("students"), gdb("teachers"), gdb("attendance"), gdb("fees"), gdb("announcements"), gdb("homework")]);
         if (!mounted) return;
-        setStudents(studentRows || []); setTeachers(teacherRows || []); setAttendance(attendanceRows || []); setFees(feeRows || []); setAnnouncements(announcementRows || []); setHomework(homeworkRows || []);
+        setStudents((studentRows || []) as Student[]);
+        setTeachers((teacherRows || []) as Teacher[]);
+        setAttendance((attendanceRows || []) as Attendance[]);
+        setFees((feeRows || []) as Fee[]);
+        setAnnouncements((announcementRows || []) as Announcement[]);
+        setHomework((homeworkRows || []) as Homework[]);
       } catch (err) { if (mounted) setError(err instanceof Error ? err.message : "Unable to load dashboard data."); }
       finally { if (mounted) setLoading(false); }
     };
