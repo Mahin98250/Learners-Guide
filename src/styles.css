@@ -67,6 +67,7 @@
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
   --ring: oklch(0.704 0.04 256.788);
+  --ring-offset-background: var(--background);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -101,6 +102,7 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
+  --ring-offset-background: var(--background);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -123,57 +125,72 @@
   }
 }
 
-/* Study-material cards: prevent long PDF names from creating horizontal overflow. */
+/* Mobile safety: no study-material filename may ever create horizontal page overflow. */
 @media (max-width: 700px) {
-  /* STMaterials outer row: the filename/content column must be allowed to shrink. */
-  div[style*="justify-content:space-between"] {
-    min-width: 0 !important;
-    max-width: 100% !important;
+  html, body, #root {
     width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Flex children otherwise have an automatic min-width based on long filenames. */
+  * {
+    box-sizing: border-box !important;
+    min-width: 0;
+  }
+
+  /* The study-material row and every nested element must fit its card. */
+  div[style*="justify-content:space-between"],
+  div[style*="justify-content: space-between"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
     flex-wrap: wrap !important;
-    overflow: hidden !important;
   }
 
-  /* First column containing the PDF title/name. */
-  div[style*="justify-content:space-between"] > div:first-child {
+  div[style*="justify-content:space-between"] > *,
+  div[style*="justify-content: space-between"] > * {
     min-width: 0 !important;
     max-width: 100% !important;
-    width: auto !important;
-    flex: 1 1 100% !important;
     box-sizing: border-box !important;
+  }
+
+  /* Material information becomes a full-width block so even huge names wrap safely. */
+  div[style*="justify-content:space-between"] > div:first-child,
+  div[style*="justify-content: space-between"] > div:first-child {
+    flex: 1 1 100% !important;
+    width: 100% !important;
     overflow: hidden !important;
   }
 
-  /* Long title and filename lines can break at any character. */
-  div[style*="justify-content:space-between"] > div:first-child > div {
-    min-width: 0 !important;
+  div[style*="justify-content:space-between"] > div:first-child * ,
+  div[style*="justify-content: space-between"] > div:first-child * {
     max-width: 100% !important;
+    min-width: 0 !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
     white-space: normal !important;
   }
 
-  /* Action buttons get their own full-width row. */
-  div[style*="justify-content:space-between"] > div:last-child {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
+  /* Buttons are always on a separate row and remain fully visible/clickable. */
+  div[style*="justify-content:space-between"] > div:last-child,
+  div[style*="justify-content: space-between"] > div:last-child {
     flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
     justify-content: flex-start !important;
-    box-sizing: border-box !important;
-    margin-top: 4px !important;
+    gap: 7px !important;
+    margin-top: 6px !important;
   }
 
-  div[style*="justify-content:space-between"] > div:last-child button {
-    flex: 0 1 auto !important;
+  div[style*="justify-content:space-between"] > div:last-child button,
+  div[style*="justify-content: space-between"] > div:last-child button {
+    flex: 0 0 auto !important;
     max-width: 100% !important;
     white-space: nowrap !important;
-  }
-
-  /* Never allow the document itself to become horizontally scrollable. */
-  html, body {
-    max-width: 100%;
-    overflow-x: hidden !important;
   }
 }
