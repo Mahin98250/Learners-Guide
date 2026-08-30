@@ -127,7 +127,7 @@
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent-foreground: oklch(0.984 0.003 260.031);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
@@ -143,15 +143,30 @@
   }
 }
 
-/* Keep long study-material filenames from pushing action buttons off-screen. */
+/* Responsive study-material cards: long PDF names must never push actions off-screen. */
 @media (max-width: 700px) {
-  div[style*="justify-content:space-between"] {
+  /* React's inline style serializes spaces around this declaration. */
+  div[style*="justify-content: space-between"] {
     min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap !important;
   }
 
-  div[style*="justify-content:space-between"] > div:first-child {
+  div[style*="justify-content: space-between"] > div:first-child {
     min-width: 0;
+    max-width: 100%;
+    flex: 1 1 220px;
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
+
+  div[style*="justify-content: space-between"] > div:last-child {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  /* Keep each action usable even when the filename is extremely long. */
+  div[style*="justify-content: flex-end"] {
+    min-width: 0;
   }
 }
