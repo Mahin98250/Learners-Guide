@@ -125,7 +125,7 @@
   }
 }
 
-/* Final mobile-safe Study Materials layout. Long PDF names must never push actions off-screen. */
+/* Mobile-safe Study Materials layout. Long PDF names must never push actions off-screen. */
 @media (max-width: 700px) {
   html, body, #root {
     width: 100% !important;
@@ -133,7 +133,6 @@
     overflow-x: hidden !important;
   }
 
-  /* The exact material row contains the View/Download buttons. */
   div[style*="display:flex"]:has(> div > button),
   div[style*="display: flex"]:has(> div > button) {
     display: flex !important;
@@ -148,7 +147,6 @@
     overflow: visible !important;
   }
 
-  /* The title/name block gets the complete card width. */
   div[style*="display:flex"]:has(> div > button) > div:first-child,
   div[style*="display: flex"]:has(> div > button) > div:first-child {
     display: block !important;
@@ -160,7 +158,6 @@
     overflow: hidden !important;
   }
 
-  /* Break long filenames, including strings with underscores/no spaces. */
   div[style*="display:flex"]:has(> div > button) > div:first-child *,
   div[style*="display: flex"]:has(> div > button) > div:first-child * {
     min-width: 0 !important;
@@ -170,7 +167,6 @@
     word-break: break-word !important;
   }
 
-  /* Buttons always occupy a separate row inside the card. */
   div[style*="display:flex"]:has(> div > button) > div:last-child,
   div[style*="display: flex"]:has(> div > button) > div:last-child {
     display: flex !important;
@@ -200,11 +196,75 @@
   }
 }
 
-/* Extra-small phones: stack the two actions so they can never overflow. */
 @media (max-width: 380px) {
   div[style*="display:flex"]:has(> div > button) > div:last-child > button,
   div[style*="display: flex"]:has(> div > button) > div:last-child > button {
     flex: 1 1 100% !important;
     width: 100% !important;
   }
+}
+
+/* Application-wide responsive foundation. Desktop keeps the full admin workspace; phones get a compact app-like layout. */
+* { min-width: 0; }
+img, video, canvas, svg { max-width: 100%; }
+button, a, input, select, textarea { max-width: 100%; }
+
+@media (max-width: 900px) {
+  body { margin: 0; overflow-x: hidden; }
+  #root { min-height: 100dvh; overflow-x: hidden; }
+
+  .admin { width: 100%; min-width: 0; overflow-x: hidden; }
+  .admin .shell { width: 100%; min-width: 0; }
+  .admin .side { width: 100% !important; min-width: 0 !important; position: sticky !important; top: 0; z-index: 40; }
+  .admin .navrow { width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; gap: 4px; }
+  .admin .navrow::-webkit-scrollbar { display: none; }
+  .admin .nav { flex: 0 0 auto; min-height: 44px; }
+  .admin .main { width: 100%; min-width: 0 !important; }
+  .admin .top { width: 100%; min-width: 0; flex-wrap: wrap; gap: 10px; }
+  .admin .content { width: 100%; max-width: 100%; min-width: 0; padding: 16px !important; overflow-x: hidden; }
+  .admin .grid { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) !important; }
+  .admin .twocol { grid-template-columns: minmax(0, 1fr) !important; }
+  .admin .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .admin .tablewrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  .admin .table { min-width: 720px; }
+  .admin .modal { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+  .admin .modalbox { width: 100% !important; max-width: 100% !important; max-height: calc(100dvh - 20px); border-radius: 18px; padding: 18px; }
+  .admin .field input, .admin .field select, .admin .field textarea { font-size: 16px; min-height: 44px; }
+  .admin .btn { min-height: 44px; touch-action: manipulation; }
+  .admin .actions { flex-wrap: wrap !important; }
+  .admin .actions > * { min-width: 110px; }
+
+  /* Study-material drive */
+  body > div[style*="background:#F0F4FF"],
+  body > div[style*="background: #F0F4FF"] { width: 100%; max-width: 100%; overflow-x: hidden; }
+}
+
+@media (max-width: 600px) {
+  .admin .stats { grid-template-columns: minmax(0, 1fr) !important; }
+  .admin .top h1 { font-size: 18px !important; line-height: 1.25; }
+  .admin .top p { max-width: 100%; }
+  .admin .content { padding: 12px !important; }
+  .admin .card { width: 100%; max-width: 100%; border-radius: 16px; }
+  .admin .actions > * { flex: 1 1 100%; width: 100%; }
+
+  /* V2 Study Materials uses inline styles, so these rules deliberately target only its structure. */
+  .materials-drive-shell { width: 100%; max-width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .admin .modalbox { padding: 14px; border-radius: 16px; }
+  .admin .btn { padding: 10px 12px; }
+  .admin .nav { padding-inline: 12px; }
+}
+
+/* Landscape phones/tablets: keep touch targets comfortable without wasting width. */
+@media (min-width: 601px) and (max-width: 1100px) {
+  .admin .content { padding: 20px !important; }
+  .admin .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .admin .twocol { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+/* Respect device safe areas on phones. */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body { padding-bottom: env(safe-area-inset-bottom); }
 }
