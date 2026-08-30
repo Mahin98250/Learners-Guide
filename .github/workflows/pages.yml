@@ -1,8 +1,11 @@
 name: Deploy to GitHub Pages
 
+# GitHub Pages is an optional manual deployment for this private project.
+# Automatic production verification/deployment is handled by the production-check
+# workflow and the hosted application. Pages cannot be auto-enabled by the current
+# repository integration, so do not fail every normal push because the Pages site
+# has not been enabled in repository settings.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -46,7 +49,7 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v6
         with:
-          enablement: true
+          enablement: false
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
