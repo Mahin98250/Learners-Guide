@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
-import { MaterialsDrive } from "@/admin/MaterialsDrive";
+import { MaterialsDriveV2 } from "@/admin/MaterialsDriveV2";
 import { LeaveRequests } from "@/lg/LeaveRequests";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
@@ -44,7 +44,7 @@ export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: 
       <span style={{ color: "#fff", fontWeight: 800, flex: 1 }}>Study Materials · Drive</span>
       <button type="button" onClick={onLogout} style={{ border: "1px solid #ef444466", borderRadius: 10, padding: "9px 13px", background: "#ef44441a", color: "#fecaca", fontWeight: 800, cursor: "pointer" }}>↪ Logout</button>
     </div>
-    <MaterialsDrive />
+    <MaterialsDriveV2 onClose={() => setMaterialsOpen(false)} />
   </div>;
 
   return <>
