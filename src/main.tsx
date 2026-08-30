@@ -6,7 +6,6 @@ import StartupMinimal from "./StartupMinimal";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
-import "./parent-visual-fix.css";
 
 const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
 const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
