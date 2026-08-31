@@ -1,4 +1,4 @@
-const CACHE = "learners-guide-v23";
+const CACHE = "learners-guide-v24";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./file_00000000451c82118020d2baea54f76b.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
