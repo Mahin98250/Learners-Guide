@@ -1,11 +1,19 @@
-/* Student portal shell: restore the full-width mobile app canvas without changing portal content. */
+/* Student portal shell: the app root and its shared Shell must both own the mobile viewport. */
 @media (max-width:700px){
+  .lg-app-shell.portal-student{
+    width:100vw!important;
+    max-width:100vw!important;
+    min-width:0!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+    overflow-x:hidden!important;
+  }
   .portal-student>div:first-child{
     width:100vw!important;
     max-width:100vw!important;
     min-width:0!important;
-    margin-left:calc(50% - 50vw)!important;
-    margin-right:calc(50% - 50vw)!important;
+    margin-left:0!important;
+    margin-right:0!important;
     align-self:stretch!important;
     box-sizing:border-box!important;
   }
