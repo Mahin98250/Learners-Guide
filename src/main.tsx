@@ -6,6 +6,7 @@ import StartupMinimal from "./StartupMinimal";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
+import "./portal-recovery.css";
 
 const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
 const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
@@ -34,11 +35,8 @@ const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router=
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
 
-// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
-  }, { once: true });
+  window.addEventListener("load", () => { void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error)); }, { once: true });
 }
 
 if (typeof window !== "undefined") {
