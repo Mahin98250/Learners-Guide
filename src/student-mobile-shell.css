@@ -10,6 +10,8 @@
     box-sizing:border-box!important;
     overflow-x:hidden!important;
   }
+  /* The shared Shell is a vertical app frame. The broad legacy mobile selector
+     in mobile.css can match the Shell itself, so make its intended axis explicit. */
   .portal-student>div:first-child,
   .portal-teacher>div:first-child,
   .portal-parent>div:first-child{
@@ -20,6 +22,27 @@
     margin-right:0!important;
     align-self:stretch!important;
     box-sizing:border-box!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    justify-content:flex-start!important;
+    flex-wrap:nowrap!important;
+  }
+  .portal-student>div:first-child>header,
+  .portal-teacher>div:first-child>header,
+  .portal-parent>div:first-child>header,
+  .portal-student>div:first-child>div,
+  .portal-teacher>div:first-child>div,
+  .portal-parent>div:first-child>div{
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+  .portal-student>div:first-child>header,
+  .portal-teacher>div:first-child>header,
+  .portal-parent>div:first-child>header{
+    width:100%!important;
+    flex:0 0 auto!important;
   }
   .portal-student>div:first-child>div[style*="overflowY:auto"],
   .portal-student>div:first-child>div[style*="overflowY: auto"],
@@ -30,6 +53,7 @@
     width:100%!important;
     max-width:100%!important;
     min-width:0!important;
+    flex:1 1 auto!important;
     box-sizing:border-box!important;
   }
 }
