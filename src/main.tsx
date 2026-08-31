@@ -6,7 +6,6 @@ import StartupMinimal from "./StartupMinimal";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
-import "./portal-recovery.css";
 
 const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
 const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
@@ -23,7 +22,6 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Learner's Guide: #root element was not found.");
-
 document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-touch-icon"]').forEach(link => { link.href = LOGO_IMG_SRC; });
 
 let router: ReturnType<typeof getRouter> | null = null;
