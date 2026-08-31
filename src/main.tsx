@@ -22,6 +22,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Learner's Guide: #root element was not found.");
+
 document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-touch-icon"]').forEach(link => { link.href = LOGO_IMG_SRC; });
 
 let router: ReturnType<typeof getRouter> | null = null;
@@ -33,8 +34,11 @@ const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router=
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
 
+// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => { void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error)); }, { once: true });
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
+  }, { once: true });
 }
 
 if (typeof window !== "undefined") {
