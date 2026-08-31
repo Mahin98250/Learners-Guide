@@ -117,7 +117,7 @@ export function ParentApp({ user, onLogout }) {
   ) : !selected ? (
     <Card style={{ padding: 24, textAlign: "center", color: "#747c94" }}>No student is linked to this parent account.</Card>
   ) : (
-    <main className="parent-portal">
+    <main className="parent-portal" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}>
       <section className="pp-hero">
         <div className="pp-eyebrow">Parent dashboard</div>
         <h1>Welcome back, {String(user?.name || "Parent").split(" ")[0]} 👋</h1>
