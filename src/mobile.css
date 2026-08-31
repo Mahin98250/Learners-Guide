@@ -2,7 +2,8 @@
 html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}html{min-height:100%;background:#fff}body{min-height:100%;background:#fff;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-y:auto;-webkit-font-smoothing:antialiased}#root{min-height:100dvh;min-height:100svh;overflow:visible!important;padding-bottom:env(safe-area-inset-bottom)}*,*::before,*::after{box-sizing:border-box}img,video,canvas,svg{max-width:100%;height:auto}button,input,select,textarea{max-width:100%;font:inherit}button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text}a{max-width:100%}.selectable,.selectable-content,.copyable{-webkit-user-select:text!important;user-select:text!important}.lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden}
 
 @media (max-width:700px){
-  /* Mobile portals are app canvases: they must own the viewport, not inherit a narrower containing block. */
+  /* The mobile app frame is viewport-owned. Never let an ancestor's narrow percentage width shrink it. */
+  html,body,#root{width:100vw!important;max-width:100vw!important;min-width:100vw!important;margin-left:0!important;margin-right:0!important}
   .lg-app-shell.portal-student,.lg-app-shell.portal-teacher,.lg-app-shell.portal-parent,.lg-app-shell.portal-admin{width:100vw!important;max-width:100vw!important;min-width:100vw!important;margin-left:0!important;margin-right:0!important;overflow-x:hidden!important;display:block!important;position:relative!important}
   .lg-app-shell.portal-student>*,.lg-app-shell.portal-teacher>*,.lg-app-shell.portal-parent>*,.lg-app-shell.portal-admin>*{min-width:0;max-width:100%;box-sizing:border-box}
   .portal-student,.portal-teacher,.portal-parent,.portal-admin,.admin{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
