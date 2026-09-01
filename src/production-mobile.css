@@ -1,11 +1,169 @@
-/* Production mobile shell hardening.
-   This file contains only structural rules that must be shared by every portal.
-   Portal-specific visual design stays in the portal/component styles. */
+/* Production responsive shell + parent portal foundation.
+   Deliberately scoped: it stabilizes layout without rewriting portal behavior. */
+
+/* Parent portal visual system. */
+.portal-parent .parent-portal {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  color: #182044;
+  padding: 0 0 24px;
+}
+
+.portal-parent .pp-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  margin: 0 0 16px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #5146d9, #7c6cf0);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(83,70,210,.16);
+}
+
+.portal-parent .pp-hero::after {
+  content: "";
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: -70px;
+  top: -80px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.09);
+  pointer-events: none;
+}
+
+.portal-parent .pp-eyebrow {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  opacity: .76;
+}
+
+.portal-parent .pp-hero h1 {
+  position: relative;
+  z-index: 1;
+  margin: 5px 0 4px;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.portal-parent .pp-hero p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: 42ch;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: .84;
+}
+
+.portal-parent .pp-child {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 15px;
+}
+
+.portal-parent .pp-avatar {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255,255,255,.17);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.portal-parent .pp-child-copy { min-width: 0; }
+.portal-parent .pp-child-copy b { display: block; font-size: 14px; }
+.portal-parent .pp-child-copy small { display: block; margin-top: 2px; font-size: 10px; opacity: .8; }
+
+.portal-parent .pp-select {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 11px;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-weight: 700;
+}
+.portal-parent .pp-select option { background: #fff; color: #182044; }
+
+.portal-parent .pp-grid,
+.portal-parent .pp-home-actions,
+.portal-parent .pp-more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 16px;
+}
+
+.portal-parent .pp-stat {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e8eaf3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(31,39,79,.05);
+}
+.portal-parent .pp-stat-value { display: block; margin-top: 5px; font-size: 21px; color: #1b2345; }
+.portal-parent .pp-stat span { display: block; margin-top: 2px; font-size: 10px; color: #7b8299; font-weight: 700; }
+
+.portal-parent .pp-home-action,
+.portal-parent .pp-more-card {
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #e8eaf3;
+  border-radius: 16px;
+  background: #fff;
+  color: #182044;
+  text-align: left;
+  box-shadow: 0 5px 18px rgba(31,39,79,.045);
+  cursor: pointer;
+}
+.portal-parent .pp-home-action:hover,
+.portal-parent .pp-more-card:hover { box-shadow: 0 8px 22px rgba(31,39,79,.08); }
+.portal-parent .pp-home-action span,
+.portal-parent .pp-more-icon { font-size: 18px; }
+.portal-parent .pp-home-action b,
+.portal-parent .pp-more-card b { display: block; margin-top: 7px; font-size: 12px; }
+.portal-parent .pp-home-action small,
+.portal-parent .pp-more-card small { display: block; margin-top: 3px; font-size: 9px; line-height: 1.35; color: #7b8299; }
+
+.portal-parent .pp-panel {
+  min-width: 0;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #e8eaf3;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(31,39,79,.045);
+}
+.portal-parent .pp-title { min-width: 0; font-size: 11px; font-weight: 800; overflow-wrap: anywhere; }
+.portal-parent .pp-sub { min-width: 0; margin-top: 2px; font-size: 9px; color: #7b8299; overflow-wrap: anywhere; }
+.portal-parent .pp-note { font-size: 10px; line-height: 1.5; color: #7b8299; }
+.portal-parent .pp-row-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.portal-parent .pp-icon { flex: 0 0 31px; width: 31px; height: 31px; display: grid; place-items: center; border-radius: 10px; background: #f1efff; font-size: 13px; }
 
 @media (max-width: 700px) {
-  html,
-  body,
-  #root {
+  html, body, #root {
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -19,9 +177,7 @@
     overflow-x: hidden !important;
   }
 
-  /* Shell is the first child of the outer portal wrapper. The previous
-     selector incorrectly looked for a nested .lg-app-shell, so the compact
-     header rule never applied. */
+  /* The outer portal wrapper owns .lg-app-shell; Shell itself is its first child. */
   .lg-app-shell > div:first-child {
     width: 100% !important;
     max-width: 430px !important;
@@ -29,16 +185,18 @@
     min-height: 100dvh !important;
   }
 
-  /* Compact shared AppBar without changing its visual identity. */
-  .lg-app-shell > div:first-child > header,
-  .lg-app-shell > div:first-child > div:first-child {
-    box-sizing: border-box !important;
+  /* Actual AppBar container: first child of the Shell root. */
+  .lg-app-shell > div:first-child > div:first-child,
+  .lg-app-shell > div:first-child > header {
+    width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 14px 16px !important;
+    box-sizing: border-box !important;
   }
 
-  /* The shared Shell content viewport must leave a real scroll tail above
-     the fixed navigation bar. */
   .lg-app-shell > div:first-child > div:nth-child(2) {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -47,22 +205,12 @@
     scroll-padding-bottom: calc(116px + env(safe-area-inset-bottom)) !important;
   }
 
-  /* Parent portal: clean, compact, predictable mobile layout. */
   .portal-parent .parent-portal {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow-x: hidden !important;
     padding: 0 14px 24px !important;
   }
 
-  .portal-parent .parent-portal > * {
-    min-width: 0 !important;
-    max-width: 100% !important;
-  }
-
   .portal-parent .pp-hero {
-    margin: 0 0 14px !important;
+    margin-bottom: 14px !important;
     padding: 18px !important;
     border-radius: 20px !important;
   }
@@ -72,17 +220,10 @@
     line-height: 1.15 !important;
   }
 
-  .portal-parent .pp-hero p {
-    max-width: 34ch !important;
-  }
-
   .portal-parent .pp-grid,
   .portal-parent .pp-home-actions,
   .portal-parent .pp-more-grid {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    width: 100% !important;
-    min-width: 0 !important;
+    grid-template-columns: repeat(2, minmax(0,1fr)) !important;
     gap: 9px !important;
   }
 
@@ -112,7 +253,14 @@
     overflow-wrap: anywhere !important;
   }
 
-  .portal-parent .pp-select {
-    min-height: 42px !important;
-  }
+  .portal-parent .pp-select { min-height: 42px !important; }
+}
+
+@media (max-width: 380px) {
+  .portal-parent .pp-grid,
+  .portal-parent .pp-home-actions,
+  .portal-parent .pp-more-grid { gap: 7px !important; }
+  .portal-parent .pp-home-action,
+  .portal-parent .pp-more-card,
+  .portal-parent .pp-stat { padding: 12px !important; }
 }
