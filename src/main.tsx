@@ -7,6 +7,7 @@ import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
 import "./parent-visual-fix.css";
+import "./appbar-redesign.css";
 
 const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
 const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
@@ -28,11 +29,9 @@ document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-tou
 
 /*
  * Mobile lifecycle guard.
- *
  * Android/iOS can restore a background tab from a frozen snapshot and briefly
- * report a different CSS viewport. Do not reload the app or measure the shell:
- * simply keep a device-level mobile marker on <html> and let CSS enforce the
- * known-good one-column shell. This is safe on pageshow/visibility restores.
+ * report a different CSS viewport. Keep a device-level marker on <html> so the
+ * responsive CSS can restore the known-good one-column shell.
  */
 function syncMobileViewport() {
   if (typeof window === "undefined") return;
