@@ -10,6 +10,11 @@ function requireText(file, text, reason) {
   if (!content.includes(text)) failures.push(`${file}: ${reason}`);
 }
 
+function forbidText(file, text, reason) {
+  const content = read(file);
+  if (content.includes(text)) failures.push(`${file}: ${reason}`);
+}
+
 requireText("src/lg/data.js", 'supabase.from(t).select("*")', "shared reads no longer use the Supabase table path");
 requireText("src/lg/data.js", "await supabase.from(t).insert(payload)", "shared inserts no longer write through Supabase");
 requireText("src/lg/data.js", "await supabase.from(t).update(payload)", "shared updates no longer write through Supabase");
@@ -19,6 +24,16 @@ requireText("src/lg/data.js", "Supabase insert failed", "write failures are not 
 requireText("src/routes/app.tsx", "portalRefreshKey", "mobile lifecycle refresh guard is missing");
 requireText("src/routes/app.tsx", "clearCache();", "restored-page cache is not cleared");
 requireText("src/routes/app.tsx", "if (event.persisted) refreshAfterRestore();", "BFCache restore is not handled");
+
+requireText("src/lg/teacherHomeworkApp.jsx", 'select("id,name,tid,subject,phone,classes,status")', "teacher profile read must stay payload-scoped");
+requireText("src/lg/teacherHomeworkApp.jsx", 'select("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at")', "teacher homework read must stay payload-scoped");
+forbidText("src/lg/teacherHomeworkApp.jsx", 'from("teachers").select("*")', "teacher portal still contains a wildcard profile read");
+forbidText("src/lg/teacherHomeworkApp.jsx", 'from("homework").select("*")', "teacher portal still contains a wildcard homework read");
+forbidText("src/lg/data.js", 'from("timetable_entries").select("*")', "shared timetable loader still contains a wildcard read");
+requireText("src/lg/data.js", 'select="id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status"', "shared timetable loader must use the verified field set");
+
+requireText("src/routes/app.tsx", 'import { ParentApp } from "@/lg/parentWorkflows";', "active parent route must use the scoped parent workflow");
+forbidText("src/routes/app.tsx", 'import { ParentApp } from "@/lg/parent";', "legacy parent workflow must not become the active route");
 
 requireText("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql", "drop extension if exists pg_graphql", "GraphQL hardening migration is missing");
 requireText("supabase/migrations/20260901150300_phase4f_remove_unused_student_rpc_execution.sql", "get_student_tests()", "unused student RPC hardening migration is missing");
@@ -50,4 +65,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("Production contract checks passed: Supabase source-of-truth, mobile restore recovery, privileged RPC boundaries, migrations and client-secret guard are intact.");
+console.log("Production contract checks passed: scoped portal payloads, active route boundaries, mobile restore recovery, privileged RPC boundaries, migrations and client-secret guard are intact.");
