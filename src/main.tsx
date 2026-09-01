@@ -27,28 +27,60 @@ if (!root) throw new Error("Learner's Guide: #root element was not found.");
 
 document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-touch-icon"]').forEach(link => { link.href = LOGO_IMG_SRC; });
 
-/*
- * Mobile lifecycle guard.
- * Android/iOS can restore a background tab from a frozen snapshot and briefly
- * report a different CSS viewport. Keep a device-level marker on <html> so the
- * responsive CSS can restore the known-good one-column shell.
- */
-function syncMobileViewport() {
-  if (typeof window === "undefined") return;
-  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-  const touch = (navigator.maxTouchPoints || 0) > 0;
+function isMobileViewport() {
+  if (typeof window === "undefined") return false;
   const viewportWidth = Math.min(
     window.innerWidth || Number.POSITIVE_INFINITY,
     window.visualViewport?.width || Number.POSITIVE_INFINITY,
   );
-  document.documentElement.toggleAttribute("data-lg-mobile", coarsePointer || touch || viewportWidth <= 700);
+  return viewportWidth <= 700 || window.matchMedia?.("(pointer: coarse)").matches || (navigator.maxTouchPoints || 0) > 0;
+}
+
+function syncMobileViewport() {
+  if (typeof window === "undefined") return;
+  document.documentElement.toggleAttribute("data-lg-mobile", isMobileViewport());
+}
+
+/*
+ * Production mobile lifecycle guard.
+ * Browsers can restore a frozen/BFCache page with stale geometry. Re-apply the
+ * mobile marker on every lifecycle transition and, only when the mounted app
+ * is measurably crushed, perform one guarded recovery reload. This avoids
+ * accumulating CSS patches while preventing a broken restored snapshot from
+ * becoming the user's persistent app state.
+ */
+function recoverRestoredMobileLayout() {
+  if (typeof window === "undefined" || !isMobileViewport()) return;
+  syncMobileViewport();
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      const shell = document.querySelector<HTMLElement>(".lg-app-shell");
+      if (!shell) return;
+      const viewport = Math.min(window.innerWidth || 0, window.visualViewport?.width || Number.POSITIVE_INFINITY);
+      if (!viewport || viewport > 700) return;
+      const width = shell.getBoundingClientRect().width;
+      const recoveryKey = "lg-mobile-layout-recovery";
+      const recovered = sessionStorage.getItem(recoveryKey) === "1";
+      if (width > 0 && width < viewport * 0.82 && !recovered) {
+        sessionStorage.setItem(recoveryKey, "1");
+        window.location.reload();
+      } else if (width >= viewport * 0.82 && recovered) {
+        sessionStorage.removeItem(recoveryKey);
+      }
+    });
+  });
 }
 
 syncMobileViewport();
 window.addEventListener("resize", syncMobileViewport, { passive: true });
 window.visualViewport?.addEventListener("resize", syncMobileViewport, { passive: true });
-window.addEventListener("pageshow", syncMobileViewport, { passive: true });
-document.addEventListener("visibilitychange", syncMobileViewport, { passive: true });
+window.addEventListener("pageshow", recoverRestoredMobileLayout, { passive: true });
+window.addEventListener("pagehide", () => { syncMobileViewport(); }, { passive: true });
+document.addEventListener("visibilitychange", () => {
+  syncMobileViewport();
+  if (document.visibilityState === "visible") recoverRestoredMobileLayout();
+}, { passive: true });
+window.addEventListener("orientationchange", recoverRestoredMobileLayout, { passive: true });
 
 let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
@@ -59,7 +91,6 @@ const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router=
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
 
-// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
