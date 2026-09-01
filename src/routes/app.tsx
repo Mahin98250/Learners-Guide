@@ -1,14 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
-import { TeacherAppWithHomeworkFiles } from "@/lg/teacherHomeworkApp";
-import { StudentApp } from "@/lg/student";
-import { ParentApp } from "@/lg/parentWorkflows";
 import { LeaveAccess } from "@/lg/LeaveAccess";
 import { PushNotificationPrompt } from "@/lg/pushNotifications";
 import ChangePassword from "@/lg/ChangePassword";
+
+const TeacherAppWithHomeworkFiles = lazy(() => import("@/lg/teacherHomeworkApp").then((module) => ({ default: module.TeacherAppWithHomeworkFiles })));
+const StudentApp = lazy(() => import("@/lg/student").then((module) => ({ default: module.StudentApp })));
+const ParentApp = lazy(() => import("@/lg/parentWorkflows").then((module) => ({ default: module.ParentApp })));
 
 const title = "My Dashboard — Learner's Guide";
 const description = "Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
@@ -54,6 +55,31 @@ function Splash({ label, retry }: { label: string; retry?: () => void }) {
           Retry
         </button>
       )}
+    </div>
+  );
+}
+
+function PortalLoading() {
+  return <Splash label="Loading your dashboard…" />;
+}
+
+function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  console.error(error);
+  const router = useNavigate();
+  useEffect(() => {
+    // Keep the existing route-level error behavior intact.
+  }, [error]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">This page didn't load</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Something went wrong on our end. You can try refreshing or head back home.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button onClick={() => { reset(); }} className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">Try again</button>
+          <button onClick={() => router({ to: "/" })} className="inline-flex min-h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent">Go home</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -153,7 +179,7 @@ function AppShell() {
 
   return (
     <div className={`lg-app-shell ${portalClass}`} data-portal={user.role}>
-      {portal}
+      <Suspense fallback={<PortalLoading />}>{portal}</Suspense>
       {(user.role === "student" || user.role === "parent") && <LeaveAccess user={user} student={null} />}
       <PushNotificationPrompt user={user} />
       <ChangePassword />
