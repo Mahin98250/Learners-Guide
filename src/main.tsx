@@ -6,7 +6,6 @@ import StartupMinimal from "./StartupMinimal";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
-import "./production-mobile.css";
 
 const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
 const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
@@ -26,56 +25,6 @@ if (!root) throw new Error("Learner's Guide: #root element was not found.");
 
 document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-touch-icon"]').forEach(link => { link.href = LOGO_IMG_SRC; });
 
-/*
- * Mobile browsers can freeze a page while it is hidden and later restore the
- * exact DOM/CSS snapshot. If a responsive layout was mid-transition when the
- * page was frozen, the restored snapshot can have stale measurements. Keep
- * the app self-healing instead of forcing users to manually reload it.
- */
-function recoverMobileLayout() {
-  if (typeof window === "undefined" || window.innerWidth > 700) return;
-
-  const viewportWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-  document.documentElement.style.setProperty("--lg-viewport-width", `${viewportWidth}px`);
-
-  void document.documentElement.offsetHeight;
-  window.dispatchEvent(new Event("resize"));
-
-  window.requestAnimationFrame(() => {
-    const shell = document.querySelector<HTMLElement>(".lg-app-shell");
-    if (!shell || viewportWidth <= 0) return;
-
-    const shellWidth = shell.getBoundingClientRect().width;
-    const mismatch = shellWidth < viewportWidth * 0.92;
-    const recoveryKey = "lg-mobile-layout-recovery";
-    let recentlyRecovered = false;
-    try {
-      const stamp = Number(sessionStorage.getItem(recoveryKey) || 0);
-      recentlyRecovered = Number.isFinite(stamp) && Date.now() - stamp < 15000;
-    } catch {}
-
-    if (mismatch && !recentlyRecovered) {
-      try { sessionStorage.setItem(recoveryKey, String(Date.now())); } catch {}
-      window.location.reload();
-      return;
-    }
-
-    if (!mismatch && recentlyRecovered) {
-      try { sessionStorage.removeItem(recoveryKey); } catch {}
-    }
-  });
-}
-
-if (typeof window !== "undefined") {
-  const recover = () => window.setTimeout(recoverMobileLayout, 60);
-  window.addEventListener("pageshow", recover);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") recover();
-  });
-  window.addEventListener("orientationchange", recover);
-  recover();
-}
-
 let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
 try { router = getRouter(); } catch (error) { bootstrapError = error instanceof Error ? error : new Error(String(error)); console.error("Learner's Guide router bootstrap failed", error); }
@@ -85,6 +34,7 @@ const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router=
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
 
+// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
