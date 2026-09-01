@@ -1,8 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
+import { reportLovableError } from "../lib/lovable-error-reporting";
 import { LeaveAccess } from "@/lg/LeaveAccess";
 import { PushNotificationPrompt } from "@/lg/pushNotifications";
 import ChangePassword from "@/lg/ChangePassword";
@@ -65,9 +66,9 @@ function PortalLoading() {
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
-  const router = useNavigate();
+  const router = useRouter();
   useEffect(() => {
-    // Keep the existing route-level error behavior intact.
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
   return (
@@ -76,8 +77,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">This page didn't load</h1>
         <p className="mt-2 text-sm text-muted-foreground">Something went wrong on our end. You can try refreshing or head back home.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button onClick={() => { reset(); }} className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">Try again</button>
-          <button onClick={() => router({ to: "/" })} className="inline-flex min-h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent">Go home</button>
+          <button onClick={() => { router.invalidate(); reset(); }} className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">Try again</button>
+          <button onClick={() => router.navigate({ to: "/" })} className="inline-flex min-h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent">Go home</button>
         </div>
       </div>
     </div>
