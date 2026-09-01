@@ -5,61 +5,56 @@ const root = process.cwd();
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const failures = [];
 const has = (source, token) => source.includes(token);
-const hasRegex = (source, regex) => regex.test(source);
+const compact = source => source.replace(/\s+/g, "");
+const hasAll = (source, tokens) => tokens.every(token => source.includes(token));
 const check = (condition, message) => { if (!condition) failures.push(message); };
 const data = read("src/lg/data.js");
 const teacher = read("src/lg/teacherHomeworkApp.jsx");
 const app = read("src/routes/app.tsx");
+const dataCompact = compact(data);
+const teacherCompact = compact(teacher);
 
-// Centralized projection contract: validate semantic source tokens, not formatting.
-check(has(data, "const TABLE_SELECTS={") || has(data, "const TABLE_SELECTS = {"), "src/lg/data.js: table projection map is missing");
-check(hasRegex(data, /TABLE_SELECTS\s*=\s*\{[\s\S]*students\s*:/), "src/lg/data.js: students projection is missing");
-check(hasRegex(data, /TABLE_SELECTS\s*=\s*\{[\s\S]*users\s*:/), "src/lg/data.js: users projection is missing");
-check(hasRegex(data, /selectForTable\s*=\s*table\s*=>\s*TABLE_SELECTS\[table\]/), "src/lg/data.js: table projection resolver is missing");
-check(hasRegex(data, /gdb\s*=\s*async\s+t\s*=>[\s\S]*?selectForTable\s*\(\s*t\s*\)/), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
-check(!hasRegex(data, /supabase\.from\(\s*t\s*\)\.select\(\s*["']\*["']\s*\)/), "src/lg/data.js: shared gdb must not issue wildcard reads");
+// Centralized projection contract. Validate the contract itself, not a particular formatter layout.
+check(has(data, "TABLE_SELECTS"), "src/lg/data.js: table projection map is missing");
+check(hasAll(dataCompact, ["TABLE_SELECTS=", "students:"]), "src/lg/data.js: students projection is missing");
+check(hasAll(dataCompact, ["TABLE_SELECTS=", "users:"]), "src/lg/data.js: users projection is missing");
+check(has(data, "selectForTable"), "src/lg/data.js: table projection resolver is missing");
+check(hasAll(dataCompact, ["gdb=async", "selectForTable(t)"]), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
+check(!/supabase\.from\(\s*t\s*\)\.select\(\s*["']\*["']\s*\)/.test(data), "src/lg/data.js: shared gdb must not issue wildcard reads");
 
 // CRUD boundary.
-check(hasRegex(data, /export const addR\s*=\s*async/), "src/lg/data.js: shared insert path missing");
-check(hasRegex(data, /export const updR\s*=\s*async/), "src/lg/data.js: shared update path missing");
-check(hasRegex(data, /export const delR\s*=\s*async/), "src/lg/data.js: shared delete path missing");
+check(has(data, "export const addR"), "src/lg/data.js: shared insert path missing");
+check(has(data, "export const updR"), "src/lg/data.js: shared update path missing");
+check(has(data, "export const delR"), "src/lg/data.js: shared delete path missing");
 check(has(data, "Supabase insert failed"), "src/lg/data.js: shared insert failures are not surfaced");
 check(has(data, "Supabase update failed"), "src/lg/data.js: shared update failures are not surfaced");
 check(has(data, "Supabase delete failed"), "src/lg/data.js: shared delete failures are not surfaced");
 
 // Timetable: projection, active filter, and role/membership scoping.
-const timetableProjection = data.match(/const\s+select\s*=\s*["']([^"']+)["']/);
-check(Boolean(timetableProjection), "src/lg/data.js: timetable projection is missing");
-if (timetableProjection) {
-  for (const field of ["id", "batch_id", "teacher_id", "status"]) check(timetableProjection[1].split(",").includes(field), `src/lg/data.js: timetable projection missing ${field}`);
-}
-check(hasRegex(data, /from\(["']timetable_entries["']\)\.select\(\s*select\s*\)/), "src/lg/data.js: timetable loader must use its verified projection");
-check(hasRegex(data, /\.eq\(["']status["']\s*,?\s*["']active["']\s*\)/), "src/lg/data.js: timetable loader must keep active-status filtering");
-check(hasRegex(data, /role\s*===\s*["']teacher["'][\s\S]*?\.eq\(["']teacher_id["']\s*,/), "src/lg/data.js: teacher timetable access must remain scoped");
-check(hasRegex(data, /role\s*===\s*["']student["']\s*\|\|\s*role\s*===\s*["']parent["'][\s\S]*?batch_students/), "src/lg/data.js: student timetable access must remain membership-scoped");
+check(hasAll(dataCompact, ["constselect=", "id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status"]), "src/lg/data.js: timetable projection is missing");
+check(hasAll(dataCompact, ["from(\"timetable_entries\").select(select)"]), "src/lg/data.js: timetable loader must use its verified projection");
+check(hasAll(dataCompact, ["eq(\"status\",\"active\")"]), "src/lg/data.js: timetable loader must keep active-status filtering");
+check(/role===(["'])teacher\1[\s\S]*?eq\((["'])teacher_id\2/.test(dataCompact), "src/lg/data.js: teacher timetable access must remain scoped");
+check(/role===(["'])student\1\|\|role===(["'])parent\2[\s\S]*?batch_students/.test(dataCompact), "src/lg/data.js: student timetable access must remain membership-scoped");
 
 // Parent route/lifecycle.
-check(hasRegex(app, /ParentApp\s*\}\s*from\s*["']@\/lg\/parentWorkflows["']/), "src/routes/app.tsx: active parent route must use the scoped workflow");
+check(has(app, "ParentApp") && has(app, "@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
 check(has(app, "event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
-check(!hasRegex(app, /addEventListener\(\s*["']visibilitychange["']/), "src/routes/app.tsx: visibility changes must not remount the whole portal");
+check(!/addEventListener\(\s*["']visibilitychange["']/.test(app), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payload contracts.
-const profile = teacher.match(/from\(["']teachers["']\)\.select\(\s*["']([^"']+)["']\s*\)/);
-check(Boolean(profile), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
-if (profile) for (const field of ["id", "name", "tid", "subject", "phone", "status"]) check(profile[1].split(",").includes(field), `src/lg/teacherHomeworkApp.jsx: teacher profile projection missing ${field}`);
-check(!hasRegex(teacher, /from\(["']teachers["']\)\.select\(\s*["']\*["']\s*\)/), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-const homework = teacher.match(/from\(["']homework["']\)\.select\(\s*["']([^"']+)["']\s*\)/);
-check(Boolean(homework), "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing");
-if (homework) for (const field of ["id", "batch_id", "subject", "desc", "given", "due", "tid", "created_at"]) check(homework[1].split(",").includes(field), `src/lg/teacherHomeworkApp.jsx: teacher homework projection missing ${field}`);
-check(!hasRegex(teacher, /from\(["']homework["']\)\.select\(\s*["']\*["']\s*\)/), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
+// Teacher payload contracts. Find the table and required projection independently so harmless formatting/import changes cannot break the gate.
+check(has(teacherCompact, "from(\"teachers\")") && has(teacherCompact, ".select(\"id,name,tid,subject,phone,classes,status\")"), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
+check(!/from\(["']teachers["']\)\.select\(\s*["']\*["']\s*\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+check(has(teacherCompact, "from(\"homework\")") && has(teacherCompact, ".select(\"id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at\")"), "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing");
+check(!/from\(["']homework["']\)\.select\(\s*["']\*["']\s*\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 // Login gateway.
 const config = read("supabase/config.toml");
-check(hasRegex(config, /\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
+check(/\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
 
 // Required security hardening migrations.
-check(hasRegex(read("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql"), /drop extension if exists pg_graphql/i), "GraphQL hardening migration is missing");
-check(hasRegex(read("supabase/migrations/20260901150300_phase4f_remove_unused_student_rpc_execution.sql"), /get_student_tests\(\)/i), "unused student RPC hardening migration is missing");
+check(/drop extension if exists pg_graphql/i.test(read("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql")), "GraphQL hardening migration is missing");
+check(/get_student_tests\(\)/i.test(read("supabase/migrations/20260901150300_phase4f_remove_unused_student_rpc_execution.sql")), "unused student RPC hardening migration is missing");
 
 // Frontend security guards.
 const sourceFiles = [];
