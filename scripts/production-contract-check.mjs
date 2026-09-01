@@ -14,12 +14,12 @@ const app = read("src/routes/app.tsx");
 const dataCompact = compact(data);
 const teacherCompact = compact(teacher);
 
-// Centralized projection contract. Validate the contract itself, not a particular formatter layout.
+// Centralized projection contract: validate behavior/patterns, not formatter layout.
 check(has(data, "TABLE_SELECTS"), "src/lg/data.js: table projection map is missing");
-check(hasAll(dataCompact, ["TABLE_SELECTS=", "students:"]), "src/lg/data.js: students projection is missing");
-check(hasAll(dataCompact, ["TABLE_SELECTS=", "users:"]), "src/lg/data.js: users projection is missing");
-check(has(data, "selectForTable"), "src/lg/data.js: table projection resolver is missing");
-check(hasAll(dataCompact, ["gdb=async", "selectForTable(t)"]), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
+check(/TABLE_SELECTS\s*=\s*\{[\s\S]*?students\s*:/m.test(data), "src/lg/data.js: students projection is missing");
+check(/TABLE_SELECTS\s*=\s*\{[\s\S]*?users\s*:/m.test(data), "src/lg/data.js: users projection is missing");
+check(/(?:const|function)\s+selectForTable\s*[=(]/.test(data), "src/lg/data.js: table projection resolver is missing");
+check(/async function gdb\s*\([^)]*\)[\s\S]*?selectForTable\s*\(\s*t\s*\)/m.test(data), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
 check(!/supabase\.from\(\s*t\s*\)\.select\(\s*["']\*["']\s*\)/.test(data), "src/lg/data.js: shared gdb must not issue wildcard reads");
 
 // CRUD boundary.
@@ -31,22 +31,26 @@ check(has(data, "Supabase update failed"), "src/lg/data.js: shared update failur
 check(has(data, "Supabase delete failed"), "src/lg/data.js: shared delete failures are not surfaced");
 
 // Timetable: projection, active filter, and role/membership scoping.
-check(hasAll(dataCompact, ["constselect=", "id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status"]), "src/lg/data.js: timetable projection is missing");
-check(hasAll(dataCompact, ["from(\"timetable_entries\").select(select)"]), "src/lg/data.js: timetable loader must use its verified projection");
-check(hasAll(dataCompact, ["eq(\"status\",\"active\")"]), "src/lg/data.js: timetable loader must keep active-status filtering");
-check(/role===(["'])teacher\1[\s\S]*?eq\((["'])teacher_id\2/.test(dataCompact), "src/lg/data.js: teacher timetable access must remain scoped");
-check(/role===(["'])student\1\|\|role===(["'])parent\2[\s\S]*?batch_students/.test(dataCompact), "src/lg/data.js: student timetable access must remain membership-scoped");
+check(/timetable_entries\s*:\s*["'][^"']*id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status[^"']*["']/m.test(data), "src/lg/data.js: timetable projection is missing");
+check(/from\(\s*["']timetable_entries["']\s*\)\.select\(\s*select\s*\)/.test(data), "src/lg/data.js: timetable loader must use its verified projection");
+check(/\.eq\(\s*["']status["']\s*,\s*["']active["']\s*\)/.test(data), "src/lg/data.js: timetable loader must keep active-status filtering");
+check(/role\s*===\s*["']teacher["'][\s\S]*?\.eq\(\s*["']teacher_id["']/.test(data), "src/lg/data.js: teacher timetable access must remain scoped");
+check(/role\s*===\s*["']student["']\s*\|\|\s*role\s*===\s*["']parent["'][\s\S]*?batch_students/.test(data), "src/lg/data.js: student timetable access must remain membership-scoped");
 
 // Parent route/lifecycle.
 check(has(app, "ParentApp") && has(app, "@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
 check(has(app, "event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!/addEventListener\(\s*["']visibilitychange["']/.test(app), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payload contracts. Find the table and required projection independently so harmless formatting/import changes cannot break the gate.
-check(has(teacherCompact, "from(\"teachers\")") && has(teacherCompact, ".select(\"id,name,tid,subject,phone,classes,status\")"), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
-check(!/from\(["']teachers["']\)\.select\(\s*["']\*["']\s*\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-check(has(teacherCompact, "from(\"homework\")") && has(teacherCompact, ".select(\"id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at\")"), "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing");
-check(!/from\(["']homework["']\)\.select\(\s*["']\*["']\s*\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
+// Teacher payload contracts. Match the actual Supabase table/read pair and verify required columns semantically.
+const teacherProfileRead = /supabase\.from\(\s*["']teachers["']\s*\)\.select\(\s*["']([^"']+)["']\s*\)/m.exec(teacher);
+check(Boolean(teacherProfileRead), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
+check(Boolean(teacherProfileRead && ["id", "name", "tid", "subject", "phone", "classes", "status"].every(field => teacherProfileRead[1].split(",").includes(field))), "src/lg/teacherHomeworkApp.jsx: teacher profile projection is incomplete");
+check(!/from\(\s*["']teachers["']\s*\)\.select\(\s*["']\*["']\s*\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+const teacherHomeworkRead = /supabase\.from\(\s*["']homework["']\s*\)\.select\(\s*["']([^"']+)["']\s*\)/m.exec(teacher);
+check(Boolean(teacherHomeworkRead), "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing");
+check(Boolean(teacherHomeworkRead && ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"].every(field => teacherHomeworkRead[1].split(",").includes(field))), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(!/from\(\s*["']homework["']\s*\)\.select\(\s*["']\*["']\s*\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 // Login gateway.
 const config = read("supabase/config.toml");
