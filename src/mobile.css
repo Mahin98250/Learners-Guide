@@ -1,4 +1,4 @@
-/* Learner's Guide responsive foundation. Keep layout fluid and let components own their internal layout. */
+/* Production responsive foundation: constrain the app shell, never arbitrary descendants. */
 html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}
 html{min-height:100%;background:#fff}
 body{min-height:100%;background:#fff;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-y:auto;-webkit-font-smoothing:antialiased}
@@ -13,26 +13,17 @@ a{max-width:100%}
 .lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden}
 .lg-app-shell>*{min-width:0;max-width:100%}
 
-/* Android/iOS restored-tab fallback. Only the actual application shell is constrained; never rewrite arbitrary flex children. */
+/* Restored browser/PWA tabs: identify the real Shell only. Do not force widths
+   onto its internal children; that was the source of the collapsed/mismatched UI. */
 html[data-lg-mobile] .lg-app-shell{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important}
-html[data-lg-mobile] .lg-app-shell>div:first-child{width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;display:flex!important;flex-direction:column!important;overflow-x:hidden!important}
-html[data-lg-mobile] .lg-app-shell>div:first-child>div{min-width:0!important;max-width:100%!important;width:100%!important}
+html[data-lg-mobile] .lg-app-shell>div:first-child{width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;overflow-x:hidden!important}
 
 @media (max-width:700px){
   .portal-student,.portal-teacher,.portal-parent,.portal-admin,.admin{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
-  .portal-student [style*="grid-template-columns"],.portal-teacher [style*="grid-template-columns"],.portal-parent [style*="grid-template-columns"],.portal-admin [style*="grid-template-columns"]{min-width:0!important;max-width:100%!important}
-  .portal-student [style*="minWidth: 600"],.portal-student [style*="min-width: 600"],.portal-teacher [style*="minWidth: 600"],.portal-teacher [style*="min-width: 600"],.portal-parent [style*="minWidth: 600"],.portal-parent [style*="min-width: 600"],.portal-admin [style*="minWidth: 600"],.portal-admin [style*="min-width: 600"]{min-width:0!important;max-width:100%!important}
-  .portal-student [style*="minWidth: 650"],.portal-student [style*="min-width: 650"],.portal-teacher [style*="minWidth: 650"],.portal-teacher [style*="min-width: 650"],.portal-parent [style*="minWidth: 650"],.portal-parent [style*="min-width: 650"],.portal-admin [style*="minWidth: 650"],.portal-admin [style*="min-width: 650"]{min-width:0!important;max-width:100%!important}
-
-  /* Shared bottom navigation remains controlled by its own component/inline layout. */
   .portal-student .nav-tab,.portal-teacher .nav-tab,.portal-parent .nav-tab{min-width:0!important}
   .portal-student .nav-tab span,.portal-teacher .nav-tab span,.portal-parent .nav-tab span{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:10px!important;line-height:1.15!important}
-
-  /* Keep touch targets usable without changing arbitrary flex rows. */
   .portal-student button,.portal-teacher button,.portal-parent button,.portal-admin button,.portal-student [role="button"],.portal-teacher [role="button"],.portal-parent [role="button"],.portal-admin [role="button"]{min-height:42px}
   .portal-student input,.portal-student select,.portal-student textarea,.portal-teacher input,.portal-teacher select,.portal-teacher textarea,.portal-parent input,.portal-parent select,.portal-parent textarea,.portal-admin input,.portal-admin select,.portal-admin textarea{font-size:16px}
-
-  /* Parent-specific content safety. */
   .portal-parent .parent-portal{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
   .portal-parent .pp-title,.portal-parent .pp-sub,.portal-parent .pp-note{overflow-wrap:anywhere;word-break:break-word}
 }
@@ -41,17 +32,13 @@ html[data-lg-mobile] .lg-app-shell>div:first-child>div{min-width:0!important;max
   .portal-student .nav-tab,.portal-teacher .nav-tab,.portal-parent .nav-tab{font-size:9px!important}
 }
 
-@media (min-width:701px) and (max-width:1100px){
-  .lg-app-shell,.portal-student,.portal-teacher,.portal-parent,.portal-admin,.admin{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
-  .portal-student [style*="minWidth: 600"],.portal-student [style*="min-width: 600"],.portal-teacher [style*="minWidth: 600"],.portal-teacher [style*="min-width: 600"],.portal-parent [style*="minWidth: 600"],.portal-parent [style*="min-width: 600"],.portal-admin [style*="minWidth: 600"],.portal-admin [style*="min-width: 600"]{min-width:0!important;max-width:100%!important}
-  .portal-student table,.portal-teacher table,.portal-parent table,.portal-admin table{max-width:100%;overflow-x:auto}
-}
 @media (max-width:900px){
   .portal-admin .admin-content,.admin .admin-content{max-width:100%;min-width:0}
   .portal-admin .responsive-card-grid,.admin .responsive-card-grid{min-width:0}
   .portal-admin .responsive-table,.admin .responsive-table{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .portal-admin .responsive-modal,.admin .responsive-modal{width:min(calc(100% - 24px),680px);max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}
 }
+
 @media (display-mode:standalone){
   html,body{width:100%;min-height:100%;overflow-x:hidden}
   body{margin:0}
