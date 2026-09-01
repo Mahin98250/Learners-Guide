@@ -5,18 +5,43 @@
 .portal-parent{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important}
 .portal-parent .parent-portal{width:100%!important;max-width:100%!important;min-width:0!important;padding:0 16px 28px!important;color:#182044!important}
 
-/* Parent portal surface: keep the entire mobile page on one calm, continuous background. */
+/* Premium continuous page surface: soft indigo/lilac mesh inspired by modern Apple-style app surfaces. */
 @media (max-width:700px){
   .portal-parent>div:first-child{
+    position:relative!important;
+    isolation:isolate!important;
     width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;
     min-height:100dvh!important;overflow:hidden!important;
     background:
-      radial-gradient(circle at 88% 8%,rgba(113,92,232,.10) 0 78px,transparent 79px),
-      linear-gradient(180deg,#f7f8ff 0%,#eef2ff 52%,#edf1ff 100%)!important;
+      radial-gradient(120% 48% at 8% 0%,rgba(112,92,235,.18) 0%,rgba(112,92,235,.06) 34%,transparent 64%),
+      radial-gradient(90% 42% at 100% 24%,rgba(96,114,238,.14) 0%,rgba(96,114,238,.04) 38%,transparent 72%),
+      radial-gradient(100% 52% at 50% 100%,rgba(126,102,235,.13) 0%,rgba(126,102,235,.045) 42%,transparent 75%),
+      linear-gradient(180deg,#f5f6ff 0%,#f0f3ff 48%,#eaf0ff 100%)!important;
   }
+  .portal-parent>div:first-child::before{
+    content:""!important;
+    position:absolute!important;
+    inset:-120px -90px auto auto!important;
+    width:250px!important;height:250px!important;
+    border-radius:50%!important;
+    background:radial-gradient(circle,rgba(117,98,239,.13) 0%,rgba(117,98,239,.045) 48%,transparent 72%)!important;
+    pointer-events:none!important;
+    z-index:0!important;
+  }
+  .portal-parent>div:first-child::after{
+    content:""!important;
+    position:absolute!important;
+    left:-130px!important;bottom:55px!important;
+    width:260px!important;height:260px!important;
+    border-radius:50%!important;
+    background:radial-gradient(circle,rgba(93,120,235,.10) 0%,rgba(93,120,235,.025) 48%,transparent 72%)!important;
+    pointer-events:none!important;
+    z-index:0!important;
+  }
+  .portal-parent>div:first-child>div{position:relative!important;z-index:1!important}
   .portal-parent>div:first-child>div:first-child{
     width:100%!important;min-width:0!important;max-width:100%!important;
-    min-height:0!important;height:156px!important;max-height:156px!important;
+    flex:0 0 156px!important;height:156px!important;max-height:156px!important;
     padding:14px 16px!important;overflow:hidden!important;
     border-radius:0 0 24px 24px!important;
   }
