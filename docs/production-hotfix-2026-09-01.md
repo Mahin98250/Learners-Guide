@@ -3,26 +3,64 @@
 ## Scope
 Four-portal production stabilization: Admin, Teacher, Student, Parent.
 
-## Root cause found
-The previous mobile recovery CSS used structural selectors under `.portal-parent` as if the portal content element were the shared application shell. This caused the parent hero/grid children to be treated as shell header/content/navigation, producing collapsed cards, clipped text, and mixed layouts after restoring a browser tab. A second global rule also forced widths onto every direct child of the shell during mobile recovery.
+## Active architecture reviewed
+- `/app` routes authenticated Teacher, Student and Parent users.
+- `/admin` is the dedicated authenticated Admin route.
+- Student currently uses `StudentApp` re-exported from `StudentAppFixed`.
+- Parent currently uses `ParentApp` from `parentWorkflows.jsx`.
+- Teacher currently uses `TeacherAppWithHomeworkFiles`.
+- Admin currently uses `AdminWithDrive` through the dedicated `/admin` route.
 
-## Fixes applied
-- Replaced the global mobile recovery rules with a narrow shell-only contract.
-- Removed broad descendant width/min-width overrides that could distort Student, Teacher, Parent, or Admin layouts.
-- Rebuilt the Parent visual layer with safe, role-scoped selectors.
-- Added a continuous indigo/lilac page background for Parent.
-- Redesigned the Parent dashboard hero, KPI cards, shortcuts, panels, and spacing.
-- Reduced the Parent mobile header height while retaining the real Learner's Guide logo/AppBar.
-- Made Parent bottom navigation viewport-fixed and added content clearance for it.
-- Added safe responsive rules for narrow phones and desktop layouts.
+## High-confidence root causes addressed
 
-## Supabase baseline
-Live project: `efnxjfzyqbdulpjhffsm`.
+The recent mobile regressions were caused by responsive rules acting on shell structure too broadly and by browser/PWA restoration interacting with a brittle layout boundary. The stable architecture is a single mobile Shell with a header, scrollable content viewport, and bottom navigation.
 
-Current verified counts include 10 students, 1 teacher, 1 batch, 10 active batch-student relationships, 1 batch-teacher relationship, 3 timetable entries, 15 attendance rows, 3 tests, 20 test results, 41 materials, 1 fee row, and 10 parent-student links.
+The current responsive foundation now keeps the shell fluid, prevents horizontal overflow, and avoids rewriting arbitrary descendant flex containers. Student, Teacher and Parent mobile content receives bottom clearance for a viewport-fixed navigation bar.
 
-The live database has RLS policies covering the four role scopes. No destructive data changes or schema changes were made in this hotfix.
+## Parent portal improvements
 
-## Verification status
-- Vercel deployment for the hotfix commit completed successfully.
-- Browser/device role acceptance is still required for final release sign-off because authenticated four-role UI interactions cannot be fully simulated through repository/database tooling alone.
+- compact mobile header boundary;
+- continuous indigo/lilac background with restrained depth;
+- readable hierarchy and spacing;
+- constrained KPI/action cards;
+- safe text wrapping;
+- viewport-fixed bottom navigation with safe-area support;
+- bottom content clearance so the last item is reachable;
+- scoped CSS so Parent styling does not leak into other portals.
+
+The real Learner's Guide logo remains owned by the shared `LGLogo` implementation.
+
+## Admin lifecycle fix
+
+The dedicated `/admin` route now re-checks the current authenticated admin session after a browser visibility/focus restore when the session has not been synchronized recently. This avoids leaving a stale admin session snapshot after returning from another app or tab.
+
+## PWA/cache fix
+
+Service-worker cache generation is now `learners-guide-v32`. JavaScript and CSS continue to prefer fresh network assets when online, while Supabase REST/Auth/Functions requests are not handled by the static asset cache path.
+
+## Supabase/data boundary
+
+No destructive database or schema changes were made in this hotfix. Supabase remains the source of truth for authenticated data.
+
+Earlier Phase 4B checks verified clean key relationships and counts for the current project, including 10 students, 1 teacher, 1 batch, 10 active student memberships, 1 batch-teacher relationship, 3 timetable entries, 15 attendance rows, 3 tests, 20 test results, 41 materials, 1 fee row, and 10 active parent-student links.
+
+## Deployment verification
+
+Latest commit: `5339b41bfc691f2e53800008f9d0a031a6be0006`
+
+Vercel status: **success**.
+
+## Final acceptance boundary
+
+Repository and deployment checks cannot substitute for real-device acceptance. Before client handoff, test all four roles on a real Android/iOS device and desktop browser:
+
+- switch to another app/tab and return;
+- refresh and restore an existing tab;
+- verify zero unintended horizontal scrolling;
+- verify bottom navigation remains fixed for mobile portals;
+- verify long study-material names and download actions;
+- verify Student exams do not duplicate presentation rows;
+- verify Parent Home, Attendance, Homework, Results, More, Classes, Tests, Materials, Fees;
+- verify Teacher dashboard, attendance, homework/material workflows;
+- verify Admin dashboard and management pages;
+- verify login/logout/session restoration.
