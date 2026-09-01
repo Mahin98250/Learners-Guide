@@ -15,34 +15,42 @@ function requirePattern(file, pattern, reason) {
   if (!pattern.test(content)) failures.push(`${file}: ${reason}`);
 }
 
-function forbidText(file, text, reason) {
+function forbidPattern(file, pattern, reason) {
   const content = read(file);
-  if (content.includes(text)) failures.push(`${file}: ${reason}`);
+  if (pattern.test(content)) failures.push(`${file}: ${reason}`);
 }
 
-requireText("src/lg/data.js", 'supabase.from(t).select("*")', "shared reads no longer use the Supabase table path");
-requireText("src/lg/data.js", 'supabase.from(t).insert(payload)', "shared inserts no longer write through Supabase");
-requirePattern("src/lg/data.js", /supabase\.from\(t\)\.update\(payload\)/, "shared updates no longer write through Supabase");
-requireText("src/lg/data.js", 'supabase.from(t).delete()', "shared deletes no longer write through Supabase");
+// Shared data layer: verify the real Supabase CRUD path is intact. These are
+// intentionally semantic checks rather than formatter-sensitive string checks.
+requirePattern("src/lg/data.js", /supabase\.from\(t\)\.select\(\s*["']\*["']\s*\)/, "shared reads no longer use the Supabase table path");
+requirePattern("src/lg/data.js", /supabase\.from\(t\)\.insert\(\s*payload\s*\)/, "shared inserts no longer write through Supabase");
+requirePattern("src/lg/data.js", /supabase\.from\(t\)\.update\(\s*payload\s*\)/, "shared updates no longer write through Supabase");
+requirePattern("src/lg/data.js", /supabase\.from\(t\)\.delete\(\s*\)/, "shared deletes no longer write through Supabase");
 requireText("src/lg/data.js", "Supabase insert failed", "write failures are not surfaced from the shared insert path");
 
+// Portal restore/lifecycle safety.
 requireText("src/routes/app.tsx", "portalRefreshKey", "mobile lifecycle refresh guard is missing");
 requireText("src/routes/app.tsx", "clearCache();", "restored-page cache is not cleared");
 requireText("src/routes/app.tsx", "if (event.persisted) refreshAfterRestore();", "BFCache restore is not handled");
 
-requirePattern("src/lg/teacherHomeworkApp.jsx", /from\("teachers"\)\.select\("id,name,tid,subject,phone,classes,status"\)/, "teacher profile read must stay payload-scoped");
-requirePattern("src/lg/teacherHomeworkApp.jsx", /from\("homework"\)\.select\("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at"\)/, "teacher homework read must stay payload-scoped");
-forbidText("src/lg/teacherHomeworkApp.jsx", 'from("teachers").select("*")', "teacher portal still contains a wildcard profile read");
-forbidText("src/lg/teacherHomeworkApp.jsx", 'from("homework").select("*")', "teacher portal still contains a wildcard homework read");
-forbidText("src/lg/data.js", 'from("timetable_entries").select("*")', "shared timetable loader still contains a wildcard read");
-requirePattern("src/lg/data.js", /const select\s*=\s*"id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status"/, "shared timetable loader must use the verified field set");
+// Teacher portal: assert the verified payloads without depending on spacing,
+// quote style, or whether the Supabase client is assigned to an intermediate var.
+requirePattern("src/lg/teacherHomeworkApp.jsx", /from\(\s*["']teachers["']\s*\)\.select\(\s*["']id,name,tid,subject,phone,classes,status["']\s*\)/, "teacher profile read must stay payload-scoped");
+requirePattern("src/lg/teacherHomeworkApp.jsx", /from\(\s*["']homework["']\s*\)\.select\(\s*["']id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at["']\s*\)/, "teacher homework read must stay payload-scoped");
+forbidPattern("src/lg/teacherHomeworkApp.jsx", /from\(\s*["']teachers["']\s*\)\.select\(\s*["']\*["']\s*\)/, "teacher portal still contains a wildcard profile read");
+forbidPattern("src/lg/teacherHomeworkApp.jsx", /from\(\s*["']homework["']\s*\)\.select\(\s*["']\*["']\s*\)/, "teacher portal still contains a wildcard homework read");
+forbidPattern("src/lg/data.js", /from\(\s*["']timetable_entries["']\s*\)\.select\(\s*["']\*["']\s*\)/, "shared timetable loader still contains a wildcard read");
+requirePattern("src/lg/data.js", /const\s+select\s*=\s*["']id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status["']/, "shared timetable loader must use the verified field set");
 
+// Active parent route boundary.
 requireText("src/routes/app.tsx", 'import { ParentApp } from "@/lg/parentWorkflows";', "active parent route must use the scoped parent workflow");
-forbidText("src/routes/app.tsx", 'import { ParentApp } from "@/lg/parent";', "legacy parent workflow must not become the active route");
+forbidPattern("src/routes/app.tsx", /import\s*\{\s*ParentApp\s*\}\s*from\s*["']@\/lg\/parent["'];/, "legacy parent workflow must not become the active route");
 
+// Required hardening migrations are part of the production contract.
 requireText("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql", "drop extension if exists pg_graphql", "GraphQL hardening migration is missing");
 requireText("supabase/migrations/20260901150300_phase4f_remove_unused_student_rpc_execution.sql", "get_student_tests()", "unused student RPC hardening migration is missing");
 
+// Frontend must never contain privileged credentials or revoked helper RPCs.
 const sourceFiles = [];
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
