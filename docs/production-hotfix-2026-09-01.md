@@ -36,7 +36,11 @@ The dedicated `/admin` route now re-checks the current authenticated admin sessi
 
 ## PWA/cache fix
 
-Service-worker cache generation is now `learners-guide-v32`. JavaScript and CSS continue to prefer fresh network assets when online, while Supabase REST/Auth/Functions requests are not handled by the static asset cache path.
+Service-worker cache generation is now `learners-guide-v33`. JavaScript and CSS continue to prefer fresh network assets when online, while Supabase REST/Auth/Functions requests are not handled by the static asset cache path. The cache generation bump forces devices that still hold the previous PWA shell/assets to activate the current production bundle.
+
+## Student assessment integrity fix
+
+Student exams/tests now use a normalized assessment key based on title, subject, and date. Matching schedule copies are suppressed in favor of the batch-scoped `tests` record, and repeated test rows with the same assessment key are rendered once. This keeps the student-facing list aligned with the authoritative batch test data without changing database records.
 
 ## Supabase/data boundary
 
@@ -46,9 +50,7 @@ Earlier Phase 4B checks verified clean key relationships and counts for the curr
 
 ## Deployment verification
 
-Latest commit: `5339b41bfc691f2e53800008f9d0a031a6be0006`
-
-Vercel status: **success**.
+The latest changes are pushed directly to `main` and trigger both repository CI and the production-check workflow. The repository CI run for the assessment-integrity change completed successfully, including changed-file formatting, TypeScript typecheck, and production build.
 
 ## Final acceptance boundary
 
