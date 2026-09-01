@@ -6,6 +6,7 @@ import StartupMinimal from "./StartupMinimal";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import "./mobile.css";
+import "./production-mobile.css";
 
 const InstallAppPrompt = lazy(() => import("./InstallAppPrompt"));
 const DatabaseActivityOverlay = lazy(() => import("./DatabaseActivityOverlay"));
@@ -37,8 +38,6 @@ function recoverMobileLayout() {
   const viewportWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
   document.documentElement.style.setProperty("--lg-viewport-width", `${viewportWidth}px`);
 
-  // Give flex/grid and media-query consumers a fresh measurement after a
-  // BFCache/tab restore without changing the user's route or scroll position.
   void document.documentElement.offsetHeight;
   window.dispatchEvent(new Event("resize"));
 
@@ -86,7 +85,6 @@ const app = router ? <AppErrorBoundary><StartupMinimal /><RouterProvider router=
 
 ReactDOM.createRoot(root).render(<React.StrictMode>{app}</React.StrictMode>);
 
-// Non-critical startup work runs after the first paint so the UI becomes interactive sooner.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: "none" }).catch(error => console.warn("Learner's Guide: service worker registration failed", error));
