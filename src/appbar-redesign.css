@@ -1,0 +1,145 @@
+/*
+ * Learner's Guide — shared portal AppBar redesign
+ *
+ * This is intentionally a small, component-bound presentation layer.
+ * The Shell owns the first child (header), second child (scroll content),
+ * and last child (bottom navigation). We style only that header so portal
+ * content and Supabase workflows are untouched.
+ *
+ * Branding remains the existing real LOGO_IMG_SRC rendered by AppBar.
+ */
+
+@media (max-width: 700px) {
+  .portal-student > div:first-child > div:first-child,
+  .portal-teacher > div:first-child > div:first-child,
+  .portal-parent > div:first-child > div:first-child {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 430px !important;
+    min-width: 0 !important;
+    min-height: 148px !important;
+    height: 148px !important;
+    margin: 0 auto !important;
+    padding: max(18px, env(safe-area-inset-top, 0px)) 18px 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    border-radius: 0 0 24px 24px !important;
+    background:
+      radial-gradient(85% 120% at 92% 8%, rgba(113, 92, 244, .42) 0%, rgba(113, 92, 244, 0) 60%),
+      radial-gradient(70% 110% at 6% 96%, rgba(91, 72, 220, .45) 0%, rgba(91, 72, 220, 0) 64%),
+      linear-gradient(135deg, #38228f 0%, #4d35b9 52%, #2d1c78 100%) !important;
+    box-shadow: 0 10px 28px rgba(42, 31, 110, .16) !important;
+    isolation: isolate !important;
+  }
+
+  /* Subtle decorative glow — never changes layout dimensions. */
+  .portal-student > div:first-child > div:first-child::before,
+  .portal-teacher > div:first-child > div:first-child::before,
+  .portal-parent > div:first-child > div:first-child::before {
+    content: "" !important;
+    position: absolute !important;
+    width: 180px !important;
+    height: 180px !important;
+    right: -70px !important;
+    top: -95px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,.08) !important;
+    pointer-events: none !important;
+    z-index: -1 !important;
+  }
+
+  .portal-student > div:first-child > div:first-child::after,
+  .portal-teacher > div:first-child > div:first-child::after,
+  .portal-parent > div:first-child > div:first-child::after {
+    content: "" !important;
+    position: absolute !important;
+    width: 150px !important;
+    height: 150px !important;
+    left: -82px !important;
+    bottom: -105px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,.055) !important;
+    pointer-events: none !important;
+    z-index: -1 !important;
+  }
+
+  /* AppBar's immediate content is kept compact and horizontally stable. */
+  .portal-student > div:first-child > div:first-child > div,
+  .portal-teacher > div:first-child > div:first-child > div,
+  .portal-parent > div:first-child > div:first-child > div {
+    min-width: 0 !important;
+  }
+
+  /* Existing real logo: never replace it with an icon or generated artwork. */
+  .portal-student > div:first-child > div:first-child img,
+  .portal-teacher > div:first-child > div:first-child img,
+  .portal-parent > div:first-child > div:first-child img {
+    flex: 0 0 auto !important;
+    width: 48px !important;
+    height: 48px !important;
+    max-width: 48px !important;
+    object-fit: contain !important;
+    border-radius: 13px !important;
+  }
+
+  /* Keep the identity block readable without allowing long names to push
+     notification/logout controls off-screen. */
+  .portal-student > div:first-child > div:first-child h1,
+  .portal-student > div:first-child > div:first-child h2,
+  .portal-student > div:first-child > div:first-child p,
+  .portal-teacher > div:first-child > div:first-child h1,
+  .portal-teacher > div:first-child > div:first-child h2,
+  .portal-teacher > div:first-child > div:first-child p,
+  .portal-parent > div:first-child > div:first-child h1,
+  .portal-parent > div:first-child > div:first-child h2,
+  .portal-parent > div:first-child > div:first-child p {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  /* AppBar controls: compact touch targets, no oversized transparent blocks. */
+  .portal-student > div:first-child > div:first-child button,
+  .portal-teacher > div:first-child > div:first-child button,
+  .portal-parent > div:first-child > div:first-child button {
+    min-width: 42px !important;
+    min-height: 42px !important;
+    max-width: 112px !important;
+    border-radius: 13px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .portal-student > div:first-child > div:first-child,
+  .portal-teacher > div:first-child > div:first-child,
+  .portal-parent > div:first-child > div:first-child {
+    min-height: 138px !important;
+    height: 138px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    border-radius: 0 0 20px 20px !important;
+  }
+
+  .portal-student > div:first-child > div:first-child img,
+  .portal-teacher > div:first-child > div:first-child img,
+  .portal-parent > div:first-child > div:first-child img {
+    width: 44px !important;
+    height: 44px !important;
+    max-width: 44px !important;
+  }
+}
+
+@media (min-width: 701px) {
+  /* Desktop keeps the portal's existing layout, but gives the shared header
+     a cleaner, deliberate shape without forcing a phone-width canvas. */
+  .portal-student > div:first-child > div:first-child,
+  .portal-teacher > div:first-child > div:first-child,
+  .portal-parent > div:first-child > div:first-child {
+    position: relative !important;
+    overflow: hidden !important;
+    background:
+      radial-gradient(70% 140% at 95% 0%, rgba(113, 92, 244, .38) 0%, rgba(113, 92, 244, 0) 62%),
+      linear-gradient(135deg, #38228f 0%, #4d35b9 52%, #2d1c78 100%) !important;
+  }
+}
