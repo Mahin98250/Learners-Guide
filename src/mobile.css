@@ -1,7 +1,7 @@
 /* Production responsive foundation: constrain the app shell, never arbitrary descendants. */
 html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}
-html{min-height:100%;background:#fff}
-body{min-height:100%;background:#fff;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-y:auto;-webkit-font-smoothing:antialiased}
+html{min-height:100%;background:#f4f6ff}
+body{min-height:100%;background:#f4f6ff;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-y:auto;-webkit-font-smoothing:antialiased}
 #root{min-height:100dvh;min-height:100svh;overflow:visible!important;padding-bottom:env(safe-area-inset-bottom)}
 *,*::before,*::after{box-sizing:border-box}
 img,video,canvas,svg{max-width:100%;height:auto}
@@ -10,16 +10,24 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
 a{max-width:100%}
 .selectable,.selectable-content,.copyable{-webkit-user-select:text!important;user-select:text!important}
-.lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden}
+.lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden;background:#f0f3ff}
 .lg-app-shell>*{min-width:0;max-width:100%}
 
 /* Restored browser/PWA tabs: identify the real Shell only. Do not force widths
-   onto its internal children; that was the source of the collapsed/mismatched UI. */
-html[data-lg-mobile] .lg-app-shell{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important}
-html[data-lg-mobile] .lg-app-shell>div:first-child{width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;overflow-x:hidden!important}
+   onto arbitrary descendants; that was the source of the collapsed/mismatched UI. */
+html[data-lg-mobile] .lg-app-shell{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important;background:#f0f3ff!important}
+html[data-lg-mobile] .lg-app-shell>div:first-child{width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;overflow-x:hidden!important;background:linear-gradient(180deg,#f8f9ff 0%,#f1f4ff 50%,#eaf0ff 100%)!important}
 
 @media (max-width:700px){
   .portal-student,.portal-teacher,.portal-parent,.portal-admin,.admin{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
+
+  /* Shared mobile-app frame: content scrolls, navigation stays attached to the viewport. */
+  .portal-student>div:first-child>div:nth-child(2),.portal-teacher>div:first-child>div:nth-child(2),.portal-parent>div:first-child>div:nth-child(2){padding-bottom:calc(78px + env(safe-area-inset-bottom,0px))!important;background:transparent!important}
+  .portal-student>div:first-child>div:last-child,.portal-teacher>div:first-child>div:last-child,.portal-parent>div:first-child>div:last-child{position:fixed!important;left:50%!important;bottom:0!important;transform:translateX(-50%)!important;width:min(430px,100vw)!important;max-width:430px!important;min-width:0!important;min-height:68px!important;padding:8px 6px env(safe-area-inset-bottom,0px)!important;background:rgba(255,255,255,.97)!important;border-top:1px solid rgba(225,230,244,.96)!important;box-shadow:0 -10px 30px rgba(31,39,79,.10)!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important;z-index:5000!important}
+
+  /* Calm app background with subtle depth, shared by all mobile portals. */
+  .portal-student>div:first-child,.portal-teacher>div:first-child,.portal-parent>div:first-child{background:radial-gradient(120% 42% at 0% 0%,rgba(97,82,232,.10) 0%,transparent 58%),radial-gradient(100% 46% at 100% 100%,rgba(79,101,228,.09) 0%,transparent 62%),linear-gradient(180deg,#f7f8ff 0%,#eff3ff 55%,#eaf0ff 100%)!important}
+
   .portal-student .nav-tab,.portal-teacher .nav-tab,.portal-parent .nav-tab{min-width:0!important}
   .portal-student .nav-tab span,.portal-teacher .nav-tab span,.portal-parent .nav-tab span{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:10px!important;line-height:1.15!important}
   .portal-student button,.portal-teacher button,.portal-parent button,.portal-admin button,.portal-student [role="button"],.portal-teacher [role="button"],.portal-parent [role="button"],.portal-admin [role="button"]{min-height:42px}
