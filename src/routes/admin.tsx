@@ -25,36 +25,27 @@ function AdminRoute() {
 
   const load = useCallback(async () => {
     setChecking(true);
-    const current = (await getCurrentUser()) as AdminRouteUser | null;
-    if (!current || current.role !== "admin") {
-      clearCache();
-      setUser(null);
-      setChecking(false);
-      return;
-    }
-    await syncAdmin(current);
-  }, [syncAdmin]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  useEffect(() => {
-    const { data } = onAuthStateChange((event: string, nextUser: AdminRouteUser | null) => {
-      if (!nextUser || nextUser.role !== "admin") {
+    try {
+      const current = (await getCurrentUser()) as AdminRouteUser | null;
+      if (!current || current.role !== "admin") {
         clearCache();
         setUser(null);
         setChecking(false);
         return;
       }
-      if (["SIGNED_IN", "USER_UPDATED"].includes(event)) void syncAdmin(nextUser);
-    });
-    return () => { data.subscription.unsubscribe(); };
+      await syncAdmin(current);
+    } catch {
+      setChecking(false);
+    }
   }, [syncAdmin]);
+
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     const refreshWhenVisible = () => {
       if (document.visibilityState !== "visible" || !user) return;
       if (Date.now() - lastSync.current < 30000) return;
-      lastSync.current = Date.now();
+      void load();
     };
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
@@ -62,7 +53,7 @@ function AdminRoute() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
     };
-  }, [user]);
+  }, [user, load]);
 
   if (checking && !user) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>;
   if (!user) return <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void syncAdmin(admin); }} />;
