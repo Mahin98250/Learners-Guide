@@ -5,9 +5,15 @@
 .portal-parent{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important}
 .portal-parent .parent-portal{width:100%!important;max-width:100%!important;min-width:0!important;padding:0 16px 28px!important;color:#182044!important}
 
-/* Shared app shell: compact header without changing the desktop/tablet structure. */
+/* Parent portal surface: keep the entire mobile page on one calm, continuous background. */
 @media (max-width:700px){
-  .portal-parent>div:first-child{width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;overflow-x:hidden!important}
+  .portal-parent>div:first-child{
+    width:min(430px,100%)!important;max-width:430px!important;min-width:0!important;margin:0 auto!important;
+    min-height:100dvh!important;overflow:hidden!important;
+    background:
+      radial-gradient(circle at 88% 8%,rgba(113,92,232,.10) 0 78px,transparent 79px),
+      linear-gradient(180deg,#f7f8ff 0%,#eef2ff 52%,#edf1ff 100%)!important;
+  }
   .portal-parent>div:first-child>div:first-child{
     width:100%!important;min-width:0!important;max-width:100%!important;
     min-height:0!important;height:156px!important;max-height:156px!important;
@@ -17,7 +23,27 @@
   .portal-parent>div:first-child>div:nth-child(2){
     width:100%!important;min-width:0!important;max-width:100%!important;
     flex:1 1 auto!important;min-height:0!important;overflow-x:hidden!important;
-    padding-bottom:18px!important;
+    padding:0 0 calc(88px + env(safe-area-inset-bottom,0px))!important;
+    background:transparent!important;
+  }
+
+  /* The parent bottom navigation is viewport-fixed, not content-sticky. */
+  .portal-parent>div:first-child>div:last-child{
+    position:fixed!important;
+    left:50%!important;
+    bottom:0!important;
+    transform:translateX(-50%)!important;
+    width:min(430px,100vw)!important;
+    max-width:430px!important;
+    min-width:0!important;
+    min-height:70px!important;
+    padding-bottom:env(safe-area-inset-bottom,0px)!important;
+    background:rgba(255,255,255,.97)!important;
+    border-top:1px solid rgba(226,231,246,.96)!important;
+    box-shadow:0 -8px 28px rgba(31,39,79,.10)!important;
+    backdrop-filter:blur(16px)!important;
+    -webkit-backdrop-filter:blur(16px)!important;
+    z-index:5000!important;
   }
 
   /* Keep the real Learner's Guide logo; just make the shared header visually tighter. */
