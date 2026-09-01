@@ -1,4 +1,4 @@
-const CACHE = "learners-guide-v33";
+const CACHE = "learners-guide-v34";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./file_00000000451c82118020d2baea54f76b.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
@@ -39,11 +39,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
     let payload = {};
-    try {
-      payload = event.data ? event.data.json() : {};
-    } catch {
-      payload = { body: event.data?.text?.() || "" };
-    }
+    try { payload = event.data ? event.data.json() : {}; }
+    catch { payload = { body: event.data?.text?.() || "" }; }
     await self.registration.showNotification(payload.title || "Learner's Guide", {
       body: payload.body || "You have a new notification.",
       tag: payload.notificationId || `lg-${Date.now()}`,
