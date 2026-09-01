@@ -1,4 +1,4 @@
-const CACHE = "learners-guide-v27";
+const CACHE = "learners-guide-v28";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./file_00000000451c82118020d2baea54f76b.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
@@ -79,9 +79,8 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes("/rest/v1/") || url.pathname.includes("/auth/v1/") || url.pathname.includes("/functions/v1/")) return;
 
-  // JavaScript/CSS must never be allowed to remain stale after a deployment.
-  // Vite assets are content-hashed, so network-first gives us the newest bundle
-  // while still providing an offline fallback from the current cache.
+  // Always prefer the current deployed JS/CSS. Fall back to the current cache
+  // only when the network is unavailable.
   if (STATIC_DESTINATIONS.has(request.destination)) {
     event.respondWith(
       fetch(request, { cache: "no-cache" })
