@@ -393,7 +393,7 @@ async function provision(
   if (data?.error) throw new Error(data.error);
   return data;
 }
-async function removeAuth(authId?: string) {
+async function removeAuth(authId?: string | null) {
   if (!authId) return;
   const { data, error } = await supabase.functions.invoke("admin-provision-user", {
     body: {
