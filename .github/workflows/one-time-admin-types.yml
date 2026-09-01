@@ -1,0 +1,51 @@
+name: One-time admin type fix
+on:
+  push:
+    branches: [perf/portal-query-dedup-2026-09-01]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/portal-query-dedup-2026-09-01
+      - name: Apply source typing
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/admin/ReferenceAdminPanel.tsx')
+          s = p.read_text()
+          marker = 'type Row = Record<string, any> & { id?: string | number };'
+          replacement = '''type Row = Record<string, any> & { id?: string | number };
+          type UserRow = Row & { ref?: string | null; role?: string; auth_id?: string | null; name?: string; phone?: string; status?: string };
+          type StudentRow = Row & { sid?: string; name?: string; cls?: string; sec?: string; parentName?: string; parentPhone?: string; status?: string };
+          type TeacherRow = Row & { tid?: string; name?: string; subject?: string; phone?: string; status?: string };
+          type ResultRow = Row & { sid?: string; subject?: string; exam?: string; marks?: number | string; total?: number | string; date?: string; tid?: string };'''
+          if marker not in s:
+              raise SystemExit('type marker not found')
+          s = s.replace(marker, replacement, 1)
+          replacements = {
+            'const us = await gdb("users");': 'const us: UserRow[] = await gdb("users");',
+            'const us = await gdb("users"),': 'const us: UserRow[] = await gdb("users"),',
+            'function Students({ data, reload }: { data: Row[]; reload: () => void }) {': 'function Students({ data, reload }: { data: StudentRow[]; reload: () => void }) {',
+            'function Teachers({ data, reload }: { data: Row[]; reload: () => void }) {': 'function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => void }) {',
+          }
+          for old, new in replacements.items():
+              s = s.replace(old, new)
+          s = s.replace('us.find((u) =>', 'us.find((u: UserRow) =>')
+          s = s.replace('us.filter((x) =>', 'us.filter((x: UserRow) =>')
+          p.write_text(s)
+          PY
+          npx prettier --write src/admin/ReferenceAdminPanel.tsx
+      - name: Commit fix and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/admin/ReferenceAdminPanel.tsx
+          git rm .github/workflows/one-time-admin-types.yml
+          git commit -m 'fix: type admin user callbacks at source [skip ci]'
+          git push origin HEAD:perf/portal-query-dedup-2026-09-01
