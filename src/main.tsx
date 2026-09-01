@@ -74,9 +74,6 @@ if (typeof window !== "undefined") {
     if (document.visibilityState === "visible") recover();
   });
   window.addEventListener("orientationchange", recover);
-  window.addEventListener("resize", () => {
-    if (window.innerWidth <= 700) recoverMobileLayout();
-  });
   recover();
 }
 
