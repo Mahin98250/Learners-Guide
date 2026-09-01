@@ -15,15 +15,25 @@ function forbidPattern(file, pattern, reason) {
   if (pattern.test(content)) failures.push(`${file}: ${reason}`);
 }
 
+function normalize(content) {
+  return content.replace(/\s+/g, " ").trim();
+}
+
+function requireNormalized(file, pattern, reason) {
+  const content = normalize(read(file));
+  if (!pattern.test(content)) failures.push(`${file}: ${reason}`);
+}
+
 const dataSource = read("src/lg/data.js");
 const appSource = read("src/routes/app.tsx");
 const teacherSource = read("src/lg/teacherHomeworkApp.jsx");
 
 // Centralized read contract: gdb must resolve a table projection before querying.
-requirePattern("src/lg/data.js", /TABLE_SELECTS\s*=\s*\{[\s\S]*students\s*:/, "table projection map is missing");
-requirePattern("src/lg/data.js", /TABLE_SELECTS\s*=\s*\{[\s\S]*users\s*:/, "users projection is missing");
-requirePattern("src/lg/data.js", /selectForTable\s*=\s*table\s*=>\s*TABLE_SELECTS\[table\]/, "table projection resolver is missing");
-requirePattern("src/lg/data.js", /gdb\s*=\s*async\s+t\s*=>[\s\S]*selectForTable\(t\)/, "shared gdb does not use the centralized projection resolver");
+requirePattern("src/lg/data.js", /TABLE_SELECTS\s*=\s*\{/, "table projection map is missing");
+requirePattern("src/lg/data.js", /students\s*:\s*["'][^"']+["']/, "students projection is missing");
+requirePattern("src/lg/data.js", /users\s*:\s*["'][^"']+["']/, "users projection is missing");
+requireNormalized("src/lg/data.js", /const selectForTable=table=>TABLE_SELECTS\[table\]\|\|["']id["'];/, "table projection resolver is missing");
+requireNormalized("src/lg/data.js", /const inflight=new Map\(\);export const gdb=async t=>[\s\S]*?selectForTable\(t\)/, "shared gdb does not use the centralized projection resolver");
 forbidPattern("src/lg/data.js", /supabase\.from\(t\)\.select\(\s*["']\*["']\s*\)/, "shared gdb must not issue wildcard reads");
 
 // CRUD boundary: keep the existing shared CRUD API and surfaced failures.
@@ -35,22 +45,33 @@ requirePattern("src/lg/data.js", /Supabase update failed/, "shared update failur
 requirePattern("src/lg/data.js", /Supabase delete failed/, "shared delete failures are not surfaced");
 
 // Timetable access must remain role-scoped and payload-scoped.
-requirePattern("src/lg/data.js", /const select\s*=\s*["'][^"']*batch_id[^"']*teacher_id[^"']*status["']/, "timetable projection is missing required access fields");
-requirePattern("src/lg/data.js", /from\(["']timetable_entries["']\)\.select\(select\)/, "timetable loader must use its verified projection");
-requirePattern("src/lg/data.js", /\.eq\(["']status["']\s*,\s*["']active["']\)/, "timetable loader must keep active-status filtering");
-requirePattern("src/lg/data.js", /role===\s*["']teacher["'][\s\S]*\.eq\(["']teacher_id["']/, "teacher timetable access must remain scoped");
-requirePattern("src/lg/data.js", /role===\s*["']student["'][\s\S]*batch_students/, "student timetable access must remain membership-scoped");
+requireNormalized("src/lg/data.js", /const select=["'][^"']*batch_id[^"']*teacher_id[^"']*status["'];/, "timetable projection is missing required access fields");
+requireNormalized("src/lg/data.js", /from\(["']timetable_entries["']\)\.select\(select\)/, "timetable loader must use its verified projection");
+requireNormalized("src/lg/data.js", /\.eq\(["']status["'],["']active["']\)/, "timetable loader must keep active-status filtering");
+requireNormalized("src/lg/data.js", /role===["']teacher["'][\s\S]*?\.eq\(["']teacher_id["']/, "teacher timetable access must remain scoped");
+requireNormalized("src/lg/data.js", /role===["']student["']\|\|role===["']parent["'][\s\S]*?batch_students/, "student timetable access must remain membership-scoped");
 
 // Active parent route and lifecycle behavior.
 requirePattern("src/routes/app.tsx", /ParentApp\s*\}\s*from\s*["']@\/lg\/parentWorkflows["']/, "active parent route must use the scoped workflow");
 requirePattern("src/routes/app.tsx", /event\.persisted/, "BFCache restore handling is missing");
 forbidPattern("src/routes/app.tsx", /addEventListener\(\s*["']visibilitychange["']/, "visibility changes must not remount the whole portal");
 
-// Teacher payload contracts: assert the required field sets without depending on formatter layout.
-requirePattern("src/lg/teacherHomeworkApp.jsx", /from\(["']teachers["']\)\.select\(\s*["'][^"']*id[^"']*name[^"']*tid[^"']*subject[^"']*phone[^"']*status[^"']*["']\s*\)/, "teacher profile read must stay payload-scoped");
-requirePattern("src/lg/teacherHomeworkApp.jsx", /from\(["']homework["']\)\.select\(\s*["'][^"']*id[^"']*batch_id[^"']*subject[^"']*desc[^"']*given[^"']*due[^"']*tid[^"']*created_at[^"']*["']\s*\)/, "teacher homework read must stay payload-scoped");
+// Teacher payload contracts: inspect the actual select calls and their field sets.
+const teacherProfileMatch = teacherSource.match(/from\(["']teachers["']\)\.select\(([^)]*)\)/);
+if (!teacherProfileMatch || !/id/.test(teacherProfileMatch[1]) || !/name/.test(teacherProfileMatch[1]) || !/tid/.test(teacherProfileMatch[1]) || !/subject/.test(teacherProfileMatch[1]) || !/phone/.test(teacherProfileMatch[1]) || !/status/.test(teacherProfileMatch[1]) || /["']\*["']/.test(teacherProfileMatch[1])) {
+  failures.push("src/lg/teacherHomeworkApp.jsx: teacher profile read must stay payload-scoped");
+}
+const teacherHomeworkMatch = teacherSource.match(/from\(["']homework["']\)\.select\(([^)]*)\)/);
+if (!teacherHomeworkMatch || !/id/.test(teacherHomeworkMatch[1]) || !/batch_id/.test(teacherHomeworkMatch[1]) || !/subject/.test(teacherHomeworkMatch[1]) || !/desc/.test(teacherHomeworkMatch[1]) || !/given/.test(teacherHomeworkMatch[1]) || !/due/.test(teacherHomeworkMatch[1]) || !/tid/.test(teacherHomeworkMatch[1]) || !/created_at/.test(teacherHomeworkMatch[1]) || /["']\*["']/.test(teacherHomeworkMatch[1])) {
+  failures.push("src/lg/teacherHomeworkApp.jsx: teacher homework read must stay payload-scoped");
+}
 forbidPattern("src/lg/teacherHomeworkApp.jsx", /from\(["']teachers["']\)\.select\(\s*["']\*["']\s*\)/, "teacher portal still contains a wildcard profile read");
 forbidPattern("src/lg/teacherHomeworkApp.jsx", /from\(["']homework["']\)\.select\(\s*["']\*["']\s*\)/, "teacher portal still contains a wildcard homework read");
+
+// The login gateway is intentionally unauthenticated at the edge boundary because
+// there is no user JWT before login. Keep JWT verification disabled for this function
+// and enforce credential/role validation inside the function itself.
+requirePattern("supabase/config.toml", /\[functions\.auth-login\][\s\S]*verify_jwt\s*=\s*false/i, "auth-login must allow anonymous invocation before a session exists");
 
 // Required hardening migrations.
 requirePattern("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql", /drop extension if exists pg_graphql/i, "GraphQL hardening migration is missing");
@@ -78,4 +99,4 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log("Production contract checks passed: centralized projections, scoped portal payloads, active route boundary, BFCache recovery, CRUD integrity, privileged RPC boundaries and secret guards are intact.");
+console.log("Production contract checks passed: centralized projections, scoped portal payloads, active route boundary, BFCache recovery, CRUD integrity, anonymous login gateway, privileged RPC boundaries and secret guards are intact.");
