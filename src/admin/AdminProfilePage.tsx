@@ -8,25 +8,36 @@ type ProfileType = "student" | "teacher" | "parent";
 const clean = (v: unknown) => String(v ?? "").trim();
 const Cx = { bg: "#F0F4FF", text: "#0F1B3D", sub: "#64748B", border: "#E2E8F0", accent: "#4361EE", red: "#EF4444" };
 
+const PROFILE_SELECT: Record<ProfileType, string> = {
+  student: "id,name,sid,cls,sec,status,email,phone",
+  teacher: "id,name,tid,subject,status,email,phone",
+  parent: "id,name,email,phone,role,status",
+};
+
 export function AdminProfilePage({ onBack }: { onBack?: () => void }) {
   const [type, setType] = useState<ProfileType>("student");
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<Row | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let live = true;
     (async () => {
+      setLoading(true);
+      setError("");
       try {
         const table = type === "student" ? "students" : type === "teacher" ? "teachers" : "users";
-        let q = supabase.from(table).select("*").order("name");
+        let q = supabase.from(table).select(PROFILE_SELECT[type]).order("name");
         if (type === "parent") q = q.eq("role", "parent");
         const { data, error: e } = await q;
         if (e) throw e;
         if (live) setRows(data || []);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "Unable to load profiles.");
+      } finally {
+        if (live) setLoading(false);
       }
     })();
     return () => { live = false; };
@@ -46,11 +57,12 @@ export function AdminProfilePage({ onBack }: { onBack?: () => void }) {
         {onBack && <button type="button" onClick={onBack}>← Back</button>}
       </div>
       {error && <Card onClick={() => {}} style={{ color: Cx.red, marginBottom: 12 }}>{error}</Card>}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         {(["student", "teacher", "parent"] as ProfileType[]).map((t) => <button key={t} type="button" onClick={() => { setType(t); setSelected(null); setQuery(""); }}>{t} {t === type ? `(${rows.length})` : ""}</button>)}
       </div>
       <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${type}…`} style={{ width: "100%", padding: 12, boxSizing: "border-box", marginBottom: 12 }} />
-      {list.map((r) => <button key={String(r.id)} type="button" onClick={() => setSelected(r)} style={{ display: "block", width: "100%", textAlign: "left", padding: 12, border: 0, borderTop: `1px solid ${Cx.border}`, background: "transparent" }}><b>{r.name || "Unnamed"}</b><div style={{ fontSize: 11, color: Cx.sub }}>{r.sid || r.tid || r.phone || r.email || r.id}</div></button>)}
+      {loading ? <div style={{ color: Cx.sub }}>Loading profiles…</div> : list.map((r) => <button key={String(r.id)} type="button" onClick={() => setSelected(r)} style={{ display: "block", width: "100%", textAlign: "left", padding: 12, border: 0, borderTop: `1px solid ${Cx.border}`, background: "transparent" }}><b>{r.name || "Unnamed"}</b><div style={{ fontSize: 11, color: Cx.sub }}>{r.sid || r.tid || r.phone || r.email || r.id}</div></button>)}
+      {!loading && !list.length && <div style={{ color: Cx.sub, padding: 18 }}>No matching profiles.</div>}
     </div>
   );
 }
