@@ -1,0 +1,56 @@
+name: One-time ReferenceAdminPanel typing fix
+on:
+  push:
+    branches: [perf/portal-query-dedup-2026-09-01]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/portal-query-dedup-2026-09-01
+          fetch-depth: 1
+      - name: Apply source-level row typing
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/admin/ReferenceAdminPanel.tsx')
+          s = p.read_text()
+          marker = 'type Row = Record<string, any> & { id?: string | number };'
+          types = '''type Row = Record<string, any> & { id?: string | number };
+type UserRow = Row & { ref?: string | null; role?: string; auth_id?: string | null; name?: string; phone?: string; pass?: string; status?: string };
+type StudentRow = Row & { sid?: string; name?: string; cls?: string; sec?: string; parentName?: string; parentPhone?: string; status?: string };
+type TeacherRow = Row & { tid?: string; name?: string; subject?: string; phone?: string; status?: string };
+type ResultRow = Row & { sid?: string; subject?: string; exam?: string; marks?: number | string; total?: number | string; date?: string; tid?: string };
+type SearchRow = StudentRow | TeacherRow;'''
+          if marker not in s:
+              raise SystemExit('row type marker not found')
+          s = s.replace(marker, types, 1)
+          replacements = {
+            'const us = await gdb("users");': 'const us: UserRow[] = await gdb("users");',
+            'const us = await gdb("users"),': 'const us: UserRow[] = await gdb("users"),',
+            'const [students, setStudents] = useState<Row[]>([]);': 'const [students, setStudents] = useState<StudentRow[]>([]);',
+            'function SearchProfiles({ students, teachers }: { students: Row[]; teachers: Row[] }) {': 'function SearchProfiles({ students, teachers }: { students: StudentRow[]; teachers: TeacherRow[] }) {',
+            'const [sel, setSel] = useState<Row | null>(null);': 'const [sel, setSel] = useState<SearchRow | null>(null);',
+            'function Marks({ rows }: { rows: Row[] }) {': 'function Marks({ rows }: { rows: ResultRow[] }) {',
+          }
+          for a,b in replacements.items():
+              s = s.replace(a,b)
+          # Make the remaining user callbacks explicit even if the generic source changes later.
+          s = s.replace('us.find((u) =>', 'us.find((u: UserRow) =>')
+          s = s.replace('us.filter((x) =>', 'us.filter((x: UserRow) =>')
+          p.write_text(s)
+          PY
+          npx prettier --write src/admin/ReferenceAdminPanel.tsx
+      - name: Commit and remove migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/admin/ReferenceAdminPanel.tsx
+          git rm .github/workflows/one-time-reference-types-fix.yml
+          git commit -m 'fix: type admin data collections at source [skip ci]'
+          git push origin HEAD:perf/portal-query-dedup-2026-09-01
