@@ -25,6 +25,31 @@ if (!root) throw new Error("Learner's Guide: #root element was not found.");
 
 document.querySelectorAll<HTMLLinkElement>('link[rel="icon"],link[rel="apple-touch-icon"]').forEach(link => { link.href = LOGO_IMG_SRC; });
 
+/*
+ * Mobile lifecycle guard.
+ *
+ * Android/iOS can restore a background tab from a frozen snapshot and briefly
+ * report a different CSS viewport. Do not reload the app or measure the shell:
+ * simply keep a device-level mobile marker on <html> and let CSS enforce the
+ * known-good one-column shell. This is safe on pageshow/visibility restores.
+ */
+function syncMobileViewport() {
+  if (typeof window === "undefined") return;
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const touch = (navigator.maxTouchPoints || 0) > 0;
+  const viewportWidth = Math.min(
+    window.innerWidth || Number.POSITIVE_INFINITY,
+    window.visualViewport?.width || Number.POSITIVE_INFINITY,
+  );
+  document.documentElement.toggleAttribute("data-lg-mobile", coarsePointer || touch || viewportWidth <= 700);
+}
+
+syncMobileViewport();
+window.addEventListener("resize", syncMobileViewport, { passive: true });
+window.visualViewport?.addEventListener("resize", syncMobileViewport, { passive: true });
+window.addEventListener("pageshow", syncMobileViewport, { passive: true });
+document.addEventListener("visibilitychange", syncMobileViewport, { passive: true });
+
 let router: ReturnType<typeof getRouter> | null = null;
 let bootstrapError: Error | null = null;
 try { router = getRouter(); } catch (error) { bootstrapError = error instanceof Error ? error : new Error(String(error)); console.error("Learner's Guide router bootstrap failed", error); }
