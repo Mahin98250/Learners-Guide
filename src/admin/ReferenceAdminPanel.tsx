@@ -36,6 +36,39 @@ type PageKey =
   | "search"
   | "adminmsgs";
 type Row = Record<string, any> & { id?: string | number };
+type UserRow = Row & {
+  ref?: string | null;
+  role?: string;
+  auth_id?: string | null;
+  name?: string;
+  phone?: string;
+  status?: string;
+};
+type StudentRow = Row & {
+  sid?: string;
+  name?: string;
+  cls?: string;
+  sec?: string;
+  parentName?: string;
+  parentPhone?: string;
+  status?: string;
+};
+type TeacherRow = Row & {
+  tid?: string;
+  name?: string;
+  subject?: string;
+  phone?: string;
+  status?: string;
+};
+type ResultRow = Row & {
+  sid?: string;
+  subject?: string;
+  exam?: string;
+  marks?: number | string;
+  total?: number | string;
+  date?: string;
+  tid?: string;
+};
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 type Props = { user: AdminUser; onLogout: () => void };
 const NAV: Array<[PageKey, string, string]> = [
@@ -623,7 +656,7 @@ function Dashboard({
     </div>
   );
 }
-function Students({ data, reload }: { data: Row[]; reload: () => void }) {
+function Students({ data, reload }: { data: StudentRow[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [edit, setEdit] = useState<Row | null>(null),
     [del, setDel] = useState<Row | null>(null),
@@ -651,9 +684,9 @@ function Students({ data, reload }: { data: Row[]; reload: () => void }) {
     try {
       if (edit) {
         await updR("students", edit.id, form);
-        const us = await gdb("users");
-        const su = us.find((u) => u.ref === edit.id && u.role === "student"),
-          pu = us.find((u) => u.ref === edit.id && u.role === "parent");
+        const us: UserRow[] = await gdb("users");
+        const su = us.find((u: UserRow) => u.ref === edit.id && u.role === "student"),
+          pu = us.find((u: UserRow) => u.ref === edit.id && u.role === "parent");
         if (su) {
           const a = await provision(
             "student",
@@ -727,8 +760,8 @@ function Students({ data, reload }: { data: Row[]; reload: () => void }) {
     if (!del) return;
     setBusy(true);
     try {
-      const us = await gdb("users");
-      for (const u of us.filter((x) => x.ref === del.id)) {
+      const us: UserRow[] = await gdb("users");
+      for (const u of us.filter((x: UserRow) => x.ref === del.id)) {
         await removeAuth(u.auth_id);
         await delR("users", u.id);
       }
@@ -923,7 +956,7 @@ function Students({ data, reload }: { data: Row[]; reload: () => void }) {
     </div>
   );
 }
-function Teachers({ data, reload }: { data: Row[]; reload: () => void }) {
+function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [edit, setEdit] = useState<Row | null>(null),
     [del, setDel] = useState<Row | null>(null),
@@ -943,7 +976,7 @@ function Teachers({ data, reload }: { data: Row[]; reload: () => void }) {
     try {
       if (edit) {
         await updR("teachers", edit.id, form);
-        const us = await gdb("users"),
+        const us: UserRow[] = await gdb("users"),
           u = us.find((x) => x.ref === edit.id && x.role === "teacher");
         if (u) {
           const a = await provision(
@@ -990,8 +1023,8 @@ function Teachers({ data, reload }: { data: Row[]; reload: () => void }) {
     if (!del) return;
     setBusy(true);
     try {
-      const us = await gdb("users");
-      for (const u of us.filter((x) => x.ref === del.id)) {
+      const us: UserRow[] = await gdb("users");
+      for (const u of us.filter((x: UserRow) => x.ref === del.id)) {
         await removeAuth(u.auth_id);
         await delR("users", u.id);
       }
