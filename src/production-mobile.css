@@ -1,175 +1,172 @@
-/* Production responsive shell + parent portal foundation.
-   Deliberately scoped: it stabilizes layout without rewriting portal behavior. */
+/* Learner's Guide production UI foundation.
+   Keep portal behavior/data intact. This file owns responsive presentation only. */
 
-/* Parent portal visual system. */
-.portal-parent .parent-portal {
-  width: 100%; min-width: 0; max-width: 100%; color: #182044; padding: 0 0 24px;
-}
-.portal-parent .pp-hero { position: relative; overflow: hidden; padding: 20px; margin: 0 0 16px; border-radius: 22px; background: linear-gradient(135deg, #5146d9, #7c6cf0); color: #fff; box-shadow: 0 12px 28px rgba(83,70,210,.16); }
-.portal-parent .pp-hero::after { content: ""; position: absolute; width: 170px; height: 170px; right: -70px; top: -80px; border-radius: 50%; background: rgba(255,255,255,.09); pointer-events: none; }
-.portal-parent .pp-eyebrow { position: relative; z-index: 1; font-size: 10px; line-height: 1.2; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .76; }
-.portal-parent .pp-hero h1 { position: relative; z-index: 1; margin: 5px 0 4px; font-size: 24px; line-height: 1.15; }
-.portal-parent .pp-hero p { position: relative; z-index: 1; margin: 0; max-width: 42ch; font-size: 12px; line-height: 1.45; opacity: .84; }
-.portal-parent .pp-child { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: 15px; }
-.portal-parent .pp-avatar { flex: 0 0 44px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: rgba(255,255,255,.17); font-size: 18px; font-weight: 900; }
-.portal-parent .pp-child-copy { min-width: 0; }
-.portal-parent .pp-child-copy b { display: block; font-size: 14px; }
-.portal-parent .pp-child-copy small { display: block; margin-top: 2px; font-size: 10px; opacity: .8; }
-.portal-parent .pp-select { position: relative; z-index: 2; width: 100%; min-height: 42px; margin-top: 12px; padding: 9px 11px; border: 1px solid rgba(255,255,255,.3); border-radius: 11px; background: rgba(255,255,255,.15); color: #fff; font-weight: 700; }
-.portal-parent .pp-select option { background: #fff; color: #182044; }
-.portal-parent .pp-grid, .portal-parent .pp-home-actions, .portal-parent .pp-more-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; width: 100%; min-width: 0; margin-bottom: 16px; }
-.portal-parent .pp-stat { min-width: 0; padding: 14px; border: 1px solid #e8eaf3; border-radius: 16px; background: #fff; box-shadow: 0 5px 18px rgba(31,39,79,.05); }
-.portal-parent .pp-stat-value { display: block; margin-top: 5px; font-size: 21px; color: #1b2345; }
-.portal-parent .pp-stat span { display: block; margin-top: 2px; font-size: 10px; color: #7b8299; font-weight: 700; }
-.portal-parent .pp-home-action, .portal-parent .pp-more-card { min-width: 0; width: 100%; padding: 14px; border: 1px solid #e8eaf3; border-radius: 16px; background: #fff; color: #182044; text-align: left; box-shadow: 0 5px 18px rgba(31,39,79,.045); cursor: pointer; }
-.portal-parent .pp-home-action:hover, .portal-parent .pp-more-card:hover { box-shadow: 0 8px 22px rgba(31,39,79,.08); }
-.portal-parent .pp-home-action span, .portal-parent .pp-more-icon { font-size: 18px; }
-.portal-parent .pp-home-action b, .portal-parent .pp-more-card b { display: block; margin-top: 7px; font-size: 12px; }
-.portal-parent .pp-home-action small, .portal-parent .pp-more-card small { display: block; margin-top: 3px; font-size: 9px; line-height: 1.35; color: #7b8299; }
-.portal-parent .pp-panel { min-width: 0; width: 100%; padding: 13px; border: 1px solid #e8eaf3; border-radius: 17px; background: #fff; box-shadow: 0 5px 18px rgba(31,39,79,.045); }
-.portal-parent .pp-title { min-width: 0; font-size: 11px; font-weight: 800; overflow-wrap: anywhere; }
-.portal-parent .pp-sub { min-width: 0; margin-top: 2px; font-size: 9px; color: #7b8299; overflow-wrap: anywhere; }
-.portal-parent .pp-note { font-size: 10px; line-height: 1.5; color: #7b8299; }
-.portal-parent .pp-row-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.portal-parent .pp-icon { flex: 0 0 31px; width: 31px; height: 31px; display: grid; place-items: center; border-radius: 10px; background: #f1efff; font-size: 13px; }
+*{box-sizing:border-box}
+html,body,#root{width:100%;min-width:0;margin:0;padding:0;overflow-x:hidden}
+body{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+img,svg,video,canvas{max-width:100%}
+button,input,select,textarea{max-width:100%;font:inherit}
+.lg-app-shell{width:100%;min-width:0;max-width:100%;overflow-x:hidden}
+.lg-app-shell>*{min-width:0;max-width:100%}
 
-@media (max-width: 700px) {
-  html, body, #root { width: 100% !important; min-width: 0 !important; max-width: 100% !important; overflow-x: hidden !important; }
-  .lg-app-shell { width: 100% !important; min-width: 0 !important; max-width: 100% !important; overflow-x: hidden !important; }
-  .lg-app-shell > div:first-child { width: 100% !important; max-width: 430px !important; min-width: 0 !important; min-height: 100dvh !important; }
-  .lg-app-shell > div:first-child > div:first-child, .lg-app-shell > div:first-child > header { width: 100% !important; min-width: 0 !important; max-width: 100% !important; min-height: 0 !important; height: auto !important; padding: 14px 16px !important; box-sizing: border-box !important; }
-  .lg-app-shell > div:first-child > div:nth-child(2) { min-width: 0 !important; max-width: 100% !important; overflow-x: hidden !important; padding-bottom: calc(116px + env(safe-area-inset-bottom)) !important; scroll-padding-bottom: calc(116px + env(safe-area-inset-bottom)) !important; }
-  .portal-parent .parent-portal { padding: 0 14px 24px !important; }
-  .portal-parent .pp-hero { margin-bottom: 14px !important; padding: 18px !important; border-radius: 20px !important; }
-  .portal-parent .pp-hero h1 { font-size: clamp(20px, 5.5vw, 23px) !important; line-height: 1.15 !important; }
-  .portal-parent .pp-grid, .portal-parent .pp-home-actions, .portal-parent .pp-more-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: 9px !important; }
-  .portal-parent .pp-grid > *, .portal-parent .pp-home-actions > *, .portal-parent .pp-more-grid > * { min-width: 0 !important; max-width: 100% !important; }
-  .portal-parent .pp-home-action, .portal-parent .pp-more-card, .portal-parent .pp-stat, .portal-parent .pp-panel { box-sizing: border-box !important; overflow: hidden !important; }
-  .portal-parent .pp-title, .portal-parent .pp-sub, .portal-parent .pp-note, .portal-parent .pp-child-copy, .portal-parent button, .portal-parent select { min-width: 0 !important; max-width: 100% !important; overflow-wrap: anywhere !important; }
-  .portal-parent .pp-select { min-height: 42px !important; }
-}
-@media (max-width: 380px) {
-  .portal-parent .pp-grid, .portal-parent .pp-home-actions, .portal-parent .pp-more-grid { gap: 7px !important; }
-  .portal-parent .pp-home-action, .portal-parent .pp-more-card, .portal-parent .pp-stat { padding: 12px !important; }
-}
+/* Parent portal: simple, calm, two-column mobile cards. */
+.portal-parent .parent-portal{width:100%;min-width:0;max-width:100%;padding:0 0 28px;color:#182044;overflow-x:hidden}
+.portal-parent .pp-hero{position:relative;overflow:hidden;margin:0 0 16px;padding:18px;border-radius:20px;background:linear-gradient(135deg,#5146d9,#7567ed);color:#fff;box-shadow:0 10px 24px rgba(49,42,140,.14)}
+.portal-parent .pp-eyebrow{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75}
+.portal-parent .pp-hero h1{margin:5px 0 4px;font-size:23px;line-height:1.15}
+.portal-parent .pp-hero p{margin:0;font-size:12px;line-height:1.45;opacity:.85}
+.portal-parent .pp-child{display:flex;align-items:center;gap:10px;min-width:0;margin-top:14px}
+.portal-parent .pp-avatar{flex:0 0 42px;width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:rgba(255,255,255,.17);font-weight:900}
+.portal-parent .pp-child-copy{min-width:0}
+.portal-parent .pp-child-copy b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.portal-parent .pp-child-copy small{display:block;margin-top:2px;font-size:10px;opacity:.8}
+.portal-parent .pp-select{width:100%;min-height:42px;margin-top:12px;padding:9px 11px;border:1px solid rgba(255,255,255,.3);border-radius:11px;background:rgba(255,255,255,.15);color:#fff;font-weight:700}
+.portal-parent .pp-select option{background:#fff;color:#182044}
+.portal-parent .pp-grid,.portal-parent .pp-home-actions,.portal-parent .pp-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;min-width:0;margin-bottom:16px}
+.portal-parent .pp-stat,.portal-parent .pp-home-action,.portal-parent .pp-more-card,.portal-parent .pp-panel{min-width:0;max-width:100%;border:1px solid #e8eaf3;border-radius:16px;background:#fff;box-shadow:0 5px 18px rgba(31,39,79,.05)}
+.portal-parent .pp-stat{padding:14px}
+.portal-parent .pp-stat-value{display:block;margin-top:5px;font-size:21px;color:#1b2345}
+.portal-parent .pp-stat span{display:block;margin-top:2px;font-size:10px;color:#7b8299;font-weight:700}
+.portal-parent .pp-home-action,.portal-parent .pp-more-card{width:100%;padding:14px;color:#182044;text-align:left;cursor:pointer}
+.portal-parent .pp-home-action span,.portal-parent .pp-more-icon{font-size:18px}
+.portal-parent .pp-home-action b,.portal-parent .pp-more-card b{display:block;margin-top:7px;font-size:12px}
+.portal-parent .pp-home-action small,.portal-parent .pp-more-card small{display:block;margin-top:3px;font-size:9px;line-height:1.35;color:#7b8299}
+.portal-parent .pp-panel{padding:13px}
+.portal-parent .pp-title{min-width:0;font-size:11px;font-weight:800;overflow-wrap:anywhere}
+.portal-parent .pp-sub{min-width:0;margin-top:2px;font-size:9px;color:#7b8299;overflow-wrap:anywhere}
+.portal-parent .pp-note{font-size:10px;line-height:1.5;color:#7b8299}
+.portal-parent .pp-row-main{display:flex;align-items:center;gap:9px;min-width:0}
+.portal-parent .pp-icon{flex:0 0 31px;width:31px;height:31px;display:grid;place-items:center;border-radius:10px;background:#f1efff;font-size:13px}
 
-/* ------------------------------------------------------------------
-   Unified mobile AppBar redesign
-   The AppBar is shared by student, teacher and parent portals.
-   Keep the existing real LG logo and button behavior; only improve
-   composition, spacing and responsive presentation here.
-   ------------------------------------------------------------------ */
-@media (max-width: 700px) {
-  .lg-app-shell > div:first-child > div:first-child > div:first-child {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 12px !important;
-    width: 100% !important;
-    min-height: 72px !important;
+/* ================================================================
+   UNIFIED APP HEADER
+   Shell hierarchy is:
+   .lg-app-shell -> Shell -> AppBar -> AppBar contents.
+   The old overrides targeted grandchildren that were not the AppBar,
+   which is why the blue header kept becoming oversized on phones.
+   ================================================================ */
+@media (max-width:700px){
+  .lg-app-shell>div:first-child{
+    width:100%!important;max-width:430px!important;min-width:0!important;min-height:100dvh!important;
+    margin:0 auto!important;overflow:hidden!important;
   }
 
-  /* Compact premium header: no giant empty blue area. */
-  .lg-app-shell > div:first-child > div:first-child > div:first-child {
-    padding: 10px 12px !important;
-    border-radius: 0 0 22px 22px !important;
-    box-shadow: 0 8px 24px rgba(30, 20, 100, .14) !important;
+  /* Actual AppBar root: first child of Shell. */
+  .lg-app-shell>div:first-child>div:first-child{
+    position:relative!important;
+    display:flex!important;align-items:center!important;justify-content:space-between!important;
+    width:100%!important;min-width:0!important;height:112px!important;min-height:112px!important;
+    padding:14px 16px!important;margin:0!important;
+    border-radius:0 0 20px 20px!important;
+    overflow:hidden!important;
+    box-sizing:border-box!important;
+    background:linear-gradient(135deg,#39218d 0%,#4d2ec4 52%,#24165f 100%)!important;
+    box-shadow:0 7px 20px rgba(35,22,105,.18)!important;
   }
 
-  /* Keep the real logo, but make its tile smaller and cleaner. */
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
-    border-radius: 13px !important;
-    box-shadow: 0 5px 14px rgba(0,0,0,.16) !important;
+  /* Subtle decorative layer, never allowed to affect layout. */
+  .lg-app-shell>div:first-child>div:first-child::after{
+    content:"";position:absolute;right:-65px;top:-90px;width:190px;height:190px;border-radius:50%;
+    background:rgba(255,255,255,.07);pointer-events:none;
   }
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child img {
-    max-width: 28px !important;
-    max-height: 28px !important;
-    width: auto !important;
-    height: auto !important;
+  /* AppBar's left brand group. */
+  .lg-app-shell>div:first-child>div:first-child>div:first-child{
+    position:relative!important;z-index:1;display:flex!important;align-items:center!important;
+    gap:10px!important;min-width:0!important;flex:1 1 auto!important;height:auto!important;
   }
 
-  /* Brand block stays compact and never forces the action buttons away. */
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    gap: 9px !important;
+  /* Preserve the real Learner's Guide logo supplied by ui.jsx. */
+  .lg-app-shell>div:first-child>div:first-child img{
+    object-fit:contain!important;display:block!important;
+  }
+  .lg-app-shell>div:first-child>div:first-child>div:first-child img{
+    width:42px!important;height:42px!important;max-width:42px!important;max-height:42px!important;
+    border-radius:12px!important;
   }
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
-    min-width: 0 !important;
-    overflow: hidden !important;
+  /* Brand typography. */
+  .lg-app-shell>div:first-child>div:first-child>div:first-child>div:last-child{
+    min-width:0!important;overflow:hidden!important;
+  }
+  .lg-app-shell>div:first-child>div:first-child>div:first-child>div:last-child>*:first-child{
+    font-size:9px!important;line-height:1.15!important;letter-spacing:.1em!important;
+  }
+  .lg-app-shell>div:first-child>div:first-child>div:first-child>div:last-child>*:last-child{
+    margin-top:3px!important;font-size:16px!important;line-height:1.15!important;font-weight:800!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
   }
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:nth-child(2) > div:first-child {
-    font-size: 9px !important;
-    line-height: 1.15 !important;
-    letter-spacing: .11em !important;
+  /* AppBar action group: notification + logout. */
+  .lg-app-shell>div:first-child>div:first-child>div:last-child{
+    position:relative!important;z-index:2;display:flex!important;align-items:center!important;
+    gap:7px!important;flex:0 0 auto!important;min-width:0!important;
+  }
+  .lg-app-shell>div:first-child>div:first-child button{
+    box-sizing:border-box!important;min-height:40px!important;border-radius:12px!important;
+  }
+  .lg-app-shell>div:first-child>div:first-child button[title="Notifications"]{
+    width:40px!important;height:40px!important;padding:0!important;display:grid!important;place-items:center!important;
+  }
+  .lg-app-shell>div:first-child>div:first-child button[title="Logout"]{
+    min-width:70px!important;height:40px!important;padding:0 12px!important;font-size:11px!important;white-space:nowrap!important;
   }
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:nth-child(2) > div:last-child {
-    font-size: 15px !important;
-    line-height: 1.15 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+  /* Content is the scroll viewport; keep a real tail above bottom nav. */
+  .lg-app-shell>div:first-child>div:nth-child(2){
+    min-width:0!important;max-width:100%!important;overflow-x:hidden!important;
+    padding-bottom:calc(112px + env(safe-area-inset-bottom))!important;
+    scroll-padding-bottom:calc(118px + env(safe-area-inset-bottom))!important;
   }
 
-  /* Actions remain a compact right-side control group. */
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:last-child {
-    flex: 0 0 auto !important;
-    gap: 6px !important;
-    max-width: 46% !important;
-  }
+  .portal-student,.portal-teacher,.portal-parent{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important}
+  .portal-student [style*="minWidth: 600"],.portal-student [style*="min-width: 600"],.portal-teacher [style*="minWidth: 600"],.portal-teacher [style*="min-width: 600"],.portal-parent [style*="minWidth: 600"],.portal-parent [style*="min-width: 600"]{min-width:0!important}
+  .portal-student [style*="minWidth: 650"],.portal-student [style*="min-width: 650"],.portal-teacher [style*="minWidth: 650"],.portal-teacher [style*="min-width: 650"],.portal-parent [style*="minWidth: 650"],.portal-parent [style*="min-width: 650"]{min-width:0!important}
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child .btn-icon,
-  .lg-app-shell > div:first-child > div:first-child > div:first-child .logout-btn {
-    flex: 0 0 auto !important;
-    box-sizing: border-box !important;
+  /* Shared bottom navigation remains vertical-app friendly. */
+  .lg-app-shell div:has(>.nav-tab){
+    position:fixed!important;left:50%!important;bottom:0!important;transform:translateX(-50%)!important;
+    width:min(100vw,430px)!important;max-width:100vw!important;z-index:1000!important;
+    padding-bottom:max(env(safe-area-inset-bottom),0px)!important;background:rgba(255,255,255,.98)!important;
+    backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;
+    border-top:1px solid rgba(20,25,60,.08)!important;box-shadow:0 -8px 30px rgba(31,39,79,.08)!important;
+    overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;
   }
+  .lg-app-shell div:has(>.nav-tab)::-webkit-scrollbar{display:none!important}
+  .lg-app-shell div:has(>.nav-tab)>.nav-tab{
+    flex:1 0 68px!important;width:68px!important;min-width:68px!important;min-height:64px!important;
+    padding:7px 3px 5px!important;display:flex!important;flex-direction:column!important;align-items:center!important;
+    justify-content:center!important;gap:2px!important;white-space:nowrap!important;overflow:hidden!important;
+  }
+  .lg-app-shell div:has(>.nav-tab)>.nav-tab span{display:block!important;max-width:64px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:10px!important;line-height:1.15!important}
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child .btn-icon {
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 12px !important;
-    font-size: 17px !important;
-  }
+  /* Parent content is intentionally simpler than the old dense layout. */
+  .portal-parent .parent-portal{padding:14px 14px 28px!important}
+  .portal-parent .pp-hero{margin-bottom:14px!important;padding:17px!important;border-radius:19px!important}
+  .portal-parent .pp-grid,.portal-parent .pp-home-actions,.portal-parent .pp-more-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+  .portal-parent .pp-grid>*,.portal-parent .pp-home-actions>*,.portal-parent .pp-more-grid>*{min-width:0!important;max-width:100%!important}
+  .portal-parent .pp-home-action,.portal-parent .pp-more-card,.portal-parent .pp-stat,.portal-parent .pp-panel{overflow:hidden!important}
+  .portal-parent .pp-title,.portal-parent .pp-sub,.portal-parent .pp-note{overflow-wrap:anywhere!important}
 
-  .lg-app-shell > div:first-child > div:first-child > div:first-child .logout-btn {
-    padding: 9px 12px !important;
-    min-height: 40px !important;
-    border-radius: 12px !important;
-    font-size: 11px !important;
-    white-space: nowrap !important;
-  }
-}
-
-@media (max-width: 380px) {
-  .lg-app-shell > div:first-child > div:first-child > div:first-child {
-    gap: 8px !important;
-    padding: 9px 10px !important;
-    min-height: 68px !important;
-  }
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
-    width: 38px !important;
-    height: 38px !important;
-    min-width: 38px !important;
-  }
-  .lg-app-shell > div:first-child > div:first-child > div:first-child > div:first-child > div:nth-child(2) > div:last-child {
-    font-size: 14px !important;
-  }
-  .lg-app-shell > div:first-child > div:first-child > div:first-child .btn-icon {
-    width: 36px !important;
-    height: 36px !important;
-  }
-  .lg-app-shell > div:first-child > div:first-child > div:first-child .logout-btn {
-    padding: 8px 9px !important;
-  }
+  /* Long study-material filenames/actions must stay inside the phone width. */
+  .portal-student div:has(>div>button+button){width:100%!important;max-width:100%!important;min-width:0!important;flex-wrap:wrap!important}
+  .portal-student div:has(>div>button+button)>div:first-child{flex:1 1 150px!important;min-width:0!important;max-width:100%!important;overflow:hidden!important}
+  .portal-student div:has(>div>button+button)>div:first-child *{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:break-word!important}
+  .portal-student div:has(>div>button+button)>div:last-child{width:100%!important;max-width:100%!important;display:flex!important;gap:7px!important}
+  .portal-student div:has(>div>button+button)>div:last-child button{flex:1 1 0!important;min-width:0!important;max-width:100%!important;white-space:nowrap!important}
 }
 
-/* Do not allow the header's decorative layer to create accidental width. */
-.lg-app-shell > div:first-child > div:first-child > div:first-child > * { max-width: 100%; }
+@media (max-width:380px){
+  .lg-app-shell>div:first-child>div:first-child{height:104px!important;min-height:104px!important;padding:12px!important}
+  .lg-app-shell>div:first-child>div:first-child>div:first-child img{width:38px!important;height:38px!important;max-width:38px!important;max-height:38px!important}
+  .lg-app-shell>div:first-child>div:first-child>div:first-child>div:last-child>*:last-child{font-size:14px!important}
+  .lg-app-shell>div:first-child>div:first-child button[title="Notifications"]{width:36px!important;height:36px!important}
+  .lg-app-shell>div:first-child>div:first-child button[title="Logout"]{min-width:62px!important;height:36px!important;padding:0 9px!important}
+  .portal-parent .pp-grid,.portal-parent .pp-home-actions,.portal-parent .pp-more-grid{gap:7px!important}
+}
+
+@media (min-width:701px){
+  .portal-parent .parent-portal{max-width:100%;min-width:0}
+}
+
+@media (display-mode:standalone){html,body,#root{width:100%;min-width:0;overflow-x:hidden}}
