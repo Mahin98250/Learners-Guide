@@ -18,8 +18,13 @@ export default function HomeworkPage() {
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const [hw, bs, ts] = await Promise.all([gdb("homework"), gdb("batches"), gdb("teachers")]);
-      setHomework(hw || []); setBatches((bs || []).filter((b: Row) => b.status !== "inactive")); setTeachers((ts || []).filter((t: Row) => t.status !== "inactive"));
+      const [hw, bs, ts] = await Promise.all([
+        supabase.from("homework").select("id,tid,cls,sec,batch_id,subject,desc,given,due,completedby,pdfname,storage_path,file_size,mime_type,created_at").order("created_at", { ascending: false }),
+        gdb("batches"),
+        gdb("teachers"),
+      ]);
+      if (hw.error) throw hw.error;
+      setHomework(hw.data || []); setBatches((bs || []).filter((b: Row) => b.status !== "inactive")); setTeachers((ts || []).filter((t: Row) => t.status !== "inactive"));
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load homework."); }
     finally { setLoading(false); }
   };
