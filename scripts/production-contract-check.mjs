@@ -54,39 +54,13 @@ check(app.includes("ParentApp") && app.includes("@/lg/parentWorkflows"), "src/ro
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes('addEventListener("visibilitychange"'), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher reads. The profile read is short, while the homework query has ordering
-// and filtering chained around it. Validate all source occurrences for the table
-// and accept an optimized projection when its required fields are present.
-const allSelectsForTable = (source, table) => {
-  const results = [];
-  const marker = `supabase.from("${table}").select("`;
-  let cursor = 0;
-  while (cursor < source.length) {
-    const start = source.indexOf(marker, cursor);
-    if (start < 0) break;
-    const valueStart = start + marker.length;
-    const valueEnd = source.indexOf('")', valueStart);
-    if (valueEnd < 0) break;
-    results.push(source.slice(valueStart, valueEnd));
-    cursor = valueEnd + 2;
-  }
-  return results;
-};
+// Teacher reads. Validate the exact optimized projections after whitespace normalization.
 const profileProjection = "id,name,tid,subject,phone,classes,status";
 const homeworkProjection = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-const profileSelects = allSelectsForTable(tc, "teachers");
-const homeworkSelects = allSelectsForTable(tc, "homework");
-const hasFields = (selects, fields) =>
-  selects.some((select) => {
-    const columns = new Set(select.split(",").map((field) => field.trim()));
-    return fields.every((field) => columns.has(field));
-  });
-check(profileSelects.length > 0, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
-check(hasFields(profileSelects, profileProjection.split(",")), "src/lg/teacherHomeworkApp.jsx: teacher profile projection is incomplete");
-check(!profileSelects.some((select) => select.trim() === "*"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-check(homeworkSelects.length > 0, "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing");
-check(hasFields(homeworkSelects, homeworkProjection.split(",")), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
-check(!homeworkSelects.some((select) => select.trim() === "*"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
+check(tc.includes(`supabase.from("teachers").select("${profileProjection}")`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
+check(!tc.includes('supabase.from("teachers").select("*")'), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+check(tc.includes(`supabase.from("homework").select("${homeworkProjection}")`), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(!tc.includes('supabase.from("homework").select("*")'), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 // Login gateway.
 check(
