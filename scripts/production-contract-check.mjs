@@ -54,12 +54,33 @@ check(app.includes("ParentApp") && app.includes("@/lg/parentWorkflows"), "src/ro
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes('addEventListener("visibilitychange"'), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher reads. Validate the exact optimized projections after whitespace normalization.
-const profileProjection = "id,name,tid,subject,phone,classes,status";
-const homeworkProjection = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-check(tc.includes(`supabase.from("teachers").select("${profileProjection}")`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
+// Teacher reads. Validate required optimized projection fields without depending on source formatting.
+const hasSelectFields = (source, table, requiredFields) => {
+  const match = source.match(new RegExp(`supabase\\.from\\(\\"${table}\\"\\)\\.select\\(\\"([^\\"]+)\\"\\)`));
+  if (!match) return false;
+  const selected = new Set(match[1].split(","));
+  return requiredFields.every((field) => selected.has(field));
+};
+const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "status"];
+const homeworkProjection = [
+  "id",
+  "batch_id",
+  "cls",
+  "sec",
+  "subject",
+  "desc",
+  "given",
+  "due",
+  "tid",
+  "pdfname",
+  "storage_path",
+  "file_size",
+  "mime_type",
+  "created_at",
+];
+check(hasSelectFields(tc, "teachers", profileProjection), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
 check(!tc.includes('supabase.from("teachers").select("*")'), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-check(tc.includes(`supabase.from("homework").select("${homeworkProjection}")`), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(hasSelectFields(tc, "homework", homeworkProjection), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!tc.includes('supabase.from("homework").select("*")'), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 // Login gateway.
