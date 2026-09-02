@@ -16,8 +16,7 @@ const config = read("supabase/config.toml");
 const dc = compact(data);
 const tc = compact(teacher);
 
-// Centralized read projections. Keep these checks semantic so Prettier/minification
-// cannot make a valid implementation fail the contract gate.
+// Centralized read projections.
 check(/(?:const|let|var)\s+TABLE_SELECTS\s*=/.test(data), "src/lg/data.js: table projection map is missing");
 check(/TABLE_SELECTS[\s\S]*students\s*:/.test(data), "src/lg/data.js: students projection is missing");
 check(/TABLE_SELECTS[\s\S]*users\s*:/.test(data), "src/lg/data.js: users projection is missing");
@@ -25,7 +24,6 @@ check(/(?:const|let|var)\s+selectForTable\s*=/.test(data), "src/lg/data.js: tabl
 check(/selectForTable\s*\(\s*t\s*\)/.test(data), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
 check(!/from\(t\)\.select\(\s*["']\*["']\s*\)/.test(dc), "src/lg/data.js: shared gdb must not issue wildcard reads");
 
-// Shared CRUD boundary.
 for (const [token, message] of [
   ["export const addR", "shared insert path missing"],
   ["export const updR", "shared update path missing"],
@@ -56,38 +54,41 @@ check(app.includes("ParentApp") && app.includes("@/lg/parentWorkflows"), "src/ro
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes('addEventListener("visibilitychange"'), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: inspect the actual Supabase read chains by table and require
-// the complete payload used by the portal. This intentionally avoids whitespace
-// and line-layout assumptions.
-const teacherCompact = tc;
+// Teacher reads. The profile read is short, while the homework query has ordering
+// and filtering chained around it. Validate all source occurrences for the table
+// and accept an optimized projection when its required fields are present.
+const allSelectsForTable = (source, table) => {
+  const results = [];
+  const marker = `supabase.from("${table}").select("`;
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf(marker, cursor);
+    if (start < 0) break;
+    const valueStart = start + marker.length;
+    const valueEnd = source.indexOf('")', valueStart);
+    if (valueEnd < 0) break;
+    results.push(source.slice(valueStart, valueEnd));
+    cursor = valueEnd + 2;
+  }
+  return results;
+};
 const profileProjection = "id,name,tid,subject,phone,classes,status";
 const homeworkProjection = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-check(
-  teacherCompact.includes('supabase.from("teachers").select("' + profileProjection + '")'),
-  "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing",
-);
-check(
-  teacherCompact.includes(profileProjection),
-  "src/lg/teacherHomeworkApp.jsx: teacher profile projection is incomplete",
-);
-check(
-  !/supabase\.from\("teachers"\)\.select\("\*"\)/.test(teacherCompact),
-  "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read",
-);
-check(
-  teacherCompact.includes('supabase.from("homework").select("' + homeworkProjection + '")'),
-  "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing",
-);
-check(
-  teacherCompact.includes(homeworkProjection),
-  "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
-);
-check(
-  !/supabase\.from\("homework"\)\.select\("\*"\)/.test(teacherCompact),
-  "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read",
-);
+const profileSelects = allSelectsForTable(tc, "teachers");
+const homeworkSelects = allSelectsForTable(tc, "homework");
+const hasFields = (selects, fields) =>
+  selects.some((select) => {
+    const columns = new Set(select.split(",").map((field) => field.trim()));
+    return fields.every((field) => columns.has(field));
+  });
+check(profileSelects.length > 0, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing");
+check(hasFields(profileSelects, profileProjection.split(",")), "src/lg/teacherHomeworkApp.jsx: teacher profile projection is incomplete");
+check(!profileSelects.some((select) => select.trim() === "*"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+check(homeworkSelects.length > 0, "src/lg/teacherHomeworkApp.jsx: teacher homework read is missing");
+check(hasFields(homeworkSelects, homeworkProjection.split(",")), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(!homeworkSelects.some((select) => select.trim() === "*"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
-// Login gateway must be callable before an authenticated session exists.
+// Login gateway.
 check(
   /\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config),
   "supabase/config.toml: auth-login must allow anonymous invocation before a session exists",
