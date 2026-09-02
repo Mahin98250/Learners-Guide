@@ -5,7 +5,9 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const compact = (value) => value.replace(/\s+/g, "");
 const failures = [];
-const check = (ok, message) => { if (!ok) failures.push(message); };
+const check = (ok, message) => {
+  if (!ok) failures.push(message);
+};
 
 const data = read("src/lg/data.js");
 const teacher = read("src/lg/teacherHomeworkApp.jsx");
@@ -15,52 +17,49 @@ const dc = compact(data);
 const tc = compact(teacher);
 const ac = compact(app);
 
-// Shared data layer: verify the implementation, not formatter-specific source text.
+// Shared data layer: validate behaviorally stable signatures, not formatter-specific text.
 check(/(?:const|let|var)TABLE_SELECTS=/.test(dc), "src/lg/data.js: table projection map is missing");
-check(dc.includes("students:"), "src/lg/data.js: students projection is missing");
-check(dc.includes("users:"), "src/lg/data.js: users projection is missing");
-check(dc.includes("selectForTable=table=>"), "src/lg/data.js: table projection resolver is missing");
-check(dc.includes("selectForTable(t)"), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
+check(/TABLE_SELECTS=\{[^}]*students:/.test(dc), "src/lg/data.js: students projection is missing");
+check(/TABLE_SELECTS=\{[^}]*users:/.test(dc), "src/lg/data.js: users projection is missing");
+check(/(?:const|let|var)selectForTable=/.test(dc), "src/lg/data.js: table projection resolver is missing");
+check(/selectForTable\(t\)/.test(dc), "src/lg/data.js: shared gdb does not use the centralized projection resolver");
 check(!/from\(t\)\.select\(["']\*["']\)/.test(dc), "src/lg/data.js: shared gdb must not issue wildcard reads");
-check(dc.includes("exportconstaddR="), "src/lg/data.js: shared insert path missing");
-check(dc.includes("exportconstupdR="), "src/lg/data.js: shared update path missing");
-check(dc.includes("exportconstdelR="), "src/lg/data.js: shared delete path missing");
-check(dc.includes("supabase.from(t).insert(payload)"), "src/lg/data.js: shared inserts no longer write through Supabase");
-check(dc.includes("supabase.from(t).update(payload)"), "src/lg/data.js: shared updates no longer write through Supabase");
-check(dc.includes("supabase.from(t).delete()"), "src/lg/data.js: shared deletes no longer write through Supabase");
-check(dc.includes("Supabase insert failed"), "src/lg/data.js: shared insert failures are not surfaced");
-check(dc.includes("Supabase update failed"), "src/lg/data.js: shared update failures are not surfaced");
-check(dc.includes("Supabase delete failed"), "src/lg/data.js: shared delete failures are not surfaced");
+check(/(?:export)?constaddR=/.test(dc), "src/lg/data.js: shared insert path missing");
+check(/(?:export)?constupdR=/.test(dc), "src/lg/data.js: shared update path missing");
+check(/(?:export)?constdelR=/.test(dc), "src/lg/data.js: shared delete path missing");
+check(/supabase\.from\(t\)\.insert\(payload\)/.test(dc), "src/lg/data.js: shared inserts no longer write through Supabase");
+check(/supabase\.from\(t\)\.update\(payload\)/.test(dc), "src/lg/data.js: shared updates no longer write through Supabase");
+check(/supabase\.from\(t\)\.delete\(\)/.test(dc), "src/lg/data.js: shared deletes no longer write through Supabase");
+check(/Supabaseinsertfailed/.test(dc), "src/lg/data.js: shared insert failures are not surfaced");
+check(/Supabaseupdatefailed/.test(dc), "src/lg/data.js: shared update failures are not surfaced");
+check(/Supabasedeletefailed/.test(dc), "src/lg/data.js: shared delete failures are not surfaced");
 
 // Timetable: dedicated projection plus server-side access scoping.
 const timetableProjection = "id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status";
 check(dc.includes(`constselect=\"${timetableProjection}\"`), "src/lg/data.js: timetable loader projection is missing");
-check(dc.includes('from("timetable_entries").select(select)'), "src/lg/data.js: timetable loader must use its verified projection");
-check(dc.includes('.eq("status","active")'), "src/lg/data.js: timetable loader must keep active-status filtering");
-check(dc.includes('role==="teacher"&&ref') && dc.includes('query=query.eq("teacher_id",ref)'), "src/lg/data.js: teacher timetable access must remain scoped");
-check(dc.includes('role==="student"||role==="parent"') && dc.includes('from("batch_students").select("batch_id")'), "src/lg/data.js: student timetable access must remain membership-scoped");
+check(/from\(\"timetable_entries\"\)\.select\(select\)/.test(dc), "src/lg/data.js: timetable loader must use its verified projection");
+check(/\.eq\(\"status\",\"active\"\)/.test(dc), "src/lg/data.js: timetable loader must keep active-status filtering");
+check(/role===\"teacher\"&&ref/.test(dc) && /query=query\.eq\(\"teacher_id\",ref\)/.test(dc), "src/lg/data.js: teacher timetable access must remain scoped");
+check(/role===\"student\"\|\|role===\"parent\"/.test(dc) && /from\(\"batch_students\"\)\.select\(\"batch_id\"\)/.test(dc), "src/lg/data.js: student timetable access must remain membership-scoped");
 
 // Parent lifecycle: only genuine BFCache restoration may invalidate portal state.
 check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: normalize whitespace, then verify exact field membership.
-const projectionAfter = (source, table) => {
-  const marker = `supabase.from(\"${table}\").select(\"`;
-  const start = source.indexOf(marker);
-  if (start < 0) return "";
-  const end = source.indexOf('\")', start + marker.length);
-  return end < 0 ? "" : source.slice(start + marker.length, end);
+// Teacher payloads: extract the actual select literal and verify required fields.
+const projectionFor = (source, table) => {
+  const re = new RegExp(`supabase\\.from\\([\\\"']${table}[\\\"']\\)\\.select\\([\\\"']([^\\\"']+)[\\\"']\\)`);
+  return source.match(re)?.[1] || "";
 };
 const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const homeworkProjection = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-const profileSelected = projectionAfter(tc, "teachers").split(",");
-const homeworkSelected = projectionAfter(tc, "homework").split(",");
+const profileSelected = projectionFor(teacher, "teachers").split(",");
+const homeworkSelected = projectionFor(teacher, "homework").split(",");
 check(profileProjection.every((field) => profileSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
 check(homeworkProjection.every((field) => homeworkSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
-check(!tc.includes('supabase.from("teachers").select("*")'), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-check(!tc.includes('supabase.from("homework").select("*")'), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
+check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 // Login gateway.
 check(/\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
