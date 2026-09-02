@@ -47,11 +47,25 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: normalize source before matching so CI-side Prettier cannot alter the contract check.
+// Teacher payloads: compact source first, then extract the exact select payload.
+// Keep this parser intentionally simple and quote-agnostic so CI formatting cannot change the contract result.
 const projectionFor = (source, table) => {
   const normalized = compact(source);
-  const re = new RegExp(`supabase\\.from\\([\\\"']${table}[\\\"']\\)\\.select\\([\\\"']([^\\\"']+)[\\\"']\\)`);
-  return normalized.match(re)?.[1] || "";
+  const marker = `supabase.from("${table}").select("`;
+  const altMarker = `supabase.from('${table}').select('`;
+  const start = normalized.indexOf(marker);
+  if (start >= 0) {
+    const valueStart = start + marker.length;
+    const end = normalized.indexOf('")', valueStart);
+    return end >= 0 ? normalized.slice(valueStart, end) : "";
+  }
+  const altStart = normalized.indexOf(altMarker);
+  if (altStart >= 0) {
+    const valueStart = altStart + altMarker.length;
+    const end = normalized.indexOf("')", valueStart);
+    return end >= 0 ? normalized.slice(valueStart, end) : "";
+  }
+  return "";
 };
 const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const homeworkProjection = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
