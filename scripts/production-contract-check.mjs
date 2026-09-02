@@ -47,10 +47,11 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: extract the actual select literal and verify required fields.
+// Teacher payloads: normalize source before matching so CI-side Prettier cannot alter the contract check.
 const projectionFor = (source, table) => {
+  const normalized = compact(source);
   const re = new RegExp(`supabase\\.from\\([\\\"']${table}[\\\"']\\)\\.select\\([\\\"']([^\\\"']+)[\\\"']\\)`);
-  return source.match(re)?.[1] || "";
+  return normalized.match(re)?.[1] || "";
 };
 const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const homeworkProjection = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
@@ -58,8 +59,8 @@ const profileSelected = projectionFor(teacher, "teachers").split(",");
 const homeworkSelected = projectionFor(teacher, "homework").split(",");
 check(profileProjection.every((field) => profileSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
 check(homeworkProjection.every((field) => homeworkSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
-check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
+check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 // Login gateway.
 check(/\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
