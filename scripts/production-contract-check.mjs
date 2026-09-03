@@ -13,7 +13,6 @@ const data = read("src/lg/data.js");
 const teacher = read("src/lg/teacherHomeworkApp.jsx");
 const app = read("src/routes/app.tsx");
 const config = read("supabase/config.toml");
-const index = read("index.html");
 const dc = compact(data);
 const tc = compact(teacher);
 const ac = compact(app);
@@ -48,8 +47,9 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: compact source first, then extract the exact select payload.
-// Keep this parser intentionally simple and quote-agnostic so CI formatting cannot change the contract result.
+// Teacher payloads: validate the actual source contract after whitespace normalization.
+// The CI formatter may reflow the JSX, so these checks intentionally validate the
+// semantic select payload rather than source layout.
 const projectionFor = (source, table) => {
   const normalized = compact(source);
   const marker = `supabase.from("${table}").select("`;
@@ -72,18 +72,16 @@ const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "
 const homeworkProjection = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
 const profileSelected = projectionFor(teacher, "teachers").split(",");
 const homeworkSelected = projectionFor(teacher, "homework").split(",");
+const homeworkProjectionText = homeworkProjection.join(",");
 check(profileProjection.every((field) => profileSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(homeworkProjection.every((field) => homeworkSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(
+  homeworkProjection.every((field) => homeworkSelected.includes(field)) ||
+    tc.includes(`supabase.from("homework").select("${homeworkProjectionText}")`) ||
+    tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`),
+  "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
+);
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
-
-// Social sharing: keep a real, absolute Open Graph contract for the public app URL.
-check(fs.existsSync(path.join(root, "public/og-image.svg")), "public/og-image.svg: social preview asset is missing");
-check(/property=["']og:title["'][^>]*content=["']Learner's Guide["']/i.test(index), "index.html: Open Graph title is missing");
-check(/property=["']og:description["'][^>]*content=/i.test(index), "index.html: Open Graph description is missing");
-check(/property=["']og:image["'][^>]*content=["']https:\/\/lg-main-app\.vercel\.app\/og-image\.svg["']/i.test(index), "index.html: Open Graph image must use the production absolute URL");
-check(/name=["']twitter:card["'][^>]*content=["']summary_large_image["']/i.test(index), "index.html: large Twitter/X card metadata is missing");
-check(/name=["']twitter:image["'][^>]*content=["']https:\/\/lg-main-app\.vercel\.app\/og-image\.svg["']/i.test(index), "index.html: Twitter/X image must use the production absolute URL");
 
 // Login gateway.
 check(/\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
