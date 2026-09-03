@@ -24,6 +24,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,
+    "strictNullChecks": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
