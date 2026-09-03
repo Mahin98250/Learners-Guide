@@ -17,7 +17,6 @@ const dc = compact(data);
 const tc = compact(teacher);
 const ac = compact(app);
 
-// Shared data layer: validate behaviorally stable signatures, not formatter-specific text.
 check(/(?:const|let|var)TABLE_SELECTS=/.test(dc), "src/lg/data.js: table projection map is missing");
 check(/TABLE_SELECTS=\{[^}]*students:/.test(dc), "src/lg/data.js: students projection is missing");
 check(/TABLE_SELECTS=\{[^}]*users:/.test(dc), "src/lg/data.js: users projection is missing");
@@ -34,7 +33,6 @@ check(/Supabaseinsertfailed/.test(dc), "src/lg/data.js: shared insert failures a
 check(/Supabaseupdatefailed/.test(dc), "src/lg/data.js: shared update failures are not surfaced");
 check(/Supabasedeletefailed/.test(dc), "src/lg/data.js: shared delete failures are not surfaced");
 
-// Timetable: dedicated projection plus server-side access scoping.
 const timetableProjection = "id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status";
 check(dc.includes(`constselect=\"${timetableProjection}\"`), "src/lg/data.js: timetable loader projection is missing");
 check(/from\(\"timetable_entries\"\)\.select\(select\)/.test(dc), "src/lg/data.js: timetable loader must use its verified projection");
@@ -42,15 +40,26 @@ check(/\.eq\(\"status\",\"active\"\)/.test(dc), "src/lg/data.js: timetable loade
 check(/role===\"teacher\"&&ref/.test(dc) && /query=query\.eq\(\"teacher_id\",ref\)/.test(dc), "src/lg/data.js: teacher timetable access must remain scoped");
 check(/role===\"student\"\|\|role===\"parent\"/.test(dc) && /from\(\"batch_students\"\)\.select\(\"batch_id\"\)/.test(dc), "src/lg/data.js: student timetable access must remain membership-scoped");
 
-// Parent lifecycle: only genuine BFCache restoration may invalidate portal state.
 check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: extract the actual projection after the table name so formatting/quote style cannot create false failures.
 const projectionAfterTable = (source, table) => {
-  const re = new RegExp(`supabase\\.from\\(["']${table}["']\\)\\.select\\((["'])(.*?)\\1\\)`);
-  return source.match(re)?.[2] ?? null;
+  const marker = `supabase.from("${table}").select("`;
+  const singleMarker = `supabase.from('${table}').select('`;
+  const doubleStart = source.indexOf(marker);
+  if (doubleStart >= 0) {
+    const start = doubleStart + marker.length;
+    const end = source.indexOf('")', start);
+    return end >= 0 ? source.slice(start, end) : null;
+  }
+  const singleStart = source.indexOf(singleMarker);
+  if (singleStart >= 0) {
+    const start = singleStart + singleMarker.length;
+    const end = source.indexOf("')", start);
+    return end >= 0 ? source.slice(start, end) : null;
+  }
+  return null;
 };
 const hasFields = (projection, expected) => {
   if (!projection) return false;
@@ -66,14 +75,10 @@ check(hasFields(homeworkProjection, homeworkProjectionFields), "src/lg/teacherHo
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
-// Login gateway.
 check(/\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
-
-// Required hardening migrations.
 check(/drop extension if exists pg_graphql/i.test(read("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql")), "GraphQL hardening migration is missing");
 check(/get_student_tests\(\)/i.test(read("supabase/migrations/20260901150300_phase4f_remove_unused_student_rpc_execution.sql")), "unused student RPC hardening migration is missing");
 
-// Frontend security guards.
 const files = [];
 const walk = (dir) => {
   if (!fs.existsSync(dir)) return;
