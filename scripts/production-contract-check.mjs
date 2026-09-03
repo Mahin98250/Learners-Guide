@@ -44,34 +44,14 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-const projectionAfterTable = (source, table) => {
-  const marker = `supabase.from("${table}").select("`;
-  const singleMarker = `supabase.from('${table}').select('`;
-  const doubleStart = source.indexOf(marker);
-  if (doubleStart >= 0) {
-    const start = doubleStart + marker.length;
-    const end = source.indexOf('")', start);
-    return end >= 0 ? source.slice(start, end) : null;
-  }
-  const singleStart = source.indexOf(singleMarker);
-  if (singleStart >= 0) {
-    const start = singleStart + singleMarker.length;
-    const end = source.indexOf("')", start);
-    return end >= 0 ? source.slice(start, end) : null;
-  }
-  return null;
-};
-const hasFields = (projection, expected) => {
-  if (!projection) return false;
-  const actual = projection.split(",").map((field) => field.trim()).filter(Boolean);
-  return expected.every((field) => actual.includes(field));
-};
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
-const homeworkProjectionFields = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at".split(",");
-const profileProjection = projectionAfterTable(teacher, "teachers");
-const homeworkProjection = projectionAfterTable(teacher, "homework");
-check(profileProjection === profileProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(hasFields(homeworkProjection, homeworkProjectionFields), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+const homeworkProjectionFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
+const homeworkMarker = 'supabase.from("homework").select("';
+const homeworkStart = tc.indexOf(homeworkMarker);
+const homeworkEnd = homeworkStart >= 0 ? tc.indexOf('")', homeworkStart + homeworkMarker.length) : -1;
+const homeworkProjection = homeworkStart >= 0 && homeworkEnd >= 0 ? tc.slice(homeworkStart + homeworkMarker.length, homeworkEnd) : "";
+check(tc.includes(`supabase.from("teachers").select("${profileProjectionText}")`) || tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(homeworkProjectionFields.every((field) => homeworkProjection.split(",").includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
