@@ -39,17 +39,19 @@ check(/from\(\"timetable_entries\"\)\.select\(select\)/.test(dc), "src/lg/data.j
 check(/\.eq\(\"status\",\"active\"\)/.test(dc), "src/lg/data.js: timetable loader must keep active-status filtering");
 check(/role===\"teacher\"&&ref/.test(dc) && /query=query\.eq\(\"teacher_id\",ref\)/.test(dc), "src/lg/data.js: teacher timetable access must remain scoped");
 check(/role===\"student\"\|\|role===\"parent\"/.test(dc) && /from\(\"batch_students\"\)\.select\(\"batch_id\"\)/.test(dc), "src/lg/data.js: student timetable access must remain membership-scoped");
+check(/studentRollNumber=/.test(dc), "src/lg/data.js: student roll-number sorting helper is missing");
+check(/rows=rows\.slice\(\)\.sort\(\(a,b\)=>studentRollNumber\(a\.sid\)-studentRollNumber\(b\.sid\)/.test(dc), "src/lg/data.js: student reads are not numerically sorted by roll number");
+check(/normalizeStudentSid=/.test(dc), "src/lg/data.js: student roll-number normalization helper is missing");
+check(/normalized\.sid!==undefined\)normalized\.sid=normalizeStudentSid\(normalized\.sid\)/.test(dc), "src/lg/data.js: student writes do not normalize roll-number format");
 
 check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
-const homeworkProjectionFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-const homeworkMatch = tc.match(/supabase\.from\(["']homework["']\)\.select\(["']([^"']+)["']\)/);
-const homeworkProjection = homeworkMatch?.[1] || "";
-check(tc.includes(`supabase.from("teachers").select("${profileProjectionText}")`) || tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(homeworkProjectionFields.every((field) => homeworkProjection.split(",").includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+const homeworkProjection = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
+check(tc.includes(`supabase.from(\"teachers\").select(\"${profileProjectionText}\")`) || tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(tc.includes(`supabase.from(\"homework\").select(\"${homeworkProjection}\")`) || tc.includes(`supabase.from('homework').select('${homeworkProjection}')`), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
