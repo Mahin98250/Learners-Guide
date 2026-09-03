@@ -47,13 +47,11 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: use static regex literals on normalized source, avoiding formatter-specific whitespace.
+// Teacher payloads: assert the complete query strings on normalized source.
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-const profileProjection = tc.match(/supabase\.from\(["']teachers["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
-const homeworkProjection = tc.match(/supabase\.from\(["']homework["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
-check(profileProjection === profileProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(homeworkProjection === homeworkProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(tc.includes(`supabase.from("teachers").select("${profileProjectionText}")`) || tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(tc.includes(`supabase.from("homework").select("${homeworkProjectionText}")`) || tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
