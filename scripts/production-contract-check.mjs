@@ -47,21 +47,13 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: assert the exact verified projections directly. This intentionally avoids
-// parsing JavaScript with a regex/string scanner, which previously produced false negatives
-// after Prettier rewrote the same valid source into a different layout.
+// Teacher payloads: use static regex literals for the call shape, avoiding dynamic-regex escaping bugs.
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-check(
-  tc.includes(`supabase.from(\"teachers\").select(\"${profileProjectionText}\")`) ||
-    tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`),
-  "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields",
-);
-check(
-  tc.includes(`supabase.from(\"homework\").select(\"${homeworkProjectionText}\")`) ||
-    tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`),
-  "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
-);
+const profileProjection = teacher.match(/supabase\.from\(["']teachers["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
+const homeworkProjection = teacher.match(/supabase\.from\(["']homework["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
+check(profileProjection === profileProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(homeworkProjection === homeworkProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
