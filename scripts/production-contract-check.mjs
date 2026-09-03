@@ -47,17 +47,18 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: validate exact semantic projections after Unicode/whitespace normalization.
+// Teacher payloads: parse the actual Supabase select calls so formatting cannot cause false negatives.
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-const profileHasProjection =
-  tc.includes(`supabase.from("teachers").select("${profileProjectionText}")`) ||
-  tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`);
-const homeworkHasProjection =
-  tc.includes(`supabase.from("homework").select("${homeworkProjectionText}")`) ||
-  tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`);
-check(profileHasProjection, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(homeworkHasProjection, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+const selectProjection = (source, table) => {
+  const normalized = source.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
+  const pattern = `supabase\\.from\\([\\\"']${table}[\\\"']\\)\\.select\\([\\\"']([^\\\"']+)[\\\"']\\)`;
+  return normalized.match(new RegExp(pattern))?.[1] || null;
+};
+const profileProjection = selectProjection(teacher, "teachers");
+const homeworkProjection = selectProjection(teacher, "homework");
+check(profileProjection === profileProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(homeworkProjection === homeworkProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
