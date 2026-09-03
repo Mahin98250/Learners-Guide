@@ -47,11 +47,11 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: use static regex literals for the call shape, avoiding dynamic-regex escaping bugs.
+// Teacher payloads: use static regex literals on normalized source, avoiding formatter-specific whitespace.
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-const profileProjection = teacher.match(/supabase\.from\(["']teachers["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
-const homeworkProjection = teacher.match(/supabase\.from\(["']homework["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
+const profileProjection = tc.match(/supabase\.from\(["']teachers["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
+const homeworkProjection = tc.match(/supabase\.from\(["']homework["']\)\.select\(["']([^"']+)["']\)/)?.[1] ?? null;
 check(profileProjection === profileProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
 check(homeworkProjection === homeworkProjectionText, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
