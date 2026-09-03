@@ -47,41 +47,18 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: validate the actual source contract after whitespace normalization.
-// The CI formatter may reflow the JSX, so these checks intentionally validate the
-// semantic select payload rather than source layout.
-const projectionFor = (source, table) => {
-  const normalized = compact(source);
-  const marker = `supabase.from("${table}").select("`;
-  const altMarker = `supabase.from('${table}').select('`;
-  const start = normalized.indexOf(marker);
-  if (start >= 0) {
-    const valueStart = start + marker.length;
-    const end = normalized.indexOf('")', valueStart);
-    return end >= 0 ? normalized.slice(valueStart, end) : "";
-  }
-  const altStart = normalized.indexOf(altMarker);
-  if (altStart >= 0) {
-    const valueStart = altStart + altMarker.length;
-    const end = normalized.indexOf("')", valueStart);
-    return end >= 0 ? normalized.slice(valueStart, end) : "";
-  }
-  return "";
-};
-const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "status"];
-const homeworkProjection = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-const profileSelected = projectionFor(teacher, "teachers").split(",").filter(Boolean);
-const homeworkProjectionText = homeworkProjection.join(",");
-const homeworkSelected = projectionFor(teacher, "homework").split(",").filter(Boolean);
-check(profileProjection.every((field) => profileSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-// Validate the complete projection as a literal semantic payload. This avoids relying
-// on a parser that can accidentally stop at punctuation inside a JSX expression.
-check(
-  homeworkSelected.length > 0
-    ? homeworkProjection.every((field) => homeworkSelected.includes(field))
-    : tc.includes(homeworkProjectionText),
-  "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
-);
+// Teacher payloads: validate the exact semantic projection text. The CI formatter is
+// allowed to reflow source, so whitespace is normalized before this contract check.
+const profileProjectionText = "id,name,tid,subject,phone,classes,status";
+const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
+const profileHasProjection =
+  tc.includes(`supabase.from("teachers").select("${profileProjectionText}")`) ||
+  tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`);
+const homeworkHasProjection =
+  tc.includes(`supabase.from("homework").select("${homeworkProjectionText}")`) ||
+  tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`);
+check(profileHasProjection, "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(homeworkHasProjection, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
