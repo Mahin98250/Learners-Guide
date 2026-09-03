@@ -47,13 +47,20 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: parse the actual Supabase select calls so formatting cannot cause false negatives.
+// Teacher payloads: extract the literal Supabase select projection without depending on regex escaping.
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
 const selectProjection = (source, table) => {
-  const normalized = source.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
-  const pattern = `supabase\\.from\\([\\\"']${table}[\\\"']\\)\\.select\\([\\\"']([^\\\"']+)[\\\"']\\)`;
-  return normalized.match(new RegExp(pattern))?.[1] || null;
+  const normalized = compact(source);
+  for (const quote of ['"', "'"]) {
+    const marker = `supabase.from(${quote}${table}${quote}).select(${quote}`;
+    const start = normalized.indexOf(marker);
+    if (start < 0) continue;
+    const valueStart = start + marker.length;
+    const end = normalized.indexOf(`${quote})`, valueStart);
+    if (end >= 0) return normalized.slice(valueStart, end);
+  }
+  return null;
 };
 const profileProjection = selectProjection(teacher, "teachers");
 const homeworkProjection = selectProjection(teacher, "homework");
