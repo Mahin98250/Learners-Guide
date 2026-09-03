@@ -70,14 +70,16 @@ const projectionFor = (source, table) => {
 };
 const profileProjection = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const homeworkProjection = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-const profileSelected = projectionFor(teacher, "teachers").split(",");
-const homeworkSelected = projectionFor(teacher, "homework").split(",");
+const profileSelected = projectionFor(teacher, "teachers").split(",").filter(Boolean);
 const homeworkProjectionText = homeworkProjection.join(",");
+const homeworkSelected = projectionFor(teacher, "homework").split(",").filter(Boolean);
 check(profileProjection.every((field) => profileSelected.includes(field)), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+// Validate the complete projection as a literal semantic payload. This avoids relying
+// on a parser that can accidentally stop at punctuation inside a JSX expression.
 check(
-  homeworkProjection.every((field) => homeworkSelected.includes(field)) ||
-    tc.includes(`supabase.from("homework").select("${homeworkProjectionText}")`) ||
-    tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`),
+  homeworkSelected.length > 0
+    ? homeworkProjection.every((field) => homeworkSelected.includes(field))
+    : tc.includes(homeworkProjectionText),
   "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
 );
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
