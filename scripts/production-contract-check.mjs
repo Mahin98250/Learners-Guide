@@ -3,7 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const compact = (value) => value.replace(/\s+/g, "");
+const compact = (value) => value.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
 const failures = [];
 const check = (ok, message) => {
   if (!ok) failures.push(message);
@@ -47,8 +47,7 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Teacher payloads: validate the exact semantic projection text. The CI formatter is
-// allowed to reflow source, so whitespace is normalized before this contract check.
+// Teacher payloads: validate exact semantic projections after Unicode/whitespace normalization.
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
 const profileHasProjection =
