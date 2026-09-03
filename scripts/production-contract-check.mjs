@@ -49,14 +49,9 @@ check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore hand
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
-const homeworkProjectionFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-const homeworkSelectMatches = [...tc.matchAll(/supabase\.from\(["']homework["']\)\.select\(["']([^"']*)["']\)/g)];
-const homeworkProjectionOk = homeworkSelectMatches.some((match) => {
-  const projection = String(match[1] || "").split(",");
-  return homeworkProjectionFields.every((field) => projection.includes(field));
-});
+const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
 check(tc.includes(`supabase.from(\"teachers\").select(\"${profileProjectionText}\")`) || tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(homeworkProjectionOk, "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(tc.includes(`supabase.from(\"homework\").select(\"${homeworkProjectionText}\")`) || tc.includes(`supabase.from('homework').select('${homeworkProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
