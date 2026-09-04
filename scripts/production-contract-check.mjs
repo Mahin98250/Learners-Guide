@@ -48,10 +48,31 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-const profileProjection = 'supabase.from("teachers").select("id,name,tid,subject,phone,classes,status")';
-const homeworkProjection = 'supabase.from("homework").select("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at")';
-check(tc.includes(compact(profileProjection)), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(tc.includes(compact(homeworkProjection)), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+const requiredProjectionFields = (source, table, fields, message) => {
+  const pattern = new RegExp(
+    `supabase\\.from\\(\\s*[\"']${table}[\"']\\s*\\)\\.select\\(\\s*[\"']([^\"']+)[\"']\\s*\\)`,
+  );
+  const match = source.match(pattern);
+  if (!match) {
+    check(false, message);
+    return;
+  }
+  const actual = new Set(match[1].split(",").map((field) => field.trim()).filter(Boolean));
+  check(fields.every((field) => actual.has(field)), message);
+};
+
+requiredProjectionFields(
+  teacher,
+  "teachers",
+  ["id", "name", "tid", "subject", "phone", "classes", "status"],
+  "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields",
+);
+requiredProjectionFields(
+  teacher,
+  "homework",
+  ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"],
+  "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
+);
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
