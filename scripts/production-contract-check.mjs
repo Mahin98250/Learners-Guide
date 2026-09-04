@@ -45,16 +45,11 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Projections are checked on a whitespace-compacted copy of the source. This is
-// deliberate: the CI job runs Prettier immediately before this check and Prettier
-// can wrap chained calls at arbitrary boundaries. The actual projection contents
-// remain exact and are validated as a required field set; wildcard reads are still
-// rejected separately below.
 const projectionFields = (source, table) => {
   const compactSource = compact(source);
   const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`supabase\\.from\\(([\"'])${escapedTable}\\1\\)\\.select\\(([\"'])([^\"']*?)\\2\\)`, "g");
-  return [...compactSource.matchAll(pattern)].map(match => match[3].split(",").map(field => field.trim()).filter(Boolean));
+  const pattern = new RegExp(`supabase\\.from\\(\"${escapedTable}\"\\)\\.select\\(\"([^\"]*)\"\\)`, "g");
+  return [...compactSource.matchAll(pattern)].map(match => match[1].split(",").map(field => field.trim()).filter(Boolean));
 };
 const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
@@ -85,7 +80,6 @@ for (const file of files) {
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
 
-// Regression fixtures cover both compact and Prettier-wrapped chained-call forms.
 const parserFixture = `const a = supabase.from("teachers").select("id,name,tid,subject,phone,classes,status");
 const b = supabase
   .from("homework")
