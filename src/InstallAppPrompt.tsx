@@ -17,13 +17,13 @@ export default function InstallAppPrompt() {
   useEffect(() => {
     if (isStandalone() || localStorage.getItem(INSTALLED_KEY) === "1") return;
 
-    const handler = (event: Event) => {
+    const handler = (event: Event): void => {
       if (isStandalone() || localStorage.getItem(INSTALLED_KEY) === "1") return;
       event.preventDefault();
       setPrompt(event as InstallEvent);
     };
 
-    const installed = () => {
+    const installed = (): void => {
       localStorage.setItem(INSTALLED_KEY, "1");
       setPrompt(null);
     };
