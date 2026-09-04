@@ -47,9 +47,8 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Validate the committed projection literally after whitespace normalization.
-// This is intentionally deterministic: Prettier may move the select argument
-// across lines, but the compacted literal must still contain the exact field set.
+// Validate projection literals after CI formatting. Prettier may change
+// whitespace and line wrapping, so normalize whitespace before comparison.
 const teacherProfileProjection = "id,name,tid,subject,phone,classes,status";
 const teacherHomeworkProjection = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
 const hasSelectProjection = (source, table, projection) => {
