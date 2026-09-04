@@ -48,33 +48,20 @@ check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/rout
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-const requiredProjectionFields = (source, table, fields, message) => {
-  const pattern = new RegExp(
-    `supabase\\.from\\(\\s*[\"']${table}[\"']\\s*\\)\\.select\\(\\s*[\"']([^\"']+)[\"']\\s*\\)`,
-  );
-  const match = source.match(pattern);
-  if (!match) {
-    check(false, message);
-    return;
-  }
-  const actual = new Set(match[1].split(",").map((field) => field.trim()).filter(Boolean));
-  check(fields.every((field) => actual.has(field)), message);
-};
-
-requiredProjectionFields(
-  teacher,
-  "teachers",
-  ["id", "name", "tid", "subject", "phone", "classes", "status"],
+const teacherProfileProjection = "supabase.from(\"teachers\").select(\"id,name,tid,subject,phone,classes,status\")";
+const teacherHomeworkProjection = "supabase.from(\"homework\").select(\"id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at\")";
+const teacherProfileProjectionSingle = "supabase.from('teachers').select('id,name,tid,subject,phone,classes,status')";
+const teacherHomeworkProjectionSingle = "supabase.from('homework').select('id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at')";
+check(
+  tc.includes(teacherProfileProjection) || tc.includes(teacherProfileProjectionSingle),
   "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields",
 );
-requiredProjectionFields(
-  teacher,
-  "homework",
-  ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"],
+check(
+  tc.includes(teacherHomeworkProjection) || tc.includes(teacherHomeworkProjectionSingle),
   "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete",
 );
-check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
-check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
+check(!tc.includes('supabase.from("teachers").select("*")') && !tc.includes("supabase.from('teachers').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
+check(!tc.includes('supabase.from("homework").select("*")') && !tc.includes("supabase.from('homework').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
 check(/\[functions\.auth-login\][\s\S]*?verify_jwt\s*=\s*false/i.test(config), "supabase/config.toml: auth-login must allow anonymous invocation before a session exists");
 check(/drop extension if exists pg_graphql/i.test(read("supabase/migrations/20260901145800_phase4e_production_api_surface_hardening.sql")), "GraphQL hardening migration is missing");
