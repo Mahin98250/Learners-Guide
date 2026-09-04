@@ -5,7 +5,9 @@ const root = process.cwd();
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const compact = value => value.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
 const failures = [];
-const check = (ok, message) => { if (!ok) failures.push(message); };
+const check = (ok, message) => {
+  if (!ok) failures.push(message);
+};
 
 const data = read("src/lg/data.js");
 const teacher = read("src/lg/teacherHomeworkApp.jsx");
@@ -45,28 +47,32 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Prettier runs immediately before this check in CI, so parse projections from a
-// whitespace-compacted source. Keep validation semantic: extract the exact
-// quoted projection and require every expected field; wildcard reads are checked
-// separately below.
+// CI formats changed source files before this check. Parse projection literals from
+// the compacted source without regex backreferences, then validate the complete
+// required field set. Wildcard reads remain forbidden separately below.
 const projectionFields = (source, table) => {
-  const compactSource = compact(source);
-  const prefix = `supabase.from("${table}").select("`;
-  const suffix = `")`;
-  const fields = [];
-  let cursor = 0;
-  while (cursor < compactSource.length) {
-    const start = compactSource.indexOf(prefix, cursor);
-    if (start < 0) break;
-    const fieldStart = start + prefix.length;
-    const end = compactSource.indexOf(suffix, fieldStart);
-    if (end < 0) break;
-    fields.push(compactSource.slice(fieldStart, end).split(",").map(field => field.trim()).filter(Boolean));
-    cursor = end + suffix.length;
+  const normalized = compact(source);
+  const markers = [`supabase.from(\"${table}\").select(\"`, `supabase.from('${table}').select('`];
+  const found = [];
+  for (const marker of markers) {
+    const quote = marker.at(-1);
+    let cursor = 0;
+    while (cursor < normalized.length) {
+      const start = normalized.indexOf(marker, cursor);
+      if (start < 0) break;
+      const fieldStart = start + marker.length;
+      const end = normalized.indexOf(`${quote})`, fieldStart);
+      if (end < 0) break;
+      found.push(normalized.slice(fieldStart, end).split(",").filter(Boolean));
+      cursor = end + 2;
+    }
   }
-  return fields;
+  return found;
 };
-const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
+const hasProjection = (source, table, required) => {
+  const found = projectionFields(source, table);
+  return found.some(fields => required.every(field => fields.includes(field)));
+};
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const teacherHomeworkFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
 check(hasProjection(teacher, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
@@ -95,12 +101,11 @@ for (const file of files) {
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
 
-// Regression fixtures cover compact and Prettier-wrapped chained-call forms.
-const parserFixture = `const a = supabase.from("teachers").select("id,name,tid,subject,phone,classes,status");
+const parserFixture = `const a = supabase.from(\"teachers\").select(\"id,name,tid,subject,phone,classes,status\");
 const b = supabase
-  .from("homework")
+  .from(\"homework\")
   .select(
-    "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at"
+    \"id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at\"
   );`;
 check(hasProjection(parserFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
 check(hasProjection(parserFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
