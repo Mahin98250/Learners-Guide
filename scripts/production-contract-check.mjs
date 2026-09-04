@@ -45,12 +45,12 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Parse literal Supabase projections without compacting string contents. The CI job
-// runs Prettier immediately before this check, so whitespace/line-break tolerant
-// matching is required and quote style must not change the result.
+// Parse literal Supabase projections. Prettier may wrap chained calls across lines,
+// so whitespace around method dots and arguments must not affect the check. The
+// projection contents themselves remain exact and are validated as a field set.
 const projectionFields = (source, table) => {
   const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`supabase\\.from\\(\\s*([\"'])${escapedTable}\\1\\s*\\)\\.select\\(\\s*([\"'])([\\s\\S]*?)\\2\\s*\\)`, "g");
+  const pattern = new RegExp(`supabase\\s*\\.\\s*from\\(\\s*([\"'])${escapedTable}\\1\\s*\\)\\s*\\.\\s*select\\(\\s*([\"'])([\\s\\S]*?)\\2\\s*\\)`, "g");
   return [...source.matchAll(pattern)].map(match => match[3].split(",").map(field => field.trim()).filter(Boolean));
 };
 const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
@@ -82,9 +82,12 @@ for (const file of files) {
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
 
-// Regression fixtures prevent this parser from silently breaking again on the exact
-// compact single-line form produced by the current teacher portal implementation.
-const parserFixture = `const a = supabase.from("teachers").select("id,name,tid,subject,phone,classes,status");\nconst b = supabase.from("homework").select("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at");`;
+// Regression fixtures cover the compact single-line form and Prettier-style wrapped
+// chained-call form so the parser itself cannot silently regress.
+const parserFixture = `const a = supabase.from("teachers").select("id,name,tid,subject,phone,classes,status");
+const b = supabase
+  .from("homework")
+  .select("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at");`;
 check(hasProjection(parserFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
 check(hasProjection(parserFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
 
