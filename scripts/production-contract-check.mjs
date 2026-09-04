@@ -53,12 +53,12 @@ const projectionFields = (source, table) => {
   const fields = [];
   const prefixes = [`supabase.from(\"${table}\").select(\"`, `supabase.from('${table}').select('`];
   for (const prefix of prefixes) {
+    const quote = prefix.at(-1);
     let cursor = 0;
     while (true) {
       const start = normalized.indexOf(prefix, cursor);
       if (start < 0) break;
       const valueStart = start + prefix.length;
-      const quote = prefix.endsWith("\\\"") ? "\\\"" : "'";
       const end = normalized.indexOf(quote + ")", valueStart);
       if (end < 0) break;
       fields.push(normalized.slice(valueStart, end).split(",").map(field => field.trim()).filter(Boolean));
