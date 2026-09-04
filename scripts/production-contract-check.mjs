@@ -50,11 +50,11 @@ check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes
 
 const profileProjectionText = "id,name,tid,subject,phone,classes,status";
 const homeworkProjectionText = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-const homeworkProjectionPattern = new RegExp(
-  `supabase\\.from\\([\\"']homework[\\"']\\)\\.select\\([\\"']${homeworkProjectionText}[\\"']\\)`,
+const projection = (table, fields) => new RegExp(
+  `supabase\\.from\\(\\s*[\\"']${table}[\\"']\\s*\\)\\.select\\(\\s*[\\"']${fields}[\\"']\\s*\\)`,
 );
-check(tc.includes(`supabase.from(\"teachers\").select(\"${profileProjectionText}\")`) || tc.includes(`supabase.from('teachers').select('${profileProjectionText}')`), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(homeworkProjectionPattern.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(projection("teachers", profileProjectionText).test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(projection("homework", homeworkProjectionText).test(teacher), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!/supabase\.from\(["']teachers["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!/supabase\.from\(["']homework["']\)\.select\(["']\*["']\)/.test(tc), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
