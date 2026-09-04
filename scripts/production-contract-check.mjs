@@ -45,11 +45,26 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
+// Prettier runs immediately before this check in CI, so parse projections from a
+// whitespace-compacted source. Keep validation semantic: extract the exact
+// quoted projection and require every expected field; wildcard reads are checked
+// separately below.
 const projectionFields = (source, table) => {
   const compactSource = compact(source);
-  const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`supabase\\.from\\(\"${escapedTable}\"\\)\\.select\\(\"([^\"]*)\"\\)`, "g");
-  return [...compactSource.matchAll(pattern)].map(match => match[1].split(",").map(field => field.trim()).filter(Boolean));
+  const prefix = `supabase.from("${table}").select("`;
+  const suffix = `")`;
+  const fields = [];
+  let cursor = 0;
+  while (cursor < compactSource.length) {
+    const start = compactSource.indexOf(prefix, cursor);
+    if (start < 0) break;
+    const fieldStart = start + prefix.length;
+    const end = compactSource.indexOf(suffix, fieldStart);
+    if (end < 0) break;
+    fields.push(compactSource.slice(fieldStart, end).split(",").map(field => field.trim()).filter(Boolean));
+    cursor = end + suffix.length;
+  }
+  return fields;
 };
 const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
@@ -80,6 +95,7 @@ for (const file of files) {
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
 
+// Regression fixtures cover compact and Prettier-wrapped chained-call forms.
 const parserFixture = `const a = supabase.from("teachers").select("id,name,tid,subject,phone,classes,status");
 const b = supabase
   .from("homework")
