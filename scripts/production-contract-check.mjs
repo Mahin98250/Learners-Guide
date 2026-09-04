@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const compact = (value) => value.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+const compact = value => value.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
 const failures = [];
 const check = (ok, message) => {
   if (!ok) failures.push(message);
@@ -49,8 +49,23 @@ check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore hand
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
 const projectionFields = (source, table) => {
-  const pattern = new RegExp(`supabase\\.from\\((?:\\\"|')${table}(?:\\\"|')\\)\\.select\\((?:\\\"|')([^\\\"']*)(?:\\\"|')\\)`, "g");
-  return [...source.matchAll(pattern)].map(match => match[1].split(",").map(field => field.trim()).filter(Boolean));
+  const normalized = compact(source);
+  const fields = [];
+  const prefixes = [`supabase.from(\"${table}\").select(\"`, `supabase.from('${table}').select('`];
+  for (const prefix of prefixes) {
+    let cursor = 0;
+    while (true) {
+      const start = normalized.indexOf(prefix, cursor);
+      if (start < 0) break;
+      const valueStart = start + prefix.length;
+      const quote = prefix.endsWith("\\\"") ? "\\\"" : "'";
+      const end = normalized.indexOf(quote + ")", valueStart);
+      if (end < 0) break;
+      fields.push(normalized.slice(valueStart, end).split(",").map(field => field.trim()).filter(Boolean));
+      cursor = end + quote.length + 1;
+    }
+  }
+  return fields;
 };
 const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
@@ -65,7 +80,7 @@ check(/drop extension if exists pg_graphql/i.test(read("supabase/migrations/2026
 check(/get_student_tests\(\)/i.test(read("supabase/migrations/20260901150300_phase4f_remove_unused_student_rpc_execution.sql")), "unused student RPC hardening migration is missing");
 
 const files = [];
-const walk = (dir) => {
+const walk = dir => {
   if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (["node_modules", ".git", "dist"].includes(entry.name)) continue;
