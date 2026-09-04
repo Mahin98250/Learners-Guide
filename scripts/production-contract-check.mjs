@@ -5,9 +5,7 @@ const root = process.cwd();
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const compact = value => value.normalize("NFKC").replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
 const failures = [];
-const check = (ok, message) => {
-  if (!ok) failures.push(message);
-};
+const check = (ok, message) => { if (!ok) failures.push(message); };
 
 const data = read("src/lg/data.js");
 const teacher = read("src/lg/teacherHomeworkApp.jsx");
@@ -15,7 +13,6 @@ const app = read("src/routes/app.tsx");
 const config = read("supabase/config.toml");
 const dc = compact(data);
 const tc = compact(teacher);
-const ac = compact(app);
 
 check(/(?:const|let|var)TABLE_SELECTS=/.test(dc), "src/lg/data.js: table projection map is missing");
 check(/TABLE_SELECTS=\{[^}]*students:/.test(dc), "src/lg/data.js: students projection is missing");
@@ -44,34 +41,23 @@ check(/rows=rows\.slice\(\)\.sort\(\(a,b\)=>studentRollNumber\(a\.sid\)-studentR
 check(/normalizeStudentSid=/.test(dc), "src/lg/data.js: student roll-number normalization helper is missing");
 check(/normalized\.sid!==undefined\)normalized\.sid=normalizeStudentSid\(normalized\.sid\)/.test(dc), "src/lg/data.js: student writes do not normalize roll-number format");
 
-check(ac.includes("ParentApp") && ac.includes("@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
+check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWorkflows"), "src/routes/app.tsx: active parent route must use the scoped workflow");
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
+// Parse literal Supabase projections without compacting string contents. The CI job
+// runs Prettier immediately before this check, so whitespace/line-break tolerant
+// matching is required and quote style must not change the result.
 const projectionFields = (source, table) => {
-  const normalized = compact(source);
-  const fields = [];
-  const prefixes = [`supabase.from(\"${table}\").select(\"`, `supabase.from('${table}').select('`];
-  for (const prefix of prefixes) {
-    const quote = prefix.at(-1);
-    let cursor = 0;
-    while (true) {
-      const start = normalized.indexOf(prefix, cursor);
-      if (start < 0) break;
-      const valueStart = start + prefix.length;
-      const end = normalized.indexOf(quote + ")", valueStart);
-      if (end < 0) break;
-      fields.push(normalized.slice(valueStart, end).split(",").map(field => field.trim()).filter(Boolean));
-      cursor = end + quote.length + 1;
-    }
-  }
-  return fields;
+  const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`supabase\\.from\\(\\s*([\"'])${escapedTable}\\1\\s*\\)\\.select\\(\\s*([\"'])([\\s\\S]*?)\\2\\s*\\)`, "g");
+  return [...source.matchAll(pattern)].map(match => match[3].split(",").map(field => field.trim()).filter(Boolean));
 };
 const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const teacherHomeworkFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-check(hasProjection(tc, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(hasProjection(tc, "homework", teacherHomeworkFields), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(hasProjection(teacher, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(hasProjection(teacher, "homework", teacherHomeworkFields), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!tc.includes('supabase.from("teachers").select("*")') && !tc.includes("supabase.from('teachers').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!tc.includes('supabase.from("homework").select("*")') && !tc.includes("supabase.from('homework').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
@@ -95,6 +81,12 @@ for (const file of files) {
   if (/service[_-]?role/i.test(content) && /eyJ[A-Za-z0-9_-]{20,}/.test(content)) failures.push(`${path.relative(root, file)}: possible service-role JWT embedded in frontend source`);
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
+
+// Regression fixtures prevent this parser from silently breaking again on the exact
+// compact single-line form produced by the current teacher portal implementation.
+const parserFixture = `const a = supabase.from("teachers").select("id,name,tid,subject,phone,classes,status");\nconst b = supabase.from("homework").select("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at");`;
+check(hasProjection(parserFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
+check(hasProjection(parserFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
 
 if (failures.length) {
   console.error("Production contract checks failed:");
