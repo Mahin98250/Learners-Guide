@@ -57,6 +57,9 @@ jobs:
             npx prettier --write "${FILES[@]}"
           fi
 
+      - name: Audit regression tests
+        run: npm test
+
       - name: ESLint
         run: npm run lint:eslint
 
