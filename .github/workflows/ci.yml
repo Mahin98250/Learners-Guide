@@ -27,6 +27,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Validate the committed source before any working-tree formatting.
+      # This keeps production contracts aligned with what is actually reviewed.
+      - name: Production contract checks
+        run: node scripts/production-contract-check.mjs
+
       - name: Format changed source files
         shell: bash
         run: |
@@ -51,9 +56,6 @@ jobs:
             printf ' - %s\n' "${FILES[@]}"
             npx prettier --write "${FILES[@]}"
           fi
-
-      - name: Production contract checks
-        run: node scripts/production-contract-check.mjs
 
       - name: Typecheck
         run: npm run typecheck
