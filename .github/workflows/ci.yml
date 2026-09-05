@@ -57,6 +57,9 @@ jobs:
             npx prettier --write "${FILES[@]}"
           fi
 
+      - name: ESLint
+        run: npm run lint:eslint
+
       - name: Typecheck
         run: npm run typecheck
 
