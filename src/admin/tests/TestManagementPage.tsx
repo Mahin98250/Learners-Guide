@@ -44,8 +44,10 @@ export default function TestManagementPage() {
 
   const selectedBatch = useMemo(() => batches.find(x => String(x.id) === String(form.batch_id)), [batches, form.batch_id]);
   const subjectOptions = useMemo(() => {
-    const cls = String(selectedBatch?.cls || "");
-    return Array.isArray(SUBJECTS_BY_CLASS[cls as keyof typeof SUBJECTS_BY_CLASS]) ? SUBJECTS_BY_CLASS[cls as keyof typeof SUBJECTS_BY_CLASS] : [];
+    const cls = Number(selectedBatch?.cls);
+    if (!Number.isInteger(cls)) return [];
+    const options = (SUBJECTS_BY_CLASS as Record<string, unknown>)[String(cls)];
+    return Array.isArray(options) ? options : [];
   }, [selectedBatch]);
 
   const batchStudents = useMemo(() => {
