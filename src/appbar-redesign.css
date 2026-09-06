@@ -9,6 +9,14 @@
  * Branding remains the existing real LOGO_IMG_SRC rendered by AppBar.
  */
 
+/* Messaging is a retired product feature. Keep the shared AppBar clean in
+   every student, teacher, and parent portal without affecting notifications. */
+.portal-student > div:first-child > div:first-child button[title="Messages"],
+.portal-teacher > div:first-child > div:first-child button[title="Messages"],
+.portal-parent > div:first-child > div:first-child button[title="Messages"] {
+  display: none !important;
+}
+
 @media (max-width: 700px) {
   .portal-student > div:first-child > div:first-child,
   .portal-teacher > div:first-child > div:first-child,
