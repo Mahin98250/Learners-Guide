@@ -29,9 +29,9 @@ test("Performance: shared memory cache has a bounded TTL and is reset on auth se
   assert.match(source, /supabase\.auth\.onAuthStateChange\(event=>\{if\(event===\"SIGNED_IN\"\|\|event===\"SIGNED_OUT\"\)clearCache\(\)\}\)/);
 });
 
-test("Performance: student timetable reuses the shared timetable cache path", () => {
+test("Performance: student timetable relies on the shared cache path", () => {
   const source = read("src/lg/student.jsx");
-  assert.match(source, /const timetableCache=new Map/);
+  assert.doesNotMatch(source, /const timetableCache=new Map/);
   assert.match(source, /gdb\("timetable"\)/);
 });
 
