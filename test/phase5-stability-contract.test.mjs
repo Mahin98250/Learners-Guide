@@ -53,6 +53,7 @@ test("Phase 5: timetable admin mutation regression protection is present", () =>
 
 test("Phase 5: analytics UI and reports stay real, branded, detailed, and deduplicated", () => {
   const analytics = read("src/admin/PeopleAnalyticsPage.tsx");
+  const css = read("src/appbar-redesign.css");
   assert.match(analytics, /LOGO_IMG_SRC/);
   assert.match(analytics, /Download \/ Save PDF/);
   assert.match(analytics, /window\.print\(\)/);
@@ -71,4 +72,6 @@ test("Phase 5: analytics UI and reports stay real, branded, detailed, and dedupl
   assert.match(analytics, /Subject Teacher/);
   assert.match(analytics, /Growth Plan & Next Steps/);
   assert.doesNotMatch(analytics, /https?:\/\//);
+  assert.match(css, /@media print/);
+  assert.match(css, /@page\s*\{\s*margin:\s*0;/);
 });
