@@ -51,14 +51,19 @@ test("Phase 5: timetable admin mutation regression protection is present", () =>
   assert.match(sql, /subject_names/);
 });
 
-test("Phase 5: analytics UI and reports stay real, branded, and deduplicated", () => {
+test("Phase 5: analytics UI and reports stay real, branded, detailed, and deduplicated", () => {
   const analytics = read("src/admin/PeopleAnalyticsPage.tsx");
   assert.match(analytics, /LOGO_IMG_SRC/);
   assert.match(analytics, /Download \/ Save PDF/);
-  assert.match(analytics, /test_results is the canonical source for tests/);
+  assert.match(analytics, /window\.print\(\)/);
+  assert.match(analytics, /lg-print-root/);
+  assert.match(analytics, /@media print/);
+  assert.match(analytics, /test_results/);
   assert.match(analytics, /resultKeys/);
   assert.match(analytics, /legacy\s*=\s*\(m\.data\s*\|\|\s*\[\]\)\s*\.filter/);
-  assert.match(analytics, /All recorded/);
-  assert.match(analytics, /@media print/);
+  assert.match(analytics, /subjectMap/);
+  assert.match(analytics, /Detailed assessment history/);
+  assert.match(analytics, /Homework records/);
+  assert.match(analytics, /Leave history/);
   assert.match(analytics, /Monthly Student Report/);
 });
