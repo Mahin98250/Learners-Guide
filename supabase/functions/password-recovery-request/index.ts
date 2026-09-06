@@ -8,16 +8,7 @@ const normalizeId = (value: unknown) => normalize(value).replace(/[^a-z0-9]/g, "
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const genericMessage = "If the account details match an active account with a verified recovery email, a password reset link has been sent. Check the recovery email inbox and spam folder.";
 const deliveryError = "We could not send the recovery email right now. Please try again in a few minutes or contact the institute administrator.";
-
-const configuredAppUrl = () => {
-  const value = Deno.env.get("PUBLIC_APP_URL") || "https://lg-main-app.vercel.app/";
-  try {
-    const url = new URL(value);
-    return `${url.origin}/`;
-  } catch {
-    return "https://lg-main-app.vercel.app/";
-  }
-};
+const PRODUCTION_APP_URL = "https://lg-main-app.vercel.app/";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -67,11 +58,9 @@ Deno.serve(async (req) => {
     if (!emailPattern.test(email) || !confirmed) return json({ message: genericMessage });
 
     const publicClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const base = configuredAppUrl();
-    const redirectUrl = new URL("reset-password", base);
+    const redirectUrl = new URL("reset-password", PRODUCTION_APP_URL);
     redirectUrl.searchParams.set("role", role);
-    const redirectTo = redirectUrl.toString();
-    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl.toString() });
     if (resetError) {
       console.error("password-recovery-request reset error", resetError.message);
       return json({ error: deliveryError }, 502);
