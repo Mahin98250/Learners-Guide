@@ -8,7 +8,7 @@ const normalizeId = (value: unknown) => normalize(value).replace(/[^a-z0-9]/g, "
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const genericMessage = "If the account details match an active account with a verified recovery email, a password reset link has been sent. Check the recovery email inbox and spam folder.";
 const deliveryError = "We could not send the recovery email right now. Please try again in a few minutes or contact the institute administrator.";
-const PRODUCTION_APP_URL = "https://lg-main-app.vercel.app/";
+const PRODUCTION_APP_URL = "https://learners-guide.vercel.app/";
 const isRedirectConfigError = (message: string) => /redirect|redirect_to|not allowed|invalid.*url|url.*invalid/i.test(message);
 
 Deno.serve(async (req) => {
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       const message = String(resetError.message || "");
       console.error("password-recovery-request reset error", message);
       if (isRedirectConfigError(message)) {
-        return json({ error: "Password recovery is not configured for the production app URL. Add https://lg-main-app.vercel.app/reset-password to Supabase Authentication → URL Configuration → Redirect URLs, then try again." }, 502);
+        return json({ error: "Password recovery is not configured for the production app URL. Add https://learners-guide.vercel.app/reset-password to Supabase Authentication → URL Configuration → Redirect URLs, then try again." }, 502);
       }
       return json({ error: deliveryError }, 502);
     }
