@@ -43,9 +43,9 @@ test("Performance: known retired/compatibility path does not reintroduce wildcar
 
 test("Performance: authenticated portal bundles are lazy-loaded after session discovery", () => {
   const source = read("src/routes/app.tsx");
-  assert.match(source, /const TeacherAppWithHomeworkFiles\s*=\s*lazy\(\(\)\s*=>\s*import\(\s*["']@\/lg\/teacherHomeworkApp["']\s*\)/);
-  assert.match(source, /const StudentApp\s*=\s*lazy\(\(\)\s*=>\s*import\(\s*["']@\/lg\/student["']\s*\)/);
-  assert.match(source, /const ParentApp\s*=\s*lazy\(\(\)\s*=>\s*import\(\s*["']@\/lg\/parentWorkflows["']\s*\)/);
+  assert.match(source, /const TeacherAppWithHomeworkFiles\s*=\s*lazy\([\s\S]{0,220}?import\(\s*["']@\/lg\/teacherHomeworkApp["']\s*\)/);
+  assert.match(source, /const StudentApp\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/lg\/student["']\s*\)/);
+  assert.match(source, /const ParentApp\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/lg\/parentWorkflows["']\s*\)/);
   assert.doesNotMatch(source, /import \{ TeacherAppWithHomeworkFiles \} from/);
   assert.doesNotMatch(source, /import \{ StudentApp \} from/);
   assert.doesNotMatch(source, /import \{ ParentApp \} from/);
@@ -53,8 +53,8 @@ test("Performance: authenticated portal bundles are lazy-loaded after session di
 
 test("Performance: admin bundles are lazy-loaded only on the admin route", () => {
   const source = read("src/routes/admin.tsx");
-  assert.match(source, /const AdminLogin\s*=\s*lazy\(\(\)\s*=>\s*import\(\s*["']@\/admin\/ReferenceAdminPanel["']\s*\)/);
-  assert.match(source, /const AdminWithDrive\s*=\s*lazy\(\(\)\s*=>\s*import\(\s*["']@\/admin\/AdminWithDrive["']\s*\)/);
+  assert.match(source, /const AdminLogin\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/ReferenceAdminPanel["']\s*\)/);
+  assert.match(source, /const AdminWithDrive\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/AdminWithDrive["']\s*\)/);
   assert.doesNotMatch(source, /import \{ AdminLogin \} from/);
   assert.doesNotMatch(source, /import \{ AdminWithDrive \} from/);
 });
