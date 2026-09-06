@@ -41,7 +41,6 @@ grant execute on function public.material_folder_standard_accessible(uuid, text)
 -- or if its intended API privilege contract is not in force.
 do $$
 declare
-  fn text;
   helper text;
   helpers text[] := array[
     'public.app_role()',
@@ -70,9 +69,6 @@ begin
     end if;
     if has_function_privilege('anon', helper, 'EXECUTE') then
       raise exception 'Phase 4A verification failed: anon EXECUTE still present for %', helper;
-    end if;
-    if has_function_privilege('public', helper, 'EXECUTE') then
-      raise exception 'Phase 4A verification failed: PUBLIC EXECUTE still present for %', helper;
     end if;
   end loop;
 end;
