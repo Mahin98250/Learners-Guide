@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
 import { MaterialsDriveV2 } from "@/admin/MaterialsDriveV2";
 import { LeaveRequests } from "@/lg/LeaveRequests";
+import { PeopleAnalyticsPage } from "@/admin/PeopleAnalyticsPage";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 
 export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   useEffect(() => {
     const mountAdminNavigation = () => {
@@ -26,6 +28,13 @@ export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: 
         materialNav.dataset.driveBound = "true";
         materialNav.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); setMaterialsOpen(true); }, true);
       }
+      if (!nav.querySelector(".admin-analytics-nav")) {
+        const button = document.createElement("button");
+        button.type = "button"; button.className = "nav admin-analytics-nav"; button.setAttribute("aria-label", "Open People and Analytics");
+        button.innerHTML = "<span aria-hidden=\"true\">📈</span><span>People & Analytics</span>";
+        button.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); setAnalyticsOpen(true); }, true);
+        nav.appendChild(button);
+      }
       if (nav.querySelector(".admin-leave-nav")) return;
       const button = document.createElement("button");
       button.type = "button"; button.className = "nav admin-leave-nav"; button.setAttribute("aria-label", "Open leave requests");
@@ -38,6 +47,7 @@ export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: 
     return () => observer.disconnect();
   }, []);
 
+  if (analyticsOpen) return <PeopleAnalyticsPage onClose={() => setAnalyticsOpen(false)} />;
   if (materialsOpen) return <div style={{ minHeight: "100vh", background: "#F0F4FF" }}>
     <div style={{ padding: "12px 18px", background: "#0F1B3D", display: "flex", alignItems: "center", gap: 12 }}>
       <button type="button" onClick={() => setMaterialsOpen(false)} style={{ border: 0, borderRadius: 10, padding: "9px 13px", background: "#4361EE", color: "#fff", fontWeight: 800, cursor: "pointer" }}>← Admin Dashboard</button>
