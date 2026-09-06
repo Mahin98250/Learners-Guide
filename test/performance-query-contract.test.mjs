@@ -22,6 +22,13 @@ test("Performance: shared data layer coalesces concurrent table reads", () => {
   assert.match(source, /inflight\.delete\(t\)/);
 });
 
+test("Performance: shared memory cache has a bounded TTL and is reset on auth session changes", () => {
+  const source = read("src/lg/data.js");
+  assert.match(source, /const MEMORY_CACHE_TTL_MS=15_000/);
+  assert.match(source, /expiresAt:Date\.now\(\)\+MEMORY_CACHE_TTL_MS/);
+  assert.match(source, /supabase\.auth\.onAuthStateChange\(event=>\{if\(event===\"SIGNED_IN\"\|\|event===\"SIGNED_OUT\"\)clearCache\(\)\}\)/);
+});
+
 test("Performance: student timetable reuses the shared timetable cache path", () => {
   const source = read("src/lg/student.jsx");
   assert.match(source, /const timetableCache=new Map/);
