@@ -55,7 +55,7 @@ test("Phase 5: analytics UI and reports stay real, branded, and deduplicated", (
   assert.match(analytics, /Download \/ Save PDF/);
   assert.match(analytics, /test_results is the canonical source for tests/);
   assert.match(analytics, /resultKeys/);
-  assert.match(analytics, /legacy = \(m\.data \|\| \[\]\)\.filter/);
+  assert.match(analytics, /(?:const\s+)?legacy\s*=\s*\(m\.data \|\| \[\]\)\.filter/);
   assert.match(analytics, /All recorded/);
   assert.match(analytics, /@media print/);
   assert.match(analytics, /Monthly Student Report/);
