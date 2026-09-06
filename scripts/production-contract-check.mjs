@@ -47,17 +47,28 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Validate projection literals after CI formatting. Prettier may change
-// whitespace and line wrapping, so normalize whitespace before comparison.
-const teacherProfileProjection = "id,name,tid,subject,phone,classes,status";
-const teacherHomeworkProjection = "id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at";
-const hasSelectProjection = (source, table, projection) => {
-  const normalized = compact(source);
-  return normalized.includes(`supabase.from(\"${table}\").select(\"${projection}\")`) ||
-    normalized.includes(`supabase.from('${table}').select('${projection}')`);
+// Parse only the literal projection argument. Do not compact the full source
+// because compacting source code can also alter lexical boundaries. Keep the
+// parser deliberately simple: these projections contain no quote characters.
+const projectionFields = (source, table) => {
+  const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`supabase\\.from\\(\\s*"${escapedTable}"\\s*\\)\\.select\\(\\s*"([^"]*)"\\s*\\)`, "g"),
+    new RegExp(`supabase\\.from\\(\\s*'${escapedTable}'\\s*\\)\\.select\\(\\s*'([^']*)'\\s*\\)`, "g"),
+  ];
+  const fields = [];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      fields.push(match[1].split(",").map(field => field.trim()).filter(Boolean));
+    }
+  }
+  return fields;
 };
-check(hasSelectProjection(teacher, "teachers", teacherProfileProjection), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(hasSelectProjection(teacher, "homework", teacherHomeworkProjection), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
+const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
+const teacherHomeworkFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
+check(hasProjection(teacher, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(hasProjection(teacher, "homework", teacherHomeworkFields), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!tc.includes('supabase.from("teachers").select("*")') && !tc.includes("supabase.from('teachers').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!tc.includes('supabase.from("homework").select("*")') && !tc.includes("supabase.from('homework').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
@@ -81,6 +92,11 @@ for (const file of files) {
   if (/service[_-]?role/i.test(content) && /eyJ[A-Za-z0-9_-]{20,}/.test(content)) failures.push(`${path.relative(root, file)}: possible service-role JWT embedded in frontend source`);
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
+
+// Regression fixtures exercise both supported quote styles and formatting.
+const parserFixture = `const a = supabase.from("teachers")\n  .select("id,name,tid,subject,phone,classes,status");\nconst b = supabase.from('homework').select('id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at');`;
+check(hasProjection(parserFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
+check(hasProjection(parserFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
 
 if (failures.length) {
   console.error("Production contract checks failed:");
