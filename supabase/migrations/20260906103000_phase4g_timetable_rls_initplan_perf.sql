@@ -1,3 +1,5 @@
+-- PERFORMANCE-ONLY: cache the admin role decision once per statement in timetable RLS.
+-- This preserves the existing admin-only authorization contract.
 create or replace function public.lg_is_admin()
 returns boolean
 language sql
