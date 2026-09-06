@@ -17,7 +17,8 @@ test("Phase 5: app shell has startup recovery and role-specific portal routing",
 
 test("Phase 5: auth validates server-managed role and linked/institute profile status", () => {
   const auth = read("src/lg/auth.js");
-  assert.match(auth, /authUser\.app_metadata\?\.role/);
+  assert.match(auth, /appMetadata = authUser\?\.app_metadata/);
+  assert.match(auth, /appRole = authResult\.user\.app_metadata\?\.role/);
   assert.match(auth, /appRole !== role/);
   assert.match(auth, /inactiveStatuses/);
   assert.match(auth, /validateProfile\(user, role\)/);
