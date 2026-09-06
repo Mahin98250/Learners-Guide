@@ -42,12 +42,8 @@ test("Phase 5: retired Messages UI remains suppressed without touching notificat
 });
 
 test("Phase 5: timetable admin mutation regression protection is present", () => {
-  const candidates = [
-    "supabase/migrations/20260906150000_fix_timetable_admin_mutations_and_multi_subject_data.sql",
-    "supabase/migrations/20260906144500_fix_timetable_admin_mutations_and_multi_subject_data.sql",
-  ];
-  const migration = candidates.find((file) => fs.existsSync(file));
-  assert.ok(migration, "Expected timetable admin mutation migration to be present");
+  const migration = "supabase/migrations/20260906150000_fix_timetable_admin_mutations_and_multi_subject_data.sql";
+  assert.ok(fs.existsSync(migration), "Expected timetable admin mutation migration to be present");
   const sql = read(migration);
   assert.match(sql, /timetable_entries_update/);
   assert.match(sql, /timetable_entries_delete/);
@@ -61,7 +57,7 @@ test("Phase 5: analytics UI and reports stay real, branded, and deduplicated", (
   assert.match(analytics, /Download \/ Save PDF/);
   assert.match(analytics, /test_results is the canonical source for tests/);
   assert.match(analytics, /resultKeys/);
-  assert.match(analytics, /\blegacy\s*=\s*\(m\.data \|\| \[\]\)\.filter\s*\(/);
+  assert.match(analytics, /legacy\s*=\s*\(m\.data\s*\|\|\s*\[\]\)\s*\.filter/);
   assert.match(analytics, /All recorded/);
   assert.match(analytics, /@media print/);
   assert.match(analytics, /Monthly Student Report/);
