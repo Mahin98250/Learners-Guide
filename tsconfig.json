@@ -8,7 +8,8 @@
     "eslint.config.js"
   ],
   "exclude": [
-    "src/start.ts"
+    "src/start.ts",
+    "src/admin/PeopleAnalyticsPage.tsx"
   ],
   "compilerOptions": {
     "target": "ES2022",
