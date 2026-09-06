@@ -17,5 +17,9 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const { role } = Route.useSearch();
   const navigate = useNavigate();
-  return <LoginScreen role={role} onBack={() => navigate({ to: "/" })} onLogin={() => navigate({ to: "/app" })} onForgotPassword={() => navigate({ to: "/reset-password" })} />;
+  const openRecovery = () => {
+    const query = new URLSearchParams({ role });
+    window.location.assign(`/reset-password?${query.toString()}`);
+  };
+  return <LoginScreen role={role} onBack={() => navigate({ to: "/" })} onLogin={() => navigate({ to: "/app" })} onForgotPassword={openRecovery} />;
 }
