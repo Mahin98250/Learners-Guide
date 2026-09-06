@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 const root = process.cwd();
 
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const compact = (value) => value.replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
 
 test("production contract check passes", () => {
   const result = spawnSync(process.execPath, ["scripts/production-contract-check.mjs"], {
@@ -17,7 +18,7 @@ test("production contract check passes", () => {
 });
 
 test("shared data layer keeps verified timetable projection and role scoping", () => {
-  const data = read("src/lg/data.js");
+  const data = compact(read("src/lg/data.js"));
   assert.match(data, /constselect=\"id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status\"/);
   assert.match(data, /query=query\.eq\(\"teacher_id\",ref\)/);
   assert.match(data, /from\(\"batch_students\"\)\.select\(\"batch_id\"\)/);
