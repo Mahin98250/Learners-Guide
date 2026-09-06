@@ -44,9 +44,9 @@ Deno.serve(async (req) => {
       const student = (students || []).find((row) => normalizeId(row.sid) === sid || normalizeId(row.id) === sid);
       if (student && normalize(student.status) === "active") {
         const studentRefs = new Set([normalize(String(student.id)), normalize(String(student.sid))]);
-        const { data: users, error: userError } = await admin.from("users").select("email,auth_id,role,ref,status").eq("role", "student").limit(1000);
+        const { data: users, error: userError } = await admin.from("users").select("auth_id,role,ref,status").eq("role", "student").limit(1000);
         if (userError) throw userError;
-        const account = (users || []).find((row) => row.auth_id && normalize(row.status) === "active" && studentRefs.has(normalize(row.ref)) && emailPattern.test(normalize(row.email)) && !normalize(row.email).endsWith("@learnersguide.in"));
+        const account = (users || []).find((row) => row.auth_id && normalize(row.status) === "active" && studentRefs.has(normalize(row.ref)));
         authId = String(account?.auth_id || "");
       }
     } else {
@@ -68,7 +68,9 @@ Deno.serve(async (req) => {
 
     const publicClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
     const base = configuredAppUrl();
-    const redirectTo = new URL("reset-password", base).toString();
+    const redirectUrl = new URL("reset-password", base);
+    redirectUrl.searchParams.set("role", role);
+    const redirectTo = redirectUrl.toString();
     const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo });
     if (resetError) {
       console.error("password-recovery-request reset error", resetError.message);
