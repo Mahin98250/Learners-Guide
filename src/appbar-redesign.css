@@ -41,7 +41,6 @@
     isolation: isolate !important;
   }
 
-  /* Subtle decorative glow — never changes layout dimensions. */
   .portal-student > div:first-child > div:first-child::before,
   .portal-teacher > div:first-child > div:first-child::before,
   .portal-parent > div:first-child > div:first-child::before {
@@ -72,14 +71,12 @@
     z-index: -1 !important;
   }
 
-  /* AppBar's immediate content is kept compact and horizontally stable. */
   .portal-student > div:first-child > div:first-child > div,
   .portal-teacher > div:first-child > div:first-child > div,
   .portal-parent > div:first-child > div:first-child > div {
     min-width: 0 !important;
   }
 
-  /* Existing real logo: never replace it with an icon or generated artwork. */
   .portal-student > div:first-child > div:first-child img,
   .portal-teacher > div:first-child > div:first-child img,
   .portal-parent > div:first-child > div:first-child img {
@@ -91,8 +88,6 @@
     border-radius: 13px !important;
   }
 
-  /* Keep the identity block readable without allowing long names to push
-     notification/logout controls off-screen. */
   .portal-student > div:first-child > div:first-child h1,
   .portal-student > div:first-child > div:first-child h2,
   .portal-student > div:first-child > div:first-child p,
@@ -107,7 +102,6 @@
     overflow-wrap: anywhere !important;
   }
 
-  /* AppBar controls: compact touch targets, no oversized transparent blocks. */
   .portal-student > div:first-child > div:first-child button,
   .portal-teacher > div:first-child > div:first-child button,
   .portal-parent > div:first-child > div:first-child button {
@@ -139,8 +133,6 @@
 }
 
 @media (min-width: 701px) {
-  /* Desktop keeps the portal's existing layout, but gives the shared header
-     a cleaner, deliberate shape without forcing a phone-width canvas. */
   .portal-student > div:first-child > div:first-child,
   .portal-teacher > div:first-child > div:first-child,
   .portal-parent > div:first-child > div:first-child {
@@ -149,5 +141,14 @@
     background:
       radial-gradient(70% 140% at 95% 0%, rgba(113, 92, 244, .38) 0%, rgba(113, 92, 244, 0) 62%),
       linear-gradient(135deg, #38228f 0%, #4d35b9 52%, #2d1c78 100%) !important;
+  }
+}
+
+/* Print layout: remove the document's printable margin so browser-generated
+   print header/footer content has no reserved report area. The report itself
+   contains no URL or navigation metadata. */
+@media print {
+  @page {
+    margin: 0;
   }
 }
