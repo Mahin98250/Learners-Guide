@@ -63,7 +63,12 @@ test("Phase 5: analytics UI and reports stay real, branded, detailed, and dedupl
   assert.match(analytics, /legacy\s*=\s*\(m\.data\s*\|\|\s*\[\]\)\s*\.filter/);
   assert.match(analytics, /subjectMap/);
   assert.match(analytics, /Detailed assessment history/);
-  assert.match(analytics, /Homework records/);
+  assert.match(analytics, /Homework (?:status|Snapshot|created|records)/);
   assert.match(analytics, /Leave history/);
-  assert.match(analytics, /Monthly Student Report/);
+  assert.match(analytics, /Student Progress Portfolio/);
+  assert.match(analytics, /Teacher & Parent Review/);
+  assert.match(analytics, /Parent \/ Guardian/);
+  assert.match(analytics, /Subject Teacher/);
+  assert.match(analytics, /Growth Plan & Next Steps/);
+  assert.doesNotMatch(analytics, /https?:\/\//);
 });
