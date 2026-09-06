@@ -62,7 +62,7 @@ export function ParentApp({ user, onLogout }) {
       setTests(test.data || []);
 
       const testIds = (test.data || []).map(x => String(x.id)).filter(Boolean);
-      const resultResponse = testIds.length ? await supabase.from("test_results").select("id,student_id,test_id,marks,remarks").in("test_id", testIds) : { data: [], error: null };
+      const resultResponse = testIds.length ? await supabase.from("test_results").select("id,student_id,test_id,marks,remarks").in("test_id", testIds).in("student_id", ids) : { data: [], error: null };
       if (resultResponse.error) throw resultResponse.error;
       const testMap = new Map((test.data || []).map(t => [String(t.id), t]));
       setResults((resultResponse.data || []).map(r => ({ ...r, test: testMap.get(String(r.test_id)) || null })));
