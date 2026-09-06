@@ -106,13 +106,10 @@ function AppShell() {
   }, [navigate]);
 
   // Browsers can restore a frozen/BFCache page with old component state and
-  // cached records. Treat a return to the foreground as a fresh portal session:
-  // clear the non-authoritative cache, re-check Auth, then remount the portal so
-  // every section performs its normal Supabase read again. This is deliberately
-  // scoped to lifecycle restoration; ordinary in-app navigation is untouched.
+  // cached records. Only a genuine BFCache restore gets a fresh portal mount;
+  // ordinary tab visibility changes must not trigger repeated Supabase reads.
   useEffect(() => {
     const refreshAfterRestore = () => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       clearCache();
       setPortalRefreshKey((key) => key + 1);
       void load();
@@ -123,11 +120,7 @@ function AppShell() {
     };
 
     window.addEventListener("pageshow", onPageShow);
-    document.addEventListener("visibilitychange", refreshAfterRestore);
-    return () => {
-      window.removeEventListener("pageshow", onPageShow);
-      document.removeEventListener("visibilitychange", refreshAfterRestore);
-    };
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, [load]);
 
   if (loadError) return <Splash label={loadError} retry={() => void load()} />;

@@ -6,7 +6,7 @@ let source = fs.readFileSync(file, "utf8");
 const before = source;
 
 // Keep the actual admin component as the source of truth. This prebuild step only
-// normalizes documented default credentials and does not touch custom passwords.
+// normalizes documented default credentials and deterministic student roll-number UI.
 const studentStart = source.indexOf("function Students");
 const teacherStart = source.indexOf("function Teachers");
 const simpleCrudStart = source.indexOf("function SimpleCrud");
@@ -18,7 +18,16 @@ if (studentStart >= 0 && teacherStart > studentStart) {
     .replaceAll('pass: "1234"', 'pass: "Student@1234"')
     .replaceAll('placeholder="Default: 1234"', 'placeholder="Default: Student@1234"')
     .replaceAll('parent@1234', 'Parent@1234');
-  source = prefix + body + source.slice(teacherStart);
+  const orderedBody = body
+    .replace(
+      /return `LG-?\$\{String\(Math\.max\(0, \.\.\.nums\) \+ 1\)\.padStart\(3, "0"\)\}`;/,
+      'return `LG-${String(Math.max(0, ...nums) + 1).padStart(3, "0")}`;',
+    )
+    .replace(
+      /const rows = data\.filter\(\n    \(s\) => !q \|\| `\$\{s\.name\} \$\{s\.sid\}`\.toLowerCase\(\)\.includes\(q\.toLowerCase\(\)\),\n  \);/,
+      `const rows = data\n    .filter(\n      (s) => !q || \`${"${s.name}"} ${"${s.sid}"}\`.toLowerCase().includes(q.toLowerCase()),\n    )\n    .sort((a, b) => {\n      const rollA = Number(String(a.sid || "").match(/\\d+/)?.[0] || Number.MAX_SAFE_INTEGER);\n      const rollB = Number(String(b.sid || "").match(/\\d+/)?.[0] || Number.MAX_SAFE_INTEGER);\n      return rollA - rollB || String(a.name || "").localeCompare(String(b.name || ""));\n    });`,
+    );
+  source = prefix + orderedBody + source.slice(teacherStart);
 }
 
 const teacherEnd = simpleCrudStart > teacherStart ? simpleCrudStart : source.length;
@@ -51,4 +60,4 @@ if (!source.includes("Default teacher password: <b>Teacher@1234</b>")) {
 }
 
 if (source !== before) fs.writeFileSync(file, source);
-console.log("Admin default-password UI prepared.");
+console.log("Admin default-password and student-roll UI prepared.");

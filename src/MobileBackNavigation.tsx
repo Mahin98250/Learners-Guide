@@ -58,7 +58,7 @@ export default function MobileBackNavigation() {
     let startY = 0;
     let tracking = false;
 
-    const onTouchStart = (event: TouchEvent) => {
+    const onTouchStart = (event: TouchEvent): void => {
       if (event.touches.length !== 1) return;
       const touch = event.touches[0];
       if (!touch) return;
@@ -67,7 +67,7 @@ export default function MobileBackNavigation() {
       tracking = true;
     };
 
-    const onTouchEnd = (event: TouchEvent) => {
+    const onTouchEnd = (event: TouchEvent): void => {
       if (!tracking || event.changedTouches.length !== 1) return;
       tracking = false;
       const touch = event.changedTouches[0];

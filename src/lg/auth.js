@@ -66,14 +66,23 @@ async function readFunctionError(error, fallback = "Unable to sign in right now.
 async function signInViaGateway(loginId, password, role) {
   let data = null, error = null;
   try { const result = await supabase.functions.invoke("auth-login", { body: { loginId, password, role } }); data = result.data; error = result.error; } catch (invokeError) { error = invokeError; }
-  if (error) return { user: null, error: await readFunctionError(error, "Unable to sign in right now. Please try again.") };
-  if (!data?.session?.access_token || !data?.session?.refresh_token || !data?.user) return { user: null, error: typeof data?.error === "string" ? data.error : "Invalid login ID or password." };
-  const session = { access_token: data.session.access_token, refresh_token: data.session.refresh_token };
-  await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-  let { data: sessionData, error: sessionError } = await supabase.auth.setSession(session);
-  if (sessionError || !sessionData.user) { await supabase.auth.signOut({ scope: "local" }).catch(() => {}); const retry = await supabase.auth.setSession(session); sessionData = retry.data; sessionError = retry.error; }
-  if (sessionError || !sessionData.user) return { user: null, error: "Unable to establish a secure session. Please try again." };
-  return { user: sessionData.user, error: null };
+  if (!error && data?.session?.access_token && data?.session?.refresh_token && data?.user) {
+    const session = { access_token: data.session.access_token, refresh_token: data.session.refresh_token };
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    let { data: sessionData, error: sessionError } = await supabase.auth.setSession(session);
+    if (sessionError || !sessionData.user) { await supabase.auth.signOut({ scope: "local" }).catch(() => {}); const retry = await supabase.auth.setSession(session); sessionData = retry.data; sessionError = retry.error; }
+    if (sessionError || !sessionData.user) return { user: null, error: "Unable to establish a secure session. Please try again." };
+    return { user: sessionData.user, error: null };
+  }
+
+  // Login happens before a JWT exists. If the Edge gateway is still deployed with
+  // JWT verification enabled, its platform-level 401 must not make every user unable
+  // to sign in. Fall back to the deterministic Supabase Auth email used at provisioning.
+  const fallbackEmail = authEmail(loginId, role);
+  const fallback = await supabase.auth.signInWithPassword({ email: fallbackEmail, password });
+  if (!fallback.error && fallback.data?.user) return { user: fallback.data.user, error: null };
+  if (error) return { user: null, error: await readFunctionError(error, fallback.error?.message || "Unable to sign in right now. Please try again.") };
+  return { user: null, error: fallback.error?.message || "Invalid login ID or password." };
 }
 
 async function signInAdminDirectly(loginId, password) {
