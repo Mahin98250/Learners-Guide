@@ -6,7 +6,6 @@ import path from "node:path";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const compact = (value) => value.replace(/[\s\uFEFF\u200B-\u200D]+/g, "").toLowerCase();
-const regexEscape = (value) => value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
 
 const activeHelpers = [
   "public.app_role()",
@@ -32,29 +31,28 @@ const legacyHelpers = [
 const executionMigration = "supabase/migrations/20260906123000_phase4a_security_function_execution_hardening.sql";
 const sql = compact(read(executionMigration));
 
-for (const signature of [...activeHelpers, ...legacyHelpers]) {
-  assert.match(sql, new RegExp(`revoke(?:all|execute)onfunction${regexEscape(signature)}frompublic,anon`));
-}
+const contains = (value) => assert.ok(sql.includes(compact(value)), `Missing migration contract: ${value}`);
 
 test("Phase 4A keeps authenticated EXECUTE for all 13 active RLS/storage helpers", () => {
   assert.equal(activeHelpers.length, 13);
   for (const signature of activeHelpers) {
-    assert.match(sql, new RegExp(`grantexecuteonfunction${regexEscape(signature)}toauthenticated;`));
+    contains(`revoke execute on function ${signature} from public, anon;`);
+    contains(`grant execute on function ${signature} to authenticated;`);
   }
 });
 
 test("Phase 4A removes authenticated EXECUTE from the two legacy helpers", () => {
   for (const signature of legacyHelpers) {
-    assert.match(sql, new RegExp(`revokeallexecuteonfunction${regexEscape(signature)}frompublic,anon,authenticated;`));
-    assert.doesNotMatch(sql, new RegExp(`grantexecuteonfunction${regexEscape(signature)}toauthenticated;`));
+    contains(`revoke all on function ${signature} from public, anon, authenticated;`);
+    assert.equal(sql.includes(compact(`grant execute on function ${signature} to authenticated;`)), false);
   }
 });
 
 test("Phase 4A migration contains in-database privilege verification", () => {
-  assert.match(sql, /dodeclare/);
-  assert.match(sql, /to_regprocedure\(helper\)/);
-  assert.match(sql, /has_function_privilege\('authenticated'/);
-  assert.match(sql, /has_function_privilege\('anon'/);
+  contains("do $$");
+  contains("to_regprocedure(helper)");
+  contains("has_function_privilege('authenticated'");
+  contains("has_function_privilege('anon'");
 });
 
 test("Current schema source still contains the active helper authorization graph", () => {
@@ -72,6 +70,6 @@ test("Current schema source still contains the active helper authorization graph
 
   for (const signature of activeHelpers) {
     const fnName = signature.slice("public.".length).split("(")[0];
-    assert.match(source, new RegExp(regexEscape(fnName)));
+    assert.ok(source.includes(fnName), `Active helper missing from current authorization graph: ${fnName}`);
   }
 });
