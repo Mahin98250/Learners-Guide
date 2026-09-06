@@ -12,7 +12,11 @@ async function loadStudentBatchIds(student) {
   const ids = new Set();
   const directIds = [student?.batchId, student?.batch_id, ...(Array.isArray(student?.batchIds) ? student.batchIds : [])];
   directIds.filter(Boolean).forEach((id) => ids.add(String(id)));
-  if (student?.id) {
+
+  // Most portal callers already hydrate the authoritative active batch IDs.
+  // Avoid re-reading batch_students in that case; only fall back to the DB
+  // lookup when the student object does not contain any batch relationship.
+  if (ids.size === 0 && student?.id) {
     const { data, error } = await supabase.from("batch_students").select("batch_id").eq("student_id", String(student.id)).eq("status", "active");
     if (error) throw error;
     (data || []).forEach((row) => row.batch_id && ids.add(String(row.batch_id)));
