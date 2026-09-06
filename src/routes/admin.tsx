@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
-import { AdminLogin } from "@/admin/ReferenceAdminPanel";
-import { AdminWithDrive } from "@/admin/AdminWithDrive";
+
+const AdminLogin = lazy(() =>
+  import("@/admin/ReferenceAdminPanel").then((module) => ({ default: module.AdminLogin })),
+);
+const AdminWithDrive = lazy(() =>
+  import("@/admin/AdminWithDrive").then((module) => ({ default: module.AdminWithDrive })),
+);
 
 export type AdminRouteUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 export const Route = createFileRoute("/admin")({ ssr: false, component: AdminRoute });
@@ -56,6 +61,16 @@ function AdminRoute() {
   }, [user, load]);
 
   if (checking && !user) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>;
-  if (!user) return <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void syncAdmin(admin); }} />;
-  return <AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />;
+  if (!user) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin sign-in…</div>}>
+        <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void syncAdmin(admin); }} />
+      </Suspense>
+    );
+  }
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>}>
+      <AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />
+    </Suspense>
+  );
 }
