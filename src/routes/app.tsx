@@ -1,14 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
-import { TeacherAppWithHomeworkFiles } from "@/lg/teacherHomeworkApp";
-import { StudentApp } from "@/lg/student";
-import { ParentApp } from "@/lg/parentWorkflows";
 import { LeaveAccess } from "@/lg/LeaveAccess";
 import { PushNotificationPrompt } from "@/lg/pushNotifications";
 import ChangePassword from "@/lg/ChangePassword";
+
+const TeacherAppWithHomeworkFiles = lazy(() =>
+  import("@/lg/teacherHomeworkApp").then((module) => ({ default: module.TeacherAppWithHomeworkFiles })),
+);
+const StudentApp = lazy(() => import("@/lg/student").then((module) => ({ default: module.StudentApp })));
+const ParentApp = lazy(() => import("@/lg/parentWorkflows").then((module) => ({ default: module.ParentApp })));
 
 const title = "My Dashboard — Learner's Guide";
 const description = "Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
@@ -146,7 +149,9 @@ function AppShell() {
 
   return (
     <div className={`lg-app-shell ${portalClass}`} data-portal={user.role}>
-      {portal}
+      <Suspense fallback={<Splash label="Loading your dashboard…" />}>
+        {portal}
+      </Suspense>
       {(user.role === "student" || user.role === "parent") && <LeaveAccess user={user} student={null} />}
       <PushNotificationPrompt user={user} />
       <ChangePassword />
