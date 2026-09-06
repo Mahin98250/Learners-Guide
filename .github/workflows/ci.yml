@@ -32,6 +32,20 @@ jobs:
       - name: Production contract checks
         run: node scripts/production-contract-check.mjs
 
+      - name: Audit regression tests
+        run: npm test
+
+      - name: ESLint
+        run: npm run lint:eslint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      # Formatting is intentionally last so tests and build validate the
+      # committed source instead of a CI-mutated working tree.
       - name: Format changed source files
         shell: bash
         run: |
@@ -56,15 +70,3 @@ jobs:
             printf ' - %s\n' "${FILES[@]}"
             npx prettier --write "${FILES[@]}"
           fi
-
-      - name: Audit regression tests
-        run: npm test
-
-      - name: ESLint
-        run: npm run lint:eslint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Production build
-        run: npm run build
