@@ -47,14 +47,13 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Parse only the literal projection argument. Do not compact the full source
-// because compacting source code can also alter lexical boundaries. Keep the
-// parser deliberately simple: these projections contain no quote characters.
+// Parse only literal projection arguments. Whitespace between chained calls is
+// allowed because CI formats changed files with Prettier before this check.
 const projectionFields = (source, table) => {
   const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const patterns = [
-    new RegExp(`supabase\\.from\\(\\s*"${escapedTable}"\\s*\\)\\.select\\(\\s*"([^"]*)"\\s*\\)`, "g"),
-    new RegExp(`supabase\\.from\\(\\s*'${escapedTable}'\\s*\\)\\.select\\(\\s*'([^']*)'\\s*\\)`, "g"),
+    new RegExp(`supabase\\.from\\(\\s*"${escapedTable}"\\s*\\)\\s*\\.select\\(\\s*"([^"]*)"\\s*\\)`, "g"),
+    new RegExp(`supabase\\.from\\(\\s*'${escapedTable}'\\s*\\)\\s*\\.select\\(\\s*'([^']*)'\\s*\\)`, "g"),
   ];
   const fields = [];
   for (const pattern of patterns) {
@@ -93,8 +92,8 @@ for (const file of files) {
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
 
-// Regression fixtures exercise both supported quote styles and formatting.
-const parserFixture = `const a = supabase.from("teachers")\n  .select("id,name,tid,subject,phone,classes,status");\nconst b = supabase.from('homework').select('id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at');`;
+// Regression fixtures exercise both quote styles and multiline chaining.
+const parserFixture = `const a = supabase.from("teachers")\n  .select("id,name,tid,subject,phone,classes,status");\nconst b = supabase.from('homework')\n  .select('id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at');`;
 check(hasProjection(parserFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
 check(hasProjection(parserFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
 
