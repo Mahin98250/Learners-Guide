@@ -2,19 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const adminIdentity = fs.readFileSync("src/admin/AdminIdentityLabels.tsx", "utf8");
-const identity = fs.readFileSync("src/lg/IdentityLabels.jsx", "utf8");
+const portal = fs.readFileSync("src/admin/ModernAdminPortal.tsx", "utf8");
+const records = fs.readFileSync("src/admin/records/AdminRecordsPage.tsx", "utf8");
 
-test("identity labels do not globally convert roll numbers or phone values to names", () => {
-  assert.match(adminIdentity, /IdentityLabels rootSelector=\"\.admin\"/);
-  assert.match(identity, /replaceAll\(`Batch \$\{id\}`, name\)/);
-  assert.doesNotMatch(identity, /maps\.student\.get\(trimmed\).*phone/);
-  assert.doesNotMatch(identity, /for \(const \[id, name\] of maps\.student\)[\s\S]*replaceAll\(id, name\)/);
+test("modern admin avoids global identity text rewriting", () => {
+  assert.doesNotMatch(portal, /AdminIdentityLabels|IdentityLabels/);
 });
 
-test("identity labels only translate internal record ids", () => {
-  assert.match(identity, /const id = clean\(row\.id\)/);
-  assert.match(identity, /Student ID: \$\{id\}/);
-  assert.match(identity, /Teacher ID: \$\{id\}/);
-  assert.match(identity, /batch_id: \$\{id\}/);
+test("student and teacher identity fields remain semantic", () => {
+  assert.match(records, /\[\"sid\", r\.sid\]/);
+  assert.match(records, /\[\"tid\", r\.tid\]/);
+  assert.match(records, /\[\"phone\", r\.phone\]/);
+  assert.doesNotMatch(records, /\[\"sid\", r\.name\]/);
+  assert.doesNotMatch(records, /\[\"phone\", r\.name\]/);
+  assert.match(records, /Student ID/);
 });
