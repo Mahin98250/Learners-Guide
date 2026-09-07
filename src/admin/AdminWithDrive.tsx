@@ -4,17 +4,19 @@ import { MaterialsDriveV2 } from "@/admin/MaterialsDriveV2";
 import { LeaveRequests } from "@/lg/LeaveRequests";
 import { PeopleAnalyticsPage } from "@/admin/PeopleAnalyticsPage";
 import { AdvancedAdminHome } from "@/admin/AdvancedAdminHome";
+import { AdminManagementHub } from "@/admin/AdminManagementHub";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 
 export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const [advancedHome, setAdvancedHome] = useState(true);
+  const [managementHub, setManagementHub] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   useEffect(() => {
-    if (advancedHome) return;
+    if (advancedHome || managementHub) return;
     const mountAdminNavigation = () => {
       const nav = document.querySelector<HTMLElement>(".navrow");
       if (!nav) return;
@@ -44,9 +46,10 @@ export function AdminWithDrive({ user, onLogout }: { user: AdminUser; onLogout: 
     };
     mountAdminNavigation(); const observer = new MutationObserver(mountAdminNavigation); observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [advancedHome]);
+  }, [advancedHome, managementHub]);
 
-  if (advancedHome) return <AdvancedAdminHome user={user} onOpenManagement={() => setAdvancedHome(false)} onLogout={onLogout} />;
+  if (advancedHome) return <AdvancedAdminHome user={user} onOpenManagement={() => setManagementHub(true)} onLogout={onLogout} />;
+  if (managementHub) return <AdminManagementHub user={user} onOpenLegacy={() => setManagementHub(false)} onBack={() => setAdvancedHome(true)} onLogout={onLogout} />;
   if (analyticsOpen) return <PeopleAnalyticsPage onClose={() => setAnalyticsOpen(false)} />;
   if (materialsOpen) return <div style={{ minHeight: "100vh", background: "#F0F4FF" }}><div style={{ padding: "12px 18px", background: "#0F1B3D", display: "flex", alignItems: "center", gap: 12 }}><button type="button" onClick={() => setMaterialsOpen(false)} style={{ border: 0, borderRadius: 10, padding: "9px 13px", background: "#4361EE", color: "#fff", fontWeight: 800, cursor: "pointer" }}>← Admin Dashboard</button><span style={{ color: "#fff", fontWeight: 800, flex: 1 }}>Study Materials · Drive</span><button type="button" onClick={onLogout} style={{ border: "1px solid #ef444466", borderRadius: 10, padding: "9px 13px", background: "#ef44441a", color: "#fecaca", fontWeight: 800, cursor: "pointer" }}>↪ Logout</button></div><MaterialsDriveV2 onClose={() => setMaterialsOpen(false)} /></div>;
 
