@@ -8,13 +8,14 @@ import BatchesTimetablePage from "@/admin/batches/BatchesTimetablePage";
 import TestManagementPage from "@/admin/tests/TestManagementPage";
 import HomeworkPage from "@/admin/HomeworkPage";
 import AnnouncementsPage from "@/admin/AnnouncementsPage";
+import ReportCardsPage from "@/admin/ReportCardsPage";
 import { ModernAdminSectionPage } from "@/admin/ModernAdminSectionPages";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Item = { key: string; icon: string; label: string; special?: "dashboard" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" };
+type Item = { key: string; icon: string; label: string; special?: "dashboard" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" };
 type Group = { label: string; items: Item[] };
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
@@ -32,6 +33,7 @@ const GROUPS: Group[] = [
     { key: "Student Results", icon: "🏆", label: "Student Results", special: "results" },
     { key: "Marks Overview", icon: "◒", label: "Marks Overview", special: "marks" },
     { key: "Study Materials", icon: "📚", label: "Study Materials", special: "materials" },
+    { key: "Report Cards", icon: "▤", label: "Report Cards", special: "report-cards" },
   ] },
   { label: "Operations", items: [
     { key: "Fees", icon: "₹", label: "Fees", special: "fees" },
@@ -55,6 +57,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     if (activeItem.special === "tests") return <div className="modern-admin-native-page"><TestManagementPage /></div>;
     if (activeItem.special === "homework") return <div className="modern-admin-native-page"><HomeworkPage /></div>;
     if (activeItem.special === "announcements") return <div className="modern-admin-native-page"><AnnouncementsPage /></div>;
+    if (activeItem.special === "report-cards") return <div className="modern-admin-native-page"><ReportCardsPage /></div>;
     if (activeItem.special === "materials") return <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
     if (["attendance","results","marks","fees","accounts","profiles","analytics"].includes(activeItem.special || "")) return <div className="modern-admin-section-page"><ModernAdminSectionPage section={activeItem.special as "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics"} onBack={() => choose(allItems[0])} /></div>;
