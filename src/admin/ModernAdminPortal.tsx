@@ -7,13 +7,15 @@ import AdminRecordsPage from "@/admin/records/AdminRecordsPage";
 import TeacherRecordsPage from "@/admin/records/TeacherRecordsPage";
 import BatchesTimetablePage from "@/admin/batches/BatchesTimetablePage";
 import TestManagementPage from "@/admin/tests/TestManagementPage";
+import HomeworkPage from "@/admin/HomeworkPage";
+import AnnouncementsPage from "@/admin/AnnouncementsPage";
 import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" };
+type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" };
 type Group = { label: string; items: Item[] };
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
@@ -26,7 +28,7 @@ const GROUPS: Group[] = [
   { label: "Academic", items: [
     { key: "Batches & Timetable", icon: "▦", label: "Batches & Timetable", special: "batches" },
     { key: "Attendance", icon: "✓", label: "Attendance" },
-    { key: "Homework", icon: "✎", label: "Homework" },
+    { key: "Homework", icon: "✎", label: "Homework", special: "homework" },
     { key: "Exam Schedule", icon: "▤", label: "Exam Schedule", special: "tests" },
     { key: "Student Results", icon: "🏆", label: "Student Results" },
     { key: "Marks Overview", icon: "◒", label: "Marks Overview" },
@@ -34,7 +36,7 @@ const GROUPS: Group[] = [
   ] },
   { label: "Operations", items: [
     { key: "Fees", icon: "₹", label: "Fees" },
-    { key: "Announcements", icon: "📢", label: "Announcements" },
+    { key: "Announcements", icon: "📢", label: "Announcements", special: "announcements" },
     { key: "Leave Requests", icon: "☷", label: "Leave Requests", special: "leave" },
   ] },
   { label: "Insights", items: [{ key: "People & Analytics", icon: "↗", label: "Analytics", special: "analytics" }] },
@@ -52,6 +54,8 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage /></div>;
     if (activeItem.special === "batches") return <div className="modern-admin-native-page"><BatchesTimetablePage /></div>;
     if (activeItem.special === "tests") return <div className="modern-admin-native-page"><TestManagementPage /></div>;
+    if (activeItem.special === "homework") return <div className="modern-admin-native-page"><HomeworkPage /></div>;
+    if (activeItem.special === "announcements") return <div className="modern-admin-native-page"><AnnouncementsPage /></div>;
     if (activeItem.special === "analytics") return <div className="modern-admin-special"><PeopleAnalyticsPage onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "materials") return <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
