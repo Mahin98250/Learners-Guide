@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import "@/admin/modern-admin-dashboard.css";
 
 type AdminUser = { name: string };
 type Props = { user: AdminUser; onNavigate: (label: string) => void };
@@ -51,14 +52,14 @@ export function ModernAdminDashboard({ user, onNavigate }: Props) {
   }, []);
 
   const cards = [
-    ["Students", "🎓", counts.students, "People enrolled", "Students"],
-    ["Teachers", "👨‍🏫", counts.teachers, "Teaching staff", "Teachers"],
-    ["Batches", "▦", counts.batches, "Active groups", "Batches & Timetable"],
-    ["Homework", "✎", counts.homework, "Assigned work", "Homework"],
-    ["Tests", "▤", counts.tests, "Scheduled tests", "Exam Schedule"],
-    ["Attendance", "✓", counts.attendance, "Attendance records", "Attendance"],
-    ["Fees", "₹", counts.fees, "Fee records", "Fees"],
-    ["Announcements", "📢", counts.announcements, "Published notices", "Announcements"],
+    ["Students", "🎓", counts.students, "People enrolled"],
+    ["Teachers", "👨‍🏫", counts.teachers, "Teaching staff"],
+    ["Batches", "▦", counts.batches, "Active groups"],
+    ["Homework", "✎", counts.homework, "Assigned work"],
+    ["Tests", "▤", counts.tests, "Scheduled tests"],
+    ["Attendance", "✓", counts.attendance, "Attendance records"],
+    ["Fees", "₹", counts.fees, "Fee records"],
+    ["Announcements", "📢", counts.announcements, "Published notices"],
   ] as const;
 
   const quick = [
