@@ -7,6 +7,7 @@ import AdminRecordsPage from "@/admin/records/AdminRecordsPage";
 import TeacherRecordsPage from "@/admin/records/TeacherRecordsPage";
 import BatchesTimetablePage from "@/admin/batches/BatchesTimetablePage";
 import TestManagementPage from "@/admin/tests/TestManagementPage";
+import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 
@@ -58,7 +59,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     if (activeItem.special === "analytics") return <div className="modern-admin-special"><PeopleAnalyticsPage onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "materials") return <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
-    return <div className="modern-admin-native-placeholder"><div className="modern-admin-placeholder-icon">✦</div><h2>{activeItem.label}</h2><p>This section is being migrated into the new Admin workspace. Existing data and permissions remain unchanged.</p></div>;
+    return <div className="modern-admin-legacy-host"><ReferenceAdminPanel user={user} onLogout={onLogout} /></div>;
   };
 
   return (
