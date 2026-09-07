@@ -10,11 +10,11 @@ import TestManagementPage from "@/admin/tests/TestManagementPage";
 import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
+import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" };
 type Group = { label: string; items: Item[] };
-
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
   { label: "People", items: [
@@ -39,17 +39,13 @@ const GROUPS: Group[] = [
   ] },
   { label: "Insights", items: [{ key: "People & Analytics", icon: "↗", label: "Analytics", special: "analytics" }] },
 ];
-
 const allItems = GROUPS.flatMap((group) => group.items);
-
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeItem = useMemo(() => allItems.find((item) => item.key === active) || allItems[0], [active]);
-
   const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); };
   const go = (label: string) => { const item = allItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
-
   const renderPage = () => {
     if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
     if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
@@ -61,16 +57,13 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
     return <div className="modern-admin-legacy-host"><ReferenceAdminPanel user={user} onLogout={onLogout} /></div>;
   };
-
   return (
     <div className="modern-admin">
       <button type="button" className="modern-admin-mobile-back" onClick={() => { if (mobileOpen) setMobileOpen(false); else choose(allItems[0]); }} aria-label={mobileOpen ? "Close navigation" : "Back to dashboard"}>{mobileOpen ? "×" : "←"}</button>
       <aside className={`modern-admin-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="modern-admin-brand"><div className="modern-admin-brand-mark"><LGLogo size={58} showText={false} /></div><div><strong>Learner's Guide</strong><span>Admin Portal</span></div></div>
         <div className="modern-admin-profile"><div className="modern-admin-avatar">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div className="modern-admin-profile-copy"><strong>{user.name || "Admin"}</strong><span>Administrator</span></div><span className="modern-admin-online" title="Signed in" /></div>
-        <nav className="modern-admin-nav" aria-label="Admin navigation">
-          {GROUPS.map((group) => <div className="modern-admin-nav-group" key={group.label}><div className="modern-admin-nav-label">{group.label}</div>{group.items.map((item) => <button type="button" key={item.key} className={`modern-admin-nav-item ${active === item.key ? "active" : ""}`} onClick={() => choose(item)}><span className="modern-admin-nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}</div>)}
-        </nav>
+        <nav className="modern-admin-nav" aria-label="Admin navigation">{GROUPS.map((group) => <div className="modern-admin-nav-group" key={group.label}><div className="modern-admin-nav-label">{group.label}</div>{group.items.map((item) => <button type="button" key={item.key} className={`modern-admin-nav-item ${active === item.key ? "active" : ""}`} onClick={() => choose(item)}><span className="modern-admin-nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}</div>)}</nav>
         <div className="modern-admin-sidebar-bottom"><div className="modern-admin-current-admin"><span>Signed in as</span><strong>{user.name || "Admin"}</strong></div><button type="button" className="modern-admin-logout" onClick={onLogout}>↪ <span>Logout</span></button></div>
       </aside>
       <main className="modern-admin-main">
