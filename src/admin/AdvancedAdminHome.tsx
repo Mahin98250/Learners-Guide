@@ -3,154 +3,33 @@ import { supabase } from "@/lg/supabase";
 import { LGLogo } from "@/lg/ui";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-
 type Props = { user: AdminUser; onOpenManagement: () => void; onLogout: () => void };
-
 type Metric = { label: string; value: number; icon: string; note: string };
-
-const A = {
-  bg: "#F4F7FB",
-  ink: "#0F1B3D",
-  sub: "#64748B",
-  border: "#E2E8F0",
-  accent: "#4361EE",
-  green: "#16A34A",
-  amber: "#D97706",
-  red: "#DC2626",
-};
-
-const countRows = async (table: string) => {
-  const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true });
-  if (error) throw error;
-  return count || 0;
-};
-
-function Action({ icon, title, text, onClick }: { icon: string; title: string; text: string; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="advanced-admin-action">
-      <span className="advanced-admin-action-icon" aria-hidden="true">{icon}</span>
-      <span><b>{title}</b><small>{text}</small></span>
-      <span aria-hidden="true">→</span>
-    </button>
-  );
-}
-
+const A = { bg: "#F4F7FB", ink: "#0F1B3D", sub: "#64748B", border: "#E2E8F0", accent: "#4361EE", green: "#16A34A", red: "#DC2626" };
+const countRows = async (table: string) => { const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true }); if (error) throw error; return count || 0; };
+function Action({ icon, title, text, onClick }: { icon: string; title: string; text: string; onClick: () => void }) { return <button type="button" onClick={onClick} className="advanced-admin-action"><span className="advanced-admin-action-icon" aria-hidden="true">{icon}</span><span><b>{title}</b><small>{text}</small></span><span aria-hidden="true">→</span></button>; }
 export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [attendanceRate, setAttendanceRate] = useState(0);
-  const [upcomingTests, setUpcomingTests] = useState(0);
-  const [pendingFees, setPendingFees] = useState(0);
-  const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
-
+  const [loading, setLoading] = useState(true), [error, setError] = useState(""), [metrics, setMetrics] = useState<Metric[]>([]), [upcomingTests, setUpcomingTests] = useState(0), [pendingFees, setPendingFees] = useState(0), [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-
-  const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [students, teachers, batches, homework, announcements, tests, attendance, fees] = await Promise.all([
-        countRows("students"), countRows("teachers"), countRows("batches"), countRows("homework"),
-        countRows("announcements"), countRows("tests"),
-        supabase.from("attendance").select("status"),
-        supabase.from("fees").select("status,amount"),
-      ]);
-      if (attendance.error) throw attendance.error;
-      if (fees.error) throw fees.error;
-
-      const att = attendance.data || [];
-      const present = att.filter((r) => String(r.status || "").toLowerCase() === "present").length;
-      const rate = att.length ? Math.round((present / att.length) * 100) : 0;
-      const feeRows = fees.data || [];
-      const pending = feeRows
-        .filter((r) => String(r.status || "").toLowerCase() !== "paid")
-        .reduce((sum, r) => sum + Number(r.amount || 0), 0);
-      const { data: testRows, error: testError } = await supabase
-        .from("tests")
-        .select("id,test_date,date")
-        .gte("test_date", today)
-        .order("test_date", { ascending: true });
-      if (testError) {
-        const fallback = await supabase.from("tests").select("id,date").gte("date", today);
-        if (fallback.error) throw testError;
-        setUpcomingTests(fallback.data?.length || 0);
-      } else {
-        setUpcomingTests(testRows?.length || 0);
-      }
-      const { data: anns, error: annError } = await supabase
-        .from("announcements")
-        .select("id,title,date,target")
-        .order("date", { ascending: false })
-        .limit(4);
-      if (annError) throw annError;
-      setRecentAnnouncements(anns || []);
-      setAttendanceRate(rate);
-      setPendingFees(pending);
-      setMetrics([
-        { label: "Students", value: students, icon: "🎓", note: "Active learner base" },
-        { label: "Teachers", value: teachers, icon: "👨‍🏫", note: "Teaching staff" },
-        { label: "Batches", value: batches, icon: "👥", note: "Classes & groups" },
-        { label: "Homework", value: homework, icon: "📝", note: "Assigned records" },
-        { label: "Tests", value: tests, icon: "📋", note: "Total assessments" },
-        { label: "Attendance", value: rate, icon: "✅", note: "Overall rate %" },
-      ]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to load the admin overview.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const load = async () => { setLoading(true); setError(""); try {
+    const [students, teachers, batches, homework, announcements, tests, attendance, fees] = await Promise.all([countRows("students"), countRows("teachers"), countRows("batches"), countRows("homework"), countRows("announcements"), countRows("tests"), supabase.from("attendance").select("status"), supabase.from("fees").select("status,amount")]);
+    if (attendance.error) throw attendance.error; if (fees.error) throw fees.error;
+    const att = attendance.data || [], present = att.filter((r) => String(r.status || "").toLowerCase() === "present").length, rate = att.length ? Math.round((present / att.length) * 100) : 0;
+    const pending = (fees.data || []).filter((r) => String(r.status || "").toLowerCase() !== "paid").reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const primaryTests = await supabase.from("tests").select("id,test_date,date").gte("test_date", today).order("test_date", { ascending: true });
+    if (primaryTests.error) { const fallback = await supabase.from("tests").select("id,date").gte("date", today); if (fallback.error) throw primaryTests.error; setUpcomingTests(fallback.data?.length || 0); } else setUpcomingTests(primaryTests.data?.length || 0);
+    const { data: anns, error: annError } = await supabase.from("announcements").select("id,title,date,target").order("date", { ascending: false }).limit(4); if (annError) throw annError;
+    setRecentAnnouncements(anns || []); setPendingFees(pending); setMetrics([{ label: "Students", value: students, icon: "🎓", note: "Active learner base" }, { label: "Teachers", value: teachers, icon: "👨‍🏫", note: "Teaching staff" }, { label: "Batches", value: batches, icon: "👥", note: "Classes & groups" }, { label: "Homework", value: homework, icon: "📝", note: "Assigned records" }, { label: "Tests", value: tests, icon: "📋", note: "Total assessments" }, { label: "Attendance", value: rate, icon: "✅", note: "Overall rate %" }]);
+  } catch (e) { setError(e instanceof Error ? e.message : "Unable to load the admin overview."); } finally { setLoading(false); } };
   useEffect(() => { void load(); }, []);
-
-  const go = (label: string) => {
-    const item = Array.from(document.querySelectorAll<HTMLElement>(".nav")).find((x) =>
-      (x.textContent || "").trim().toLowerCase().includes(label.toLowerCase()),
-    );
-    if (item) item.click(); else onOpenManagement();
-  };
-
-  return (
-    <div className="advanced-admin-home">
-      <style>{`*{box-sizing:border-box}.advanced-admin-home{min-height:100vh;background:${A.bg};color:${A.ink};font-family:Poppins,system-ui,sans-serif}.advanced-admin-top{padding:18px clamp(16px,4vw,42px);background:#fff;border-bottom:1px solid ${A.border};display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}.advanced-admin-brand{display:flex;align-items:center;gap:10px;flex:1}.advanced-admin-logo{width:42px;height:42px;border-radius:12px;background:#eef2ff;display:grid;place-items:center;padding:4px}.advanced-admin-top button,.advanced-admin-home button{font:inherit}.advanced-admin-btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor:pointer}.advanced-admin-primary{background:${A.accent};color:#fff}.advanced-admin-secondary{background:#eef2ff;color:${A.accent}}.advanced-admin-wrap{max-width:1440px;margin:auto;padding:clamp(16px,3vw,32px)}.advanced-admin-hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:24px}.advanced-admin-eyebrow{font-size:11px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:${A.accent}}.advanced-admin-hero h1{margin:4px 0;font-size:clamp(24px,4vw,34px)}.advanced-admin-hero p{margin:0;color:${A.sub);font-size:13px}.advanced-admin-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}.advanced-admin-metric{background:#fff;border:1px solid ${A.border};border-radius:18px;padding:17px;min-width:0}.advanced-admin-metric-icon{font-size:21px}.advanced-admin-metric-value{font-size:27px;font-weight:950;margin-top:8px}.advanced-admin-metric-label{font-weight:800}.advanced-admin-metric-note{font-size:11px;color:${A.sub};margin-top:3px}.advanced-admin-main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;margin-top:16px}.advanced-admin-card{background:#fff;border:1px solid ${A.border};border-radius:20px;padding:20px}.advanced-admin-card h2{font-size:17px;margin:0 0 5px}.advanced-admin-card p{font-size:12px;color:${A.sub};margin:0 0 15px}.advanced-admin-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.advanced-admin-action{border:1px solid ${A.border};background:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;text-align:left;cursor:pointer;color:${A.ink}.advanced-admin-action:hover{border-color:#aab8f8;background:#f8faff}.advanced-admin-action-icon{width:34px;height:34px;border-radius:10px;background:#eef2ff;display:grid;place-items:center;flex:none}.advanced-admin-action b{display:block;font-size:12px}.advanced-admin-action small{display:block;color:${A.sub};font-size:10px;margin-top:2px}.advanced-admin-action>span:last-child{margin-left:auto;color:${A.accent);font-weight:900}.advanced-admin-health{display:grid;gap:10px}.advanced-admin-health-row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid ${A.border};font-size:12px}.advanced-admin-health-row:last-child{border-bottom:0}.advanced-admin-status{font-weight:900}.advanced-admin-list{display:grid;gap:8px}.advanced-admin-ann{padding:11px;border-radius:12px;background:#f8faff;border:1px solid #edf1f8}.advanced-admin-ann b{font-size:12px}.advanced-admin-ann small{display:block;color:${A.sub};font-size:10px;margin-top:3px}.advanced-admin-error{background:#fef2f2;color:${A.red};padding:11px;border-radius:12px;margin-bottom:15px;font-size:12px}@media(max-width:1100px){.advanced-admin-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:800px){.advanced-admin-main{grid-template-columns:1fr}.advanced-admin-hero{align-items:flex-start;flex-direction:column}.advanced-admin-actions{grid-template-columns:1fr 1fr}}@media(max-width:520px){.advanced-admin-grid{grid-template-columns:1fr 1fr}.advanced-admin-actions{grid-template-columns:1fr}.advanced-admin-top{padding:12px 14px}.advanced-admin-top .advanced-admin-secondary{display:none}.advanced-admin-brand small{display:none}.advanced-admin-wrap{padding:14px}.advanced-admin-card{padding:16px}}`}</style>
-      <header className="advanced-admin-top">
-        <div className="advanced-admin-brand">
-          <div className="advanced-admin-logo"><LGLogo size={34} showText={false} /></div>
-          <div><b>Learner's Guide</b><small style={{ display: "block", color: A.sub, fontSize: 10 }}>Admin Control Center</small></div>
-        </div>
-        <button className="advanced-admin-btn advanced-admin-secondary" onClick={onOpenManagement}>Management</button>
-        <button className="advanced-admin-btn" style={{ background: "#fff1f2", color: A.red }} onClick={onLogout}>Logout</button>
-      </header>
-      <main className="advanced-admin-wrap">
-        <section className="advanced-admin-hero">
-          <div><div className="advanced-admin-eyebrow">Administrator dashboard</div><h1>Good day, {user.name || "Admin"} 👋</h1><p>One simple control center for the entire institute.</p></div>
-          <button className="advanced-admin-btn advanced-admin-secondary" onClick={() => void load()} disabled={loading}>{loading ? "Syncing…" : "↻ Refresh"}</button>
-        </section>
-        {error && <div className="advanced-admin-error">{error}</div>}
-        <section className="advanced-admin-grid">
-          {metrics.map((m) => <div className="advanced-admin-metric" key={m.label}><div className="advanced-admin-metric-icon">{m.icon}</div><div className="advanced-admin-metric-value">{m.label === "Attendance" ? `${m.value}%` : m.value}</div><div className="advanced-admin-metric-label">{m.label}</div><div className="advanced-admin-metric-note">{m.note}</div></div>)}
-        </section>
-        <section className="advanced-admin-main">
-          <div className="advanced-admin-card"><h2>Quick Management ⚡</h2><p>Jump directly to the area you need. Existing management screens remain available.</p><div className="advanced-admin-actions">
-            <Action icon="🎓" title="Students" text="Profiles & accounts" onClick={() => go("Students")} />
-            <Action icon="👨‍🏫" title="Teachers" text="Staff & subjects" onClick={() => go("Teachers")} />
-            <Action icon="👥" title="Batches" text="Classes & timetable" onClick={() => go("Batches")} />
-            <Action icon="📋" title="Tests & Results" text="Assessments" onClick={() => go("Student Results")} />
-            <Action icon="✅" title="Attendance" text="Daily records" onClick={() => go("Attendance")} />
-            <Action icon="💰" title="Fees" text="Payments & dues" onClick={() => go("Fees")} />
-            <Action icon="📚" title="Study Materials" text="Library & files" onClick={() => go("Study Materials")} />
-            <Action icon="📈" title="Analytics" text="People & reports" onClick={() => go("People & Analytics")} />
-          </div></div>
-          <div className="advanced-admin-card"><h2>System Health 🛡️</h2><p>At-a-glance operational indicators.</p><div className="advanced-admin-health">
-            <div className="advanced-admin-health-row"><span>Supabase connection</span><span className="advanced-admin-status" style={{ color: error ? A.red : A.green }}>{error ? "Check" : "Healthy"}</span></div>
-            <div className="advanced-admin-health-row"><span>Upcoming tests</span><b>{upcomingTests}</b></div>
-            <div className="advanced-admin-health-row"><span>Fees outstanding</span><b>₹{pendingFees.toLocaleString("en-IN")}</b></div>
-            <div className="advanced-admin-health-row"><span>Admin account</span><span className="advanced-admin-status" style={{ color: A.green }}>Authorized</span></div>
-          </div></div>
-        </section>
-        <section className="advanced-admin-card" style={{ marginTop: 16 }}><h2>Latest Announcements 📢</h2><p>Most recent institute communications.</p><div className="advanced-admin-list">{recentAnnouncements.length ? recentAnnouncements.map((a) => <div className="advanced-admin-ann" key={a.id}><b>{a.title || "Announcement"}</b><small>{a.date || "—"} · {a.target || "all"}</small></div>) : <div style={{ color: A.sub, fontSize: 12 }}>No announcements yet.</div>}</div></section>
-      </main>
-    </div>
-  );
+  const go = (label: string) => { const item = Array.from(document.querySelectorAll<HTMLElement>(".nav")).find((x) => (x.textContent || "").trim().toLowerCase().includes(label.toLowerCase())); if (item) item.click(); else onOpenManagement(); };
+  return <div className="advanced-admin-home"><style>{`*{box-sizing:border-box}.advanced-admin-home{min-height:100vh;background:${A.bg};color:${A.ink};font-family:Poppins,system-ui,sans-serif}.advanced-admin-top{padding:18px clamp(16px,4vw,42px);background:#fff;border-bottom:1px solid ${A.border};display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}.advanced-admin-brand{display:flex;align-items:center;gap:10px;flex:1}.advanced-admin-logo{width:42px;height:42px;border-radius:12px;background:#eef2ff;display:grid;place-items:center;padding:4px}.advanced-admin-top button,.advanced-admin-home button{font:inherit}.advanced-admin-btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor:pointer}.advanced-admin-secondary{background:#eef2ff;color:${A.accent}}.advanced-admin-wrap{max-width:1440px;margin:auto;padding:clamp(16px,3vw,32px)}.advanced-admin-hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:24px}.advanced-admin-eyebrow{font-size:11px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:${A.accent}}.advanced-admin-hero h1{margin:4px 0;font-size:clamp(24px,4vw,34px)}.advanced-admin-hero p{margin:0;color:${A.sub};font-size:13px}.advanced-admin-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}.advanced-admin-metric{background:#fff;border:1px solid ${A.border};border-radius:18px;padding:17px;min-width:0}.advanced-admin-metric-icon{font-size:21px}.advanced-admin-metric-value{font-size:27px;font-weight:950;margin-top:8px}.advanced-admin-metric-label{font-weight:800}.advanced-admin-metric-note{font-size:11px;color:${A.sub};margin-top:3px}.advanced-admin-main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;margin-top:16px}.advanced-admin-card{background:#fff;border:1px solid ${A.border};border-radius:20px;padding:20px}.advanced-admin-card h2{font-size:17px;margin:0 0 5px}.advanced-admin-card p{font-size:12px;color:${A.sub};margin:0 0 15px}.advanced-admin-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.advanced-admin-action{border:1px solid ${A.border};background:#fff;border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;text-align:left;cursor:pointer;color:${A.ink}.advanced-admin-action:hover{border-color:#aab8f8;background:#f8faff}.advanced-admin-action-icon{width:34px;height:34px;border-radius:10px;background:#eef2ff;display:grid;place-items:center;flex:none}.advanced-admin-action b{display:block;font-size:12px}.advanced-admin-action small{display:block;color:${A.sub};font-size:10px;margin-top:2px}.advanced-admin-action>span:last-child{margin-left:auto;color:${A.accent};font-weight:900}.advanced-admin-health{display:grid;gap:10px}.advanced-admin-health-row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid ${A.border};font-size:12px}.advanced-admin-health-row:last-child{border-bottom:0}.advanced-admin-status{font-weight:900}.advanced-admin-list{display:grid;gap:8px}.advanced-admin-ann{padding:11px;border-radius:12px;background:#f8faff;border:1px solid #edf1f8}.advanced-admin-ann b{font-size:12px}.advanced-admin-ann small{display:block;color:${A.sub};font-size:10px;margin-top:3px}.advanced-admin-error{background:#fef2f2;color:${A.red};padding:11px;border-radius:12px;margin-bottom:15px;font-size:12px}@media(max-width:1100px){.advanced-admin-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:800px){.advanced-admin-main{grid-template-columns:1fr}.advanced-admin-hero{align-items:flex-start;flex-direction:column}.advanced-admin-actions{grid-template-columns:1fr 1fr}}@media(max-width:520px){.advanced-admin-grid{grid-template-columns:1fr 1fr}.advanced-admin-actions{grid-template-columns:1fr}.advanced-admin-top{padding:12px 14px}.advanced-admin-top .advanced-admin-secondary{display:none}.advanced-admin-brand small{display:none}.advanced-admin-wrap{padding:14px}.advanced-admin-card{padding:16px}}`}</style>
+    <header className="advanced-admin-top"><div className="advanced-admin-brand"><div className="advanced-admin-logo"><LGLogo size={34} showText={false} /></div><div><b>Learner's Guide</b><small style={{ display: "block", color: A.sub, fontSize: 10 }}>Admin Control Center</small></div></div><button className="advanced-admin-btn advanced-admin-secondary" onClick={onOpenManagement}>Management</button><button className="advanced-admin-btn" style={{ background: "#fff1f2", color: A.red }} onClick={onLogout}>Logout</button></header>
+    <main className="advanced-admin-wrap"><section className="advanced-admin-hero"><div><div className="advanced-admin-eyebrow">Administrator dashboard</div><h1>Good day, {user.name || "Admin"} 👋</h1><p>One simple control center for the entire institute.</p></div><button className="advanced-admin-btn advanced-admin-secondary" onClick={() => void load()} disabled={loading}>{loading ? "Syncing…" : "↻ Refresh"}</button></section>
+      {error && <div className="advanced-admin-error">{error}</div>}
+      <section className="advanced-admin-grid">{metrics.map((m) => <div className="advanced-admin-metric" key={m.label}><div className="advanced-admin-metric-icon">{m.icon}</div><div className="advanced-admin-metric-value">{m.label === "Attendance" ? `${m.value}%` : m.value}</div><div className="advanced-admin-metric-label">{m.label}</div><div className="advanced-admin-metric-note">{m.note}</div></div>)}</section>
+      <section className="advanced-admin-main"><div className="advanced-admin-card"><h2>Quick Management ⚡</h2><p>Jump directly to the area you need. Existing management screens remain available.</p><div className="advanced-admin-actions"><Action icon="🎓" title="Students" text="Profiles & accounts" onClick={() => go("Students")} /><Action icon="👨‍🏫" title="Teachers" text="Staff & subjects" onClick={() => go("Teachers")} /><Action icon="👥" title="Batches" text="Classes & timetable" onClick={() => go("Batches")} /><Action icon="📋" title="Tests & Results" text="Assessments" onClick={() => go("Student Results")} /><Action icon="✅" title="Attendance" text="Daily records" onClick={() => go("Attendance")} /><Action icon="💰" title="Fees" text="Payments & dues" onClick={() => go("Fees")} /><Action icon="📚" title="Study Materials" text="Library & files" onClick={() => go("Study Materials")} /><Action icon="📈" title="Analytics" text="People & reports" onClick={() => go("People & Analytics")} /></div></div>
+        <div className="advanced-admin-card"><h2>System Health 🛡️</h2><p>At-a-glance operational indicators.</p><div className="advanced-admin-health"><div className="advanced-admin-health-row"><span>Supabase connection</span><span className="advanced-admin-status" style={{ color: error ? A.red : A.green }}>{error ? "Check" : "Healthy"}</span></div><div className="advanced-admin-health-row"><span>Upcoming tests</span><b>{upcomingTests}</b></div><div className="advanced-admin-health-row"><span>Fees outstanding</span><b>₹{pendingFees.toLocaleString("en-IN")}</b></div><div className="advanced-admin-health-row"><span>Admin account</span><span className="advanced-admin-status" style={{ color: A.green }}>Authorized</span></div></div></div></section>
+      <section className="advanced-admin-card" style={{ marginTop: 16 }}><h2>Latest Announcements 📢</h2><p>Most recent institute communications.</p><div className="advanced-admin-list">{recentAnnouncements.length ? recentAnnouncements.map((a) => <div className="advanced-admin-ann" key={a.id}><b>{a.title || "Announcement"}</b><small>{a.date || "—"} · {a.target || "all"}</small></div>) : <div style={{ color: A.sub, fontSize: 12 }}>No announcements yet.</div>}</div></section>
+    </main></div>;
 }
