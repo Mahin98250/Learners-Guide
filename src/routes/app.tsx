@@ -3,15 +3,15 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
-import { LeaveAccess } from "@/lg/LeaveAccess";
-import { PushNotificationPrompt } from "@/lg/pushNotifications";
-import ChangePassword from "@/lg/ChangePassword";
 
 const TeacherAppWithHomeworkFiles = lazy(() =>
   import("@/lg/teacherHomeworkApp").then((module) => ({ default: module.TeacherAppWithHomeworkFiles })),
 );
 const StudentApp = lazy(() => import("@/lg/student").then((module) => ({ default: module.StudentApp })));
 const ParentApp = lazy(() => import("@/lg/parentWorkflows").then((module) => ({ default: module.ParentApp })));
+const LeaveAccess = lazy(() => import("@/lg/LeaveAccess").then((module) => ({ default: module.LeaveAccess })));
+const PushNotificationPrompt = lazy(() => import("@/lg/pushNotifications").then((module) => ({ default: module.PushNotificationPrompt })));
+const ChangePassword = lazy(() => import("@/lg/ChangePassword"));
 
 const title = "My Dashboard — Learner's Guide";
 const description = "Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
@@ -108,9 +108,6 @@ function AppShell() {
     return () => data.subscription.unsubscribe();
   }, [navigate]);
 
-  // Browsers can restore a frozen/BFCache page with old component state and
-  // cached records. Only a genuine BFCache restore gets a fresh portal mount;
-  // ordinary tab visibility changes must not trigger repeated Supabase reads.
   useEffect(() => {
     const refreshAfterRestore = () => {
       clearCache();
@@ -152,9 +149,11 @@ function AppShell() {
       <Suspense fallback={<Splash label="Loading your dashboard…" />}>
         {portal}
       </Suspense>
-      {(user.role === "student" || user.role === "parent") && <LeaveAccess user={user} student={null} />}
-      <PushNotificationPrompt user={user} />
-      <ChangePassword />
+      <Suspense fallback={null}>
+        {(user.role === "student" || user.role === "parent") && <LeaveAccess user={user} student={null} />}
+        <PushNotificationPrompt user={user} />
+        <ChangePassword />
+      </Suspense>
     </div>
   );
 }
