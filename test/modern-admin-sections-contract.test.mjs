@@ -18,7 +18,7 @@ for (const label of ["Attendance Center", "Student Results Center", "Marks & Per
   assert.match(page, new RegExp(label.replace(/[&]/g, "\\&")));
 }
 
-for (const label of ["Roll No", "Student attendance", "Subject performance", "Collection health", "Executive summary"]) {
+for (const label of ["Roll No", "Student attendance", "Latest results", "Collection health", "Executive summary"]) {
   assert.match(page, new RegExp(label));
 }
 
