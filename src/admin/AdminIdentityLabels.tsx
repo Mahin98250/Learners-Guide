@@ -5,40 +5,37 @@ type Row = Record<string, any>;
 
 const clean = (value: unknown) => String(value ?? "").trim();
 
-function buildMaps(students: Row[], teachers: Row[], users: Row[]) {
+function buildMaps(students: Row[], teachers: Row[], users: Row[], batches: Row[]) {
   const student = new Map<string, string>();
   const teacher = new Map<string, string>();
-  const person = new Map<string, string>();
+  const batch = new Map<string, string>();
 
   for (const row of students) {
     const name = clean(row.name);
     if (!name) continue;
-    for (const key of [row.id, row.sid]) {
-      const value = clean(key);
-      if (value) student.set(value, name);
-    }
+    const id = clean(row.id);
+    if (id) student.set(id, name);
   }
   for (const row of teachers) {
     const name = clean(row.name);
     if (!name) continue;
-    for (const key of [row.id, row.tid]) {
-      const value = clean(key);
-      if (value) teacher.set(value, name);
-    }
+    const id = clean(row.id);
+    if (id) teacher.set(id, name);
   }
-  for (const row of users) {
-    const name = clean(row.name);
-    const ref = clean(row.ref);
-    const phone = clean(row.phone);
-    if (!name) continue;
-    // Student/teacher identifiers always have higher priority than the
-    // generic user reference. A parent user commonly shares the same `ref`
-    // as the linked student, so allowing `person` to overwrite that key would
-    // incorrectly display the parent's name in student-facing admin columns.
-    if (ref && !student.has(ref) && !teacher.has(ref)) person.set(ref, name);
-    if (phone && !student.has(phone) && !teacher.has(phone)) person.set(phone, name);
+  for (const row of batches) {
+    const id = clean(row.id);
+    if (!id) continue;
+    const classLabel = [clean(row.cls), clean(row.sec)].filter(Boolean).join("-");
+    const name = clean(row.name) || (classLabel ? `Class ${classLabel}` : "");
+    if (name) batch.set(id, name);
   }
-  return { student, teacher, person };
+
+  // `sid`, `tid`, phone numbers and login identifiers are real user-facing
+  // values. Never replace them with names globally: doing that corrupts
+  // columns such as Roll No and Parent Phone. Only internal database IDs are
+  // translated, and only when they have an explicit ID-like form.
+  void users;
+  return { student, teacher, batch };
 }
 
 function replaceText(root: HTMLElement, maps: ReturnType<typeof buildMaps>) {
@@ -48,6 +45,8 @@ function replaceText(root: HTMLElement, maps: ReturnType<typeof buildMaps>) {
   let node: Node | null;
   while ((node = walker.nextNode())) nodes.push(node as Text);
 
+  const replaceExact = (value: string) => maps.student.get(value) || maps.teacher.get(value) || maps.batch.get(value);
+
   for (const textNode of nodes) {
     const parent = textNode.parentElement;
     if (!parent || skip.has(parent.tagName)) continue;
@@ -56,18 +55,21 @@ function replaceText(root: HTMLElement, maps: ReturnType<typeof buildMaps>) {
     if (!trimmed) continue;
 
     let next = raw;
-    for (const [key, name] of maps.student) {
-      if (trimmed === key) next = raw.replace(trimmed, name);
-      next = next.replaceAll(`Roll ${key}`, `Student: ${name}`);
-      next = next.replaceAll(` · ${key}`, ` · ${name}`);
-    }
-    for (const [key, name] of maps.teacher) {
-      if (trimmed === key) next = raw.replace(trimmed, name);
-      next = next.replaceAll(`Teacher ${key}`, `Teacher: ${name}`);
-      next = next.replaceAll(` · ${key}`, ` · ${name}`);
-    }
-    for (const [key, name] of maps.person) {
-      if (trimmed === key) next = raw.replace(trimmed, name);
+    const exact = replaceExact(trimmed);
+    if (exact) {
+      next = raw.replace(trimmed, exact);
+    } else {
+      for (const [key, name] of maps.student) {
+        next = next.replaceAll(`Roll ${key}`, `Student: ${name}`);
+        next = next.replaceAll(`Student ID: ${key}`, `Student: ${name}`);
+      }
+      for (const [key, name] of maps.teacher) {
+        next = next.replaceAll(`Teacher ${key}`, `Teacher: ${name}`);
+        next = next.replaceAll(`Teacher ID: ${key}`, `Teacher: ${name}`);
+      }
+      for (const [key, name] of maps.batch) {
+        next = next.replaceAll(`Batch ${key}`, name);
+      }
     }
     if (next !== raw) textNode.nodeValue = next;
   }
@@ -83,13 +85,14 @@ export function AdminIdentityLabels() {
 
     const load = async () => {
       try {
-        const [students, teachers, users] = await Promise.all([
+        const [students, teachers, users, batches] = await Promise.all([
           gdb("students"),
           gdb("teachers"),
           gdb("users"),
+          gdb("batches"),
         ]);
         if (!alive) return;
-        mapsRef.current = buildMaps(students || [], teachers || [], users || []);
+        mapsRef.current = buildMaps(students || [], teachers || [], users || [], batches || []);
 
         const apply = () => {
           const root = document.querySelector<HTMLElement>(".admin");
