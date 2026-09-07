@@ -2,18 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { LeaveRequests } from "@/lg/LeaveRequests";
 import { PeopleAnalyticsPage } from "@/admin/PeopleAnalyticsPage";
 import { MaterialsDriveV2 } from "@/admin/MaterialsDriveV2";
+import { ModernAdminDashboard } from "@/admin/ModernAdminDashboard";
 import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
 import { AdminIdentityLabels } from "@/admin/AdminIdentityLabels";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-
-type Item = { key: string; icon: string; label: string; special?: "analytics" | "materials" | "leave" };
+type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" };
 type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
-  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard" }] },
+  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
   {
     label: "People",
     items: [
@@ -53,7 +53,7 @@ const allItems = GROUPS.flatMap((group) => group.items);
 
 function findLegacyNav(label: string) {
   const wanted = label.toLowerCase();
-  return Array.from(document.querySelectorAll<HTMLElement>(".admin .nav")).find((el) => {
+  return Array.from(document.querySelectorAll<HTMLElement>(".modern-admin-legacy-host .admin .nav")).find((el) => {
     const text = (el.textContent || "").trim().toLowerCase();
     return text === wanted || text.includes(wanted);
   });
@@ -96,6 +96,11 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     setActive(item.key);
     setMobileOpen(false);
     setLegacyReady(false);
+  };
+
+  const go = (label: string) => {
+    const item = allItems.find((x) => x.key === label || x.label === label);
+    if (item) choose(item);
   };
 
   return (
@@ -175,7 +180,9 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
         </header>
 
         <section className="modern-admin-content">
-          {activeItem.special === "analytics" ? (
+          {activeItem.special === "dashboard" ? (
+            <ModernAdminDashboard user={user} onNavigate={go} />
+          ) : activeItem.special === "analytics" ? (
             <div className="modern-admin-special"><PeopleAnalyticsPage onClose={() => choose(allItems[0])} /></div>
           ) : activeItem.special === "materials" ? (
             <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>
