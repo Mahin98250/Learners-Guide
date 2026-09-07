@@ -4,18 +4,15 @@ import fs from "node:fs";
 
 const read = (path) => fs.readFileSync(path, "utf8");
 
-test("Admin management hub groups the core management areas and supports search", () => {
-  const source = read("src/admin/AdminManagementHub.tsx");
-  for (const label of ["People", "Academic", "Operations", "Students", "Teachers", "Batches & Timetable", "Attendance", "Fees", "Announcements"]) {
+test("modern admin portal contains the management areas", () => {
+  const source = read("src/admin/ModernAdminPortal.tsx");
+  for (const label of ["Students", "Teachers", "User Accounts", "Search Profiles", "Batches & Timetable", "Attendance", "Fees", "Announcements", "People & Analytics"]) {
     assert.match(source, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(source, /Search management/);
-  assert.match(source, /Admin Management/);
 });
 
-test("Admin flow can open the management hub without removing the legacy panel", () => {
+test("admin wrapper keeps only the modern portal entry point", () => {
   const source = read("src/admin/AdminWithDrive.tsx");
-  assert.match(source, /AdminManagementHub/);
-  assert.match(source, /setManagementHub\(true\)/);
-  assert.match(source, /<ReferenceAdminPanel/);
+  assert.match(source, /ModernAdminPortal/);
+  assert.doesNotMatch(source, /AdminManagementHub|ReferenceAdminPanel|setManagementHub/);
 });

@@ -4,26 +4,17 @@ import fs from "node:fs";
 
 const read = (path) => fs.readFileSync(path, "utf8");
 
-test("Admin advanced home is wired as the primary admin landing screen", () => {
+test("current admin landing uses the modern portal", () => {
   const admin = read("src/admin/AdminWithDrive.tsx");
-  const home = read("src/admin/AdvancedAdminHome.tsx");
-  assert.match(admin, /import \{ AdvancedAdminHome \} from "@\/admin\/AdvancedAdminHome"/);
-  assert.match(admin, /if \(advancedHome\) return <AdvancedAdminHome/);
-  assert.match(home, /Students/);
-  assert.match(home, /Teachers/);
-  assert.match(home, /Batches/);
-  assert.match(home, /Tests & Results/);
-  assert.match(home, /Attendance/);
-  assert.match(home, /Fees/);
-  assert.match(home, /Study Materials/);
-  assert.match(home, /Analytics/);
-  assert.match(home, /@media\(max-width:1100px\)/);
-  assert.match(home, /@media\(max-width:800px\)/);
-  assert.match(home, /@media\(max-width:520px\)/);
+  const portal = read("src/admin/ModernAdminPortal.tsx");
+  assert.match(admin, /import \{ ModernAdminPortal \} from "@\/admin\/ModernAdminPortal"/);
+  assert.match(admin, /<ModernAdminPortal user=\{user\} onLogout=\{onLogout\} \/>/);
+  assert.match(portal, /Attendance/);
+  assert.match(portal, /Fees/);
+  assert.match(portal, /People & Analytics/);
 });
 
-test("Admin advanced home keeps the existing management portal available", () => {
+test("modern admin landing does not retain retired wrappers", () => {
   const admin = read("src/admin/AdminWithDrive.tsx");
-  assert.match(admin, /onOpenManagement=\{\(\) => setAdvancedHome\(false\)\}/);
-  assert.match(admin, /<ReferenceAdminPanel user=\{user\} onLogout=\{onLogout\} \/>/);
+  assert.doesNotMatch(admin, /AdvancedAdminHome|AdminManagementHub|ReferenceAdminPanel/);
 });

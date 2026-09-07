@@ -51,27 +51,31 @@ test("Phase 5: timetable admin mutation regression protection is present", () =>
   assert.match(sql, /subject_names/);
 });
 
-test("Phase 5: analytics UI and reports stay real, branded, detailed, and deduplicated", () => {
+test("Phase 5: analytics keeps live data and the dedicated report-card architecture", () => {
   const analytics = read("src/admin/PeopleAnalyticsPage.tsx");
+  const report = read("src/admin/StudentReportCardPrint.tsx");
   const css = read("src/appbar-redesign.css");
   assert.match(analytics, /LOGO_IMG_SRC/);
-  assert.match(analytics, /Download \/ Save PDF/);
-  assert.match(analytics, /window\.print\(\)/);
-  assert.match(analytics, /lg-print-root/);
-  assert.match(analytics, /@media print/);
+  assert.match(analytics, /StudentReportCardPrint/);
+  assert.match(analytics, /Generate PDF/);
   assert.match(analytics, /test_results/);
   assert.match(analytics, /resultKeys/);
   assert.match(analytics, /legacy\s*=\s*\(m\.data\s*\|\|\s*\[\]\)\s*\.filter/);
   assert.match(analytics, /subjectMap/);
   assert.match(analytics, /Detailed assessment history/);
-  assert.match(analytics, /Homework (?:status|Snapshot|created|records)/);
-  assert.match(analytics, /Leave history/);
-  assert.match(analytics, /Student Progress Portfolio/);
-  assert.match(analytics, /Teacher & Parent Review/);
-  assert.match(analytics, /Parent \/ Guardian/);
-  assert.match(analytics, /Subject Teacher/);
-  assert.match(analytics, /Growth Plan & Next Steps/);
-  assert.doesNotMatch(analytics, /https?:\/\//);
+  assert.match(report, /Student Academic Report/);
+  assert.match(report, /Student Name/);
+  assert.match(report, /Academic Performance/);
+  assert.match(report, /Examination Results/);
+  assert.match(report, /Attendance/);
+  assert.match(report, /Homework/);
+  assert.match(report, /Leave Record/);
+  assert.match(report, /Overall Performance/);
+  assert.match(report, /Teacher \/ Institute Remarks/);
+  assert.match(report, /@page\{size:A4/);
+  assert.doesNotMatch(report, /page-break-after:\s*always|break-after:\s*page/);
+  assert.doesNotMatch(report, /Logout/);
+  assert.doesNotMatch(report, /Dashboard/);
   assert.match(css, /@media print/);
   assert.match(css, /@page\s*\{\s*margin:\s*0;/);
 });
