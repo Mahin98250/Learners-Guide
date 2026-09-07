@@ -31,8 +31,12 @@ function buildMaps(students: Row[], teachers: Row[], users: Row[]) {
     const ref = clean(row.ref);
     const phone = clean(row.phone);
     if (!name) continue;
-    if (ref) person.set(ref, name);
-    if (phone) person.set(phone, name);
+    // Student/teacher identifiers always have higher priority than the
+    // generic user reference. A parent user commonly shares the same `ref`
+    // as the linked student, so allowing `person` to overwrite that key would
+    // incorrectly display the parent's name in student-facing admin columns.
+    if (ref && !student.has(ref) && !teacher.has(ref)) person.set(ref, name);
+    if (phone && !student.has(phone) && !teacher.has(phone)) person.set(phone, name);
   }
   return { student, teacher, person };
 }
