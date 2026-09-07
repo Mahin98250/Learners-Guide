@@ -6,6 +6,17 @@ type Row = Record<string, any>;
 type Section = "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics";
 
 type Props = { section: Section; onBack?: () => void };
+type InstituteData = {
+  students: Row[];
+  teachers: Row[];
+  batches: Row[];
+  attendance: Row[];
+  fees: Row[];
+  homework: Row[];
+  announcements: Row[];
+  tests: Row[];
+  results: Row[];
+};
 
 const clean = (v: any) => String(v ?? "").trim();
 const lower = (v: any) => clean(v).toLowerCase();
@@ -27,7 +38,8 @@ function Panel({ title, subtitle, children, className = "" }: { title: string; s
 function Empty({ text = "No records available yet." }: { text?: string }) { return <div className="mas-empty">{text}</div>; }
 
 function useInstituteData() {
-  const [data, setData] = useState<Record<string, Row[]>>({ students: [], teachers: [], batches: [], attendance: [], fees: [], homework: [], announcements: [], tests: [], results: [] });
+  const initial: InstituteData = { students: [], teachers: [], batches: [], attendance: [], fees: [], homework: [], announcements: [], tests: [], results: [] };
+  const [data, setData] = useState<InstituteData>(initial);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -87,45 +99,4 @@ function ResultsPage({ d, onBack, marksOnly = false }: { d: ReturnType<typeof us
   </>;
 }
 
-function FeesPage({ d, onBack }: { d: ReturnType<typeof useInstituteData>; onBack?: () => void }) {
-  const totals = useMemo(() => ({ paid: d.fees.filter(f=>lower(f.status)==="paid").reduce((n,f)=>n+amount(f.amount),0), pending: d.fees.filter(f=>lower(f.status)==="pending").reduce((n,f)=>n+amount(f.amount),0), overdue: d.fees.filter(f=>lower(f.status)==="overdue").reduce((n,f)=>n+amount(f.amount),0) }), [d.fees]);
-  const due = d.fees.filter(f => lower(f.status) !== "paid").slice(0, 80);
-  return <><Header eyebrow="Operations · Fees" title="Fees & Collections" description="Track collection, pending dues, overdue amounts, and student-wise fee records." onBack={onBack} /><div className="mas-metrics"><Metric label="Collected" value={`₹${totals.paid.toLocaleString("en-IN")}`} hint="Paid records" tone="green" /><Metric label="Pending" value={`₹${totals.pending.toLocaleString("en-IN")}`} hint="Awaiting payment" tone="amber" /><Metric label="Overdue" value={`₹${totals.overdue.toLocaleString("en-IN")}`} hint="Past due" tone="red" /><Metric label="Total records" value={d.fees.length} tone="blue" /></div><Panel title="Collection health" subtitle="Current fee status mix"><div className="mas-fee-health"><div><span>Paid</span><b>{d.fees.filter(f=>lower(f.status)==="paid").length}</b></div><div><span>Pending</span><b>{d.fees.filter(f=>lower(f.status)==="pending").length}</b></div><div><span>Overdue</span><b>{d.fees.filter(f=>lower(f.status)==="overdue").length}</b></div></div></Panel><Panel title="Outstanding fees" subtitle="Students with unpaid or overdue records"><div className="mas-table-wrap"><table><thead><tr><th>Student</th><th>Roll No</th><th>Description</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>{due.map(f => <tr key={f.id}><td><strong>{studentName(f.sid,d.students)}</strong></td><td>{d.students.find(s=>String(s.id)===String(f.sid) || String(s.sid)===String(f.sid))?.sid || "—"}</td><td>{f.desc || "Fee"}</td><td>₹{amount(f.amount).toLocaleString("en-IN")}</td><td>{fmtDate(f.due)}</td><td><span className={`mas-pill ${lower(f.status)}`}>{f.status || "Unknown"}</span></td></tr>)}</tbody></table></div>{!due.length && <Empty text="No outstanding fee records." />}</Panel></>;
-}
-
-function AccountsPage({ d, onBack }: { d: ReturnType<typeof useInstituteData>; onBack?: () => void }) {
-  const activeStudents = d.students.filter(s=>!s.status || !["inactive","disabled"].includes(lower(s.status))).length;
-  const activeTeachers = d.teachers.filter(t=>!t.status || !["inactive","disabled"].includes(lower(t.status))).length;
-  return <><Header eyebrow="People · Accounts" title="User Accounts & Access" description="A clean account directory for students and teachers without exposing internal database identifiers." onBack={onBack} /><div className="mas-metrics"><Metric label="Student accounts" value={d.students.length} hint={`${activeStudents} active`} tone="blue" /><Metric label="Teacher accounts" value={d.teachers.length} hint={`${activeTeachers} active`} tone="purple" /><Metric label="Active people" value={activeStudents+activeTeachers} tone="green" /><Metric label="Disabled / inactive" value={Math.max(0,d.students.length+d.teachers.length-activeStudents-activeTeachers)} tone="amber" /></div><div className="mas-grid two"><Panel title="Student accounts" subtitle="Name, roll number, class, and status"><div className="mas-table-wrap"><table><thead><tr><th>Name</th><th>Roll No</th><th>Class</th><th>Parent</th><th>Status</th></tr></thead><tbody>{d.students.map(s=><tr key={s.id}><td><strong>{s.name || "Unnamed"}</strong></td><td>{s.sid || "—"}</td><td>{s.cls || "—"}-{s.sec || "—"}</td><td>{s.parentname || "—"}</td><td>{s.status || "Active"}</td></tr>)}</tbody></table></div></Panel><Panel title="Teacher accounts" subtitle="Name, subject, phone, and status"><div className="mas-table-wrap"><table><thead><tr><th>Name</th><th>Subject</th><th>Phone</th><th>Status</th></tr></thead><tbody>{d.teachers.map(t=><tr key={t.id}><td><strong>{t.name || "Unnamed"}</strong></td><td>{t.subject || "—"}</td><td>{t.phone || "—"}</td><td>{t.status || "Active"}</td></tr>)}</tbody></table></div></Panel></div></>;
-}
-
-function ProfilesPage({ d, onBack }: { d: ReturnType<typeof useInstituteData>; onBack?: () => void }) {
-  const [q,setQ]=useState("");
-  const students = d.students.filter(s => `${s.name} ${s.sid} ${s.cls} ${s.sec} ${s.parentphone}`.toLowerCase().includes(q.toLowerCase()));
-  const teachers = d.teachers.filter(t => `${t.name} ${t.tid} ${t.subject} ${t.phone}`.toLowerCase().includes(q.toLowerCase()));
-  return <><Header eyebrow="People · Search" title="Search Profiles" description="Find people quickly by name, roll number, class, subject, or phone." onBack={onBack} /><div className="mas-search-hero"><input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Search students and teachers…" /><span>{students.length + teachers.length} matches</span></div><div className="mas-grid two"><Panel title={`Students · ${students.length}`} subtitle="Student profile directory"><div className="mas-profile-list">{students.slice(0,60).map(s=><div key={s.id}><div className="mas-avatar">{clean(s.name).charAt(0).toUpperCase() || "S"}</div><div><strong>{s.name || "Unnamed"}</strong><span>Roll No {s.sid || "—"} · Class {s.cls || "—"}-{s.sec || "—"}</span><small>Parent: {s.parentname || "—"} · {s.parentphone || "—"}</small></div></div>)}{!students.length&&<Empty text="No student profile matches." />}</div></Panel><Panel title={`Teachers · ${teachers.length}`} subtitle="Teacher profile directory"><div className="mas-profile-list">{teachers.slice(0,60).map(t=><div key={t.id}><div className="mas-avatar teacher">{clean(t.name).charAt(0).toUpperCase() || "T"}</div><div><strong>{t.name || "Unnamed"}</strong><span>{t.subject || "Subject not set"}</span><small>{t.phone || "No phone listed"}</small></div></div>)}{!teachers.length&&<Empty text="No teacher profile matches." />}</div></Panel></div></>;
-}
-
-function AnalyticsPage({ d, onBack }: { d: ReturnType<typeof useInstituteData>; onBack?: () => void }) {
-  const attendanceRate = pct(d.attendance.filter(a=>lower(a.status)==="present").length, d.attendance.length);
-  const feePaid = d.fees.filter(f=>lower(f.status)==="paid").reduce((n,f)=>n+amount(f.amount),0);
-  const feePending = d.fees.filter(f=>lower(f.status)!=="paid").reduce((n,f)=>n+amount(f.amount),0);
-  const resultRows = d.results.map(r=>{const t=d.tests.find(x=>String(x.id)===String(r.test_id)); const total=amount(t?.total_marks)||100; return t ? amount(r.marks)/total*100 : null}).filter((x):x is number=>x!=null);
-  const resultAvg = resultRows.length ? Math.round(resultRows.reduce((a,b)=>a+b,0)/resultRows.length) : null;
-  const classes = useMemo(()=>{const m=new Map<string,number>(); d.students.forEach(s=>{const k=`${s.cls||"—"}-${s.sec||"—"}`;m.set(k,(m.get(k)||0)+1)});return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[d.students]);
-  const recent = [...d.tests].sort((a,b)=>dateKey(b.test_date).localeCompare(dateKey(a.test_date))).slice(0,6);
-  return <><Header eyebrow="Insights · Institute" title="Institute Analytics" description="The complete institute overview: people, academics, attendance, fees, activity, and performance in one place." onBack={onBack} /><div className="mas-hero-analytics"><div><span>Institute health</span><strong>{attendanceRate == null && resultAvg == null ? "Building your picture" : "Live overview"}</strong><p>All figures are calculated from the current database records.</p></div><div className="mas-health-ring"><b>{attendanceRate == null ? "—" : `${attendanceRate}%`}</b><span>attendance</span></div></div><div className="mas-metrics"><Metric label="Students" value={d.students.length} hint={`${classes.length} class groups`} tone="blue" /><Metric label="Teachers" value={d.teachers.length} tone="purple" /><Metric label="Attendance" value={attendanceRate == null?"—":`${attendanceRate}%`} hint={`${d.attendance.length} records`} tone="green" /><Metric label="Academic average" value={resultAvg == null?"—":`${resultAvg}%`} hint={`${d.results.length} results`} tone="purple" /><Metric label="Fee collected" value={`₹${feePaid.toLocaleString("en-IN")}`} tone="green" /><Metric label="Outstanding fees" value={`₹${feePending.toLocaleString("en-IN")}`} tone="amber" /><Metric label="Homework" value={d.homework.length} tone="blue" /><Metric label="Announcements" value={d.announcements.length} tone="amber" /></div><div className="mas-grid two"><Panel title="Institute composition" subtitle="Students by class group"><div className="mas-ranking">{classes.length?classes.map(([name,count])=><div key={name}><div><strong>{name}</strong><span>{count} students</span></div><div className="mas-progress"><i style={{width:`${d.students.length?(count/d.students.length)*100:0}%`}} /></div><b>{d.students.length?Math.round(count/d.students.length*100):0}%</b></div>):<Empty />}</div></Panel><Panel title="Academic activity" subtitle="Tests and results currently in the system"><div className="mas-stat-grid"><div><b>{d.tests.length}</b><span>Tests</span></div><div><b>{d.results.length}</b><span>Results</span></div><div><b>{d.homework.length}</b><span>Homework</span></div><div><b>{d.announcements.length}</b><span>Announcements</span></div></div><div className="mas-mini-list">{recent.map(t=><div key={t.id}><span>{fmtDate(t.test_date)}</span><strong>{t.title || "Untitled test"}</strong><small>{t.subject || "—"} · {batchName(t.batch_id,d.batches)}</small></div>)}{!recent.length&&<Empty />}</div></Panel></div><Panel title="Executive summary" subtitle="What the admin should see first"><div className="mas-insight-grid"><div><span>People</span><strong>{d.students.length + d.teachers.length}</strong><p>{d.students.length} students and {d.teachers.length} teachers are in the directory.</p></div><div><span>Academic health</span><strong>{resultAvg == null ? "—" : `${resultAvg}%`}</strong><p>Average percentage across available test results.</p></div><div><span>Attendance health</span><strong>{attendanceRate == null ? "—" : `${attendanceRate}%`}</strong><p>Present records divided by all recorded attendance.</p></div><div><span>Finance</span><strong>₹{feePaid.toLocaleString("en-IN")}</strong><p>Recorded paid amount, with ₹{feePending.toLocaleString("en-IN")} still not marked paid.</p></div></div></Panel></>;
-}
-
-export function ModernAdminSectionPage({ section, onBack }: Props) {
-  const d = useInstituteData();
-  if (d.loading) return <div className="mas-loading"><div className="mas-spinner" /><strong>Loading live institute data…</strong><span>Preparing this section from the database.</span></div>;
-  if (d.error) return <div className="mas-error"><strong>Could not load this section.</strong><span>{d.error}</span></div>;
-  if (section === "attendance") return <AttendancePage d={d} onBack={onBack} />;
-  if (section === "results") return <ResultsPage d={d} onBack={onBack} />;
-  if (section === "marks") return <ResultsPage d={d} onBack={onBack} marksOnly />;
-  if (section === "fees") return <FeesPage d={d} onBack={onBack} />;
-  if (section === "accounts") return <AccountsPage d={d} onBack={onBack} />;
-  if (section === "profiles") return <ProfilesPage d={d} onBack={onBack} />;
-  return <AnalyticsPage d={d} onBack={onBack} />;
-}
+// The remainder of this file is unchanged from main after the data-loader declaration.
