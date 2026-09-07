@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { LeaveRequests } from "@/lg/LeaveRequests";
-import { PeopleAnalyticsPage } from "@/admin/PeopleAnalyticsPage";
 import { MaterialsDriveV2 } from "@/admin/MaterialsDriveV2";
 import { ModernAdminDashboard } from "@/admin/ModernAdminDashboard";
 import AdminRecordsPage from "@/admin/records/AdminRecordsPage";
@@ -9,33 +8,33 @@ import BatchesTimetablePage from "@/admin/batches/BatchesTimetablePage";
 import TestManagementPage from "@/admin/tests/TestManagementPage";
 import HomeworkPage from "@/admin/HomeworkPage";
 import AnnouncementsPage from "@/admin/AnnouncementsPage";
-import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
+import { ModernAdminSectionPage } from "@/admin/ModernAdminSectionPages";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" };
+type Item = { key: string; icon: string; label: string; special?: "dashboard" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" };
 type Group = { label: string; items: Item[] };
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
   { label: "People", items: [
     { key: "Students", icon: "🎓", label: "Students", special: "students" },
     { key: "Teachers", icon: "👨‍🏫", label: "Teachers", special: "teachers" },
-    { key: "User Accounts", icon: "🔐", label: "User Accounts" },
-    { key: "Search Profiles", icon: "⌕", label: "Search Profiles" },
+    { key: "User Accounts", icon: "🔐", label: "User Accounts", special: "accounts" },
+    { key: "Search Profiles", icon: "⌕", label: "Search Profiles", special: "profiles" },
   ] },
   { label: "Academic", items: [
     { key: "Batches & Timetable", icon: "▦", label: "Batches & Timetable", special: "batches" },
-    { key: "Attendance", icon: "✓", label: "Attendance" },
+    { key: "Attendance", icon: "✓", label: "Attendance", special: "attendance" },
     { key: "Homework", icon: "✎", label: "Homework", special: "homework" },
     { key: "Exam Schedule", icon: "▤", label: "Exam Schedule", special: "tests" },
-    { key: "Student Results", icon: "🏆", label: "Student Results" },
-    { key: "Marks Overview", icon: "◒", label: "Marks Overview" },
+    { key: "Student Results", icon: "🏆", label: "Student Results", special: "results" },
+    { key: "Marks Overview", icon: "◒", label: "Marks Overview", special: "marks" },
     { key: "Study Materials", icon: "📚", label: "Study Materials", special: "materials" },
   ] },
   { label: "Operations", items: [
-    { key: "Fees", icon: "₹", label: "Fees" },
+    { key: "Fees", icon: "₹", label: "Fees", special: "fees" },
     { key: "Announcements", icon: "📢", label: "Announcements", special: "announcements" },
     { key: "Leave Requests", icon: "☷", label: "Leave Requests", special: "leave" },
   ] },
@@ -56,10 +55,10 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     if (activeItem.special === "tests") return <div className="modern-admin-native-page"><TestManagementPage /></div>;
     if (activeItem.special === "homework") return <div className="modern-admin-native-page"><HomeworkPage /></div>;
     if (activeItem.special === "announcements") return <div className="modern-admin-native-page"><AnnouncementsPage /></div>;
-    if (activeItem.special === "analytics") return <div className="modern-admin-special"><PeopleAnalyticsPage onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "materials") return <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
-    return <div className="modern-admin-legacy-host"><ReferenceAdminPanel user={user} onLogout={onLogout} /></div>;
+    if (["attendance","results","marks","fees","accounts","profiles","analytics"].includes(activeItem.special || "")) return <div className="modern-admin-section-page"><ModernAdminSectionPage section={activeItem.special as "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics"} onBack={() => choose(allItems[0])} /></div>;
+    return null;
   };
   return (
     <div className="modern-admin">
