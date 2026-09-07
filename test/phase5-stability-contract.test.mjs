@@ -64,7 +64,7 @@ test("Phase 5: analytics keeps live data and the dedicated report-card architect
   assert.match(analytics, /subjectMap/);
   assert.match(analytics, /Detailed assessment history/);
   assert.match(report, /Student Academic Report/);
-  assert.match(report, /Student Information/);
+  assert.match(report, /Student Name/);
   assert.match(report, /Academic Performance/);
   assert.match(report, /Examination Results/);
   assert.match(report, /Attendance/);
