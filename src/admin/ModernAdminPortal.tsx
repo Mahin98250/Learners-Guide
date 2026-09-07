@@ -1,29 +1,32 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LeaveRequests } from "@/lg/LeaveRequests";
 import { PeopleAnalyticsPage } from "@/admin/PeopleAnalyticsPage";
 import { MaterialsDriveV2 } from "@/admin/MaterialsDriveV2";
 import { ModernAdminDashboard } from "@/admin/ModernAdminDashboard";
-import { ReferenceAdminPanel } from "@/admin/ReferenceAdminPanel";
+import AdminRecordsPage from "@/admin/records/AdminRecordsPage";
+import TeacherRecordsPage from "@/admin/records/TeacherRecordsPage";
+import BatchesTimetablePage from "@/admin/batches/BatchesTimetablePage";
+import TestManagementPage from "@/admin/tests/TestManagementPage";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" };
+type Item = { key: string; icon: string; label: string; special?: "dashboard" | "analytics" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" };
 type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
   { label: "People", items: [
-    { key: "Students", icon: "🎓", label: "Students" },
-    { key: "Teachers", icon: "👨‍🏫", label: "Teachers" },
+    { key: "Students", icon: "🎓", label: "Students", special: "students" },
+    { key: "Teachers", icon: "👨‍🏫", label: "Teachers", special: "teachers" },
     { key: "User Accounts", icon: "🔐", label: "User Accounts" },
     { key: "Search Profiles", icon: "⌕", label: "Search Profiles" },
   ] },
   { label: "Academic", items: [
-    { key: "Batches & Timetable", icon: "▦", label: "Batches & Timetable" },
+    { key: "Batches & Timetable", icon: "▦", label: "Batches & Timetable", special: "batches" },
     { key: "Attendance", icon: "✓", label: "Attendance" },
     { key: "Homework", icon: "✎", label: "Homework" },
-    { key: "Exam Schedule", icon: "▤", label: "Exam Schedule" },
+    { key: "Exam Schedule", icon: "▤", label: "Exam Schedule", special: "tests" },
     { key: "Student Results", icon: "🏆", label: "Student Results" },
     { key: "Marks Overview", icon: "◒", label: "Marks Overview" },
     { key: "Study Materials", icon: "📚", label: "Study Materials", special: "materials" },
@@ -38,41 +41,25 @@ const GROUPS: Group[] = [
 
 const allItems = GROUPS.flatMap((group) => group.items);
 
-function findLegacyNav(label: string) {
-  const wanted = label.toLowerCase();
-  return Array.from(document.querySelectorAll<HTMLElement>(".modern-admin-legacy-host .admin .nav")).find((el) => {
-    const text = (el.textContent || "").trim().toLowerCase();
-    return text === wanted || text.includes(wanted);
-  });
-}
-
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [legacyReady, setLegacyReady] = useState(false);
   const activeItem = useMemo(() => allItems.find((item) => item.key === active) || allItems[0], [active]);
-  const isSpecial = Boolean(activeItem.special);
 
-  useEffect(() => {
-    if (isSpecial) return;
-    let attempts = 0;
-    const selectLegacyPage = () => {
-      const nav = findLegacyNav(activeItem.key);
-      if (nav) { nav.click(); setLegacyReady(true); return true; }
-      return false;
-    };
-    if (selectLegacyPage()) return;
-    const observer = new MutationObserver(() => {
-      attempts += 1;
-      if (selectLegacyPage() || attempts > 30) observer.disconnect();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    const timer = window.setTimeout(() => observer.disconnect(), 3000);
-    return () => { observer.disconnect(); window.clearTimeout(timer); };
-  }, [activeItem.key, isSpecial]);
-
-  const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); setLegacyReady(false); };
+  const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); };
   const go = (label: string) => { const item = allItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
+
+  const renderPage = () => {
+    if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
+    if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
+    if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage /></div>;
+    if (activeItem.special === "batches") return <div className="modern-admin-native-page"><BatchesTimetablePage /></div>;
+    if (activeItem.special === "tests") return <div className="modern-admin-native-page"><TestManagementPage /></div>;
+    if (activeItem.special === "analytics") return <div className="modern-admin-special"><PeopleAnalyticsPage onClose={() => choose(allItems[0])} /></div>;
+    if (activeItem.special === "materials") return <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>;
+    if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
+    return <div className="modern-admin-native-placeholder"><div className="modern-admin-placeholder-icon">✦</div><h2>{activeItem.label}</h2><p>This section is being migrated into the new Admin workspace. Existing data and permissions remain unchanged.</p></div>;
+  };
 
   return (
     <div className="modern-admin">
@@ -87,9 +74,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
       </aside>
       <main className="modern-admin-main">
         <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">Learner's Guide <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
-        <section className="modern-admin-content">
-          {activeItem.special === "dashboard" ? <ModernAdminDashboard user={user} onNavigate={go} /> : activeItem.special === "analytics" ? <div className="modern-admin-special"><PeopleAnalyticsPage onClose={() => choose(allItems[0])} /></div> : activeItem.special === "materials" ? <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div> : activeItem.special === "leave" ? <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div> : <div className={`modern-admin-legacy-host ${legacyReady ? "ready" : "loading"}`}><div className="modern-admin-page-loading" hidden={legacyReady}><div className="modern-admin-spinner" /><span>Loading {activeItem.label}…</span></div><ReferenceAdminPanel user={user} onLogout={onLogout} /></div>}
-        </section>
+        <section className="modern-admin-content">{renderPage()}</section>
       </main>
     </div>
   );
