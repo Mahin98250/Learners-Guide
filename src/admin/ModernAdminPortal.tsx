@@ -9,14 +9,17 @@ import TestManagementPage from "@/admin/tests/TestManagementPage";
 import HomeworkPage from "@/admin/HomeworkPage";
 import AnnouncementsPage from "@/admin/AnnouncementsPage";
 import ReportCardsPage from "@/admin/ReportCardsPage";
+import AdminAccountPage from "@/admin/AdminAccountPage";
 import { ModernAdminSectionPage } from "@/admin/ModernAdminSectionPages";
 import { LGLogo } from "@/lg/ui";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Item = { key: string; icon: string; label: string; special?: "dashboard" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" };
+type Special = "dashboard" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" | "account-security" | "create-admin";
+type Item = { key: string; icon: string; label: string; special?: Special };
 type Group = { label: string; items: Item[] };
+
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
   { label: "People", items: [
@@ -40,16 +43,21 @@ const GROUPS: Group[] = [
     { key: "Announcements", icon: "📢", label: "Announcements", special: "announcements" },
     { key: "Leave Requests", icon: "☷", label: "Leave Requests", special: "leave" },
   ] },
-  { label: "Insights", items: [{ key: "People & Analytics", icon: "↗", label: "Analytics", special: "analytics" }] },
+  { label: "Insights", items: [{ key: "Analytics", icon: "↗", label: "Analytics", special: "analytics" }] },
 ];
 const allItems = GROUPS.flatMap((group) => group.items);
-const reportCardsItem = allItems.find((item) => item.special === "report-cards")!;
+const accountItems: Item[] = [
+  { key: "Account & Security", icon: "⚙", label: "Account & Security", special: "account-security" },
+  { key: "Create Admin Account", icon: "+", label: "Create Admin Account", special: "create-admin" },
+];
+const allSelectableItems = [...allItems, ...accountItems];
+
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const activeItem = useMemo(() => allItems.find((item) => item.key === active) || allItems[0], [active]);
+  const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
   const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); };
-  const go = (label: string) => { const item = allItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
+  const go = (label: string) => { const item = allSelectableItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
   const renderPage = () => {
     if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
     if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
@@ -61,20 +69,26 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     if (activeItem.special === "report-cards") return <div className="modern-admin-native-page"><ReportCardsPage /></div>;
     if (activeItem.special === "materials") return <div className="modern-admin-special"><MaterialsDriveV2 onClose={() => choose(allItems[0])} /></div>;
     if (activeItem.special === "leave") return <div className="modern-admin-special modern-admin-leave"><LeaveRequests user={user} student={null} canReview /></div>;
+    if (activeItem.special === "account-security") return <div className="modern-admin-section-page"><AdminAccountPage user={user} mode="security" onLogout={onLogout} /></div>;
+    if (activeItem.special === "create-admin") return <div className="modern-admin-section-page"><AdminAccountPage user={user} mode="create" onLogout={onLogout} /></div>;
     if (["attendance","results","marks","fees","accounts","profiles","analytics"].includes(activeItem.special || "")) return <div className="modern-admin-section-page"><ModernAdminSectionPage section={activeItem.special as "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics"} onBack={() => choose(allItems[0])} /></div>;
     return null;
   };
   return (
     <div className="modern-admin">
-      <button type="button" className="modern-admin-mobile-back" onClick={() => setMobileOpen((open) => !open)} aria-label={mobileOpen ? "Close admin navigation" : "Open admin navigation"} aria-expanded={mobileOpen}> {mobileOpen ? "×" : "☰"} </button>
+      <button type="button" className="modern-admin-mobile-back" onClick={() => setMobileOpen((open) => !open)} aria-label={mobileOpen ? "Close admin navigation" : "Open admin navigation"} aria-expanded={mobileOpen}>{mobileOpen ? "×" : "☰"}</button>
       <aside className={`modern-admin-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="modern-admin-brand"><div className="modern-admin-brand-mark"><LGLogo size={58} showText={false} /></div><div><strong>Learner's Guide</strong><span>Admin Portal</span></div></div>
-        <div className="modern-admin-profile"><div className="modern-admin-avatar">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div className="modern-admin-profile-copy"><strong>{user.name || "Admin"}</strong><span>Administrator</span></div><span className="modern-admin-online" title="Signed in" /></div>
         <nav className="modern-admin-nav" aria-label="Admin navigation">{GROUPS.map((group) => <div className="modern-admin-nav-group" key={group.label}><div className="modern-admin-nav-label">{group.label}</div>{group.items.map((item) => <button type="button" key={item.key} className={`modern-admin-nav-item ${active === item.key ? "active" : ""}`} onClick={() => choose(item)}><span className="modern-admin-nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}</div>)}</nav>
-        <div className="modern-admin-sidebar-bottom"><div className="modern-admin-current-admin"><span>Signed in as</span><strong>{user.name || "Admin"}</strong></div><button type="button" className="modern-admin-logout" onClick={onLogout}>↪ <span>Logout</span></button></div>
+        <div className="modern-admin-account-area">
+          <div className="modern-admin-account-identity"><div className="modern-admin-avatar">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div className="modern-admin-profile-copy"><strong>{user.name || "Admin"}</strong><span>Administrator</span></div><span className="modern-admin-online" title="Signed in" /></div>
+          <button type="button" className={`modern-admin-account-link ${active === "Account & Security" ? "active" : ""}`} onClick={() => choose(accountItems[0])}><span>⚙</span><span>Account & Security</span></button>
+          <button type="button" className={`modern-admin-account-link ${active === "Create Admin Account" ? "active" : ""}`} onClick={() => choose(accountItems[1])}><span>+</span><span>Create Admin Account</span></button>
+          <button type="button" className="modern-admin-logout" onClick={onLogout}>↪ <span>Logout</span></button>
+        </div>
       </aside>
       <main className="modern-admin-main">
-        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">Learner's Guide <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><button type="button" className="modern-admin-mobile-report" onClick={() => choose(reportCardsItem)} aria-label="Open Report Cards">Report Cards</button><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
+        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">Learner's Guide <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
         <section className="modern-admin-content">{renderPage()}</section>
       </main>
     </div>
