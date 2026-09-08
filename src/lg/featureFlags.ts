@@ -8,5 +8,5 @@ export const FEATURE_FLAGS = {
   messaging: false,
   aiChat: false,
   marks: false,
-  studentResults: true,
+  studentResults: false,
 } as const;
