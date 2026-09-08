@@ -63,10 +63,10 @@ test("Phase 5: analytics keeps live data and the dedicated report-card architect
   assert.match(analytics, /legacy\s*=\s*\(m\.data\s*\|\|\s*\[\]\)\s*\.filter/);
   assert.match(analytics, /subjectMap/);
   assert.match(analytics, /Detailed assessment history/);
-  assert.match(report, /Student Academic Report/);
+  assert.match(report, /Student Report Card/);
   assert.match(report, /Student Name/);
   assert.match(report, /Academic Performance/);
-  assert.match(report, /Examination Results/);
+  assert.match(report, /Assessment History/);
   assert.match(report, /Attendance/);
   assert.match(report, /Homework/);
   assert.match(report, /Leave Record/);
