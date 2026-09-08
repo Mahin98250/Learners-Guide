@@ -3,7 +3,6 @@ import { C } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
 import { GLOBAL_CSS, LGLogo, Bubbles, BackBtn, WBtn, Inp, EyeBtn } from "@/lg/ui";
 
-const baseUrl = () => `${window.location.origin}${import.meta.env.BASE_URL || "/"}`;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordChecks = (value) => ({ length: value.length >= 10, upper: /[A-Z]/.test(value), lower: /[a-z]/.test(value), number: /\d/.test(value) });
 
@@ -21,9 +20,9 @@ export function PasswordRecovery({ role = "student", onBack }) {
 
   const checks = useMemo(() => passwordChecks(password), [password]);
   const strongEnough = checks.length && checks.upper && checks.lower && checks.number;
-  const roleLabel = role === "parent" ? "parent" : role === "teacher" ? "teacher" : "student";
-  const identifierLabel = role === "student" ? "Student ID (SID)" : "Phone number";
-  const identifierPlaceholder = role === "student" ? "e.g. LG001" : "e.g. 9876543210";
+  const roleLabel = role === "parent" ? "parent" : role === "teacher" ? "teacher" : role === "admin" ? "administrator" : "student";
+  const identifierLabel = role === "student" ? "Student ID (SID)" : role === "admin" ? "Administrator email" : "Phone number";
+  const identifierPlaceholder = role === "student" ? "e.g. LG001" : role === "admin" ? "admin@institute.com" : "e.g. 9876543210";
 
   useEffect(() => {
     let active = true;
@@ -47,7 +46,8 @@ export function PasswordRecovery({ role = "student", onBack }) {
   const request = async () => {
     const clean = identifier.trim();
     setError(""); setMessage("");
-    if (!clean) { setError(role === "student" ? "Enter your Student ID." : "Enter your phone number."); return; }
+    if (!clean) { setError(role === "student" ? "Enter your Student ID." : role === "admin" ? "Enter your administrator email." : "Enter your phone number."); return; }
+    if (role === "admin" && !emailPattern.test(clean)) { setError("Enter a valid administrator email address."); return; }
     if (cooldown) return;
     setLoading(true);
     try {
@@ -95,7 +95,7 @@ export function PasswordRecovery({ role = "student", onBack }) {
         <div style={{ background: "rgba(0,0,0,.22)", borderRadius: 26, padding: "24px 20px", backdropFilter: "blur(20px)", border: "1.5px solid rgba(255,255,255,.1)" }}>
           {mode === "request" ? <>
             <div style={{ color: "#fff", fontSize: 12, lineHeight: 1.6, marginBottom: 15 }}>Enter the account identifier below. If it matches an active account with a verified recovery email, a reset link will be sent there. The recovery email itself is never shown on this screen.</div>
-            <Inp label={identifierLabel} val={identifier} set={setIdentifier} ph={identifierPlaceholder} icon={role === "student" ? "🎓" : "📱"} />
+            <Inp label={identifierLabel} val={identifier} set={setIdentifier} ph={identifierPlaceholder} icon={role === "student" ? "🎓" : role === "admin" ? "🛡️" : "📱"} />
             {message && <div role="status" style={{ background: "rgba(34,197,94,.16)", color: "#86efac", padding: "10px 13px", borderRadius: 10, fontSize: 12, marginBottom: 12 }}>{message}</div>}
             {error && <div role="alert" style={{ background: "rgba(239,68,68,.18)", color: "#fca5a5", padding: "10px 13px", borderRadius: 10, fontSize: 12, marginBottom: 12 }}>{error}</div>}
             <WBtn ch={loading ? "Verifying…" : cooldown ? `Try again in ${cooldown}s` : "Verify & Send Reset Link →"} onClick={request} dis={loading || !!cooldown} />
