@@ -32,6 +32,14 @@ check(/Supabaseinsertfailed/.test(dc), "src/lg/data.js: shared insert failures a
 check(/Supabaseupdatefailed/.test(dc), "src/lg/data.js: shared update failures are not surfaced");
 check(/Supabasedeletefailed/.test(dc), "src/lg/data.js: shared delete failures are not surfaced");
 
+// Phase 1 runtime safety: a duplicate student SID must be surfaced, never
+// silently rebound to an existing student record. The DB uniqueness error is
+// still the source of truth for race-safe enforcement.
+check(/t===\"students\"&&String\(error\.code\|\|\"\"\)==="23505"/.test(dc), "src/lg/data.js: duplicate student SID handling is missing");
+check(/StudentID\$\{sid\}alreadyexists/.test(dc), "src/lg/data.js: duplicate student SID must return an explicit conflict error");
+check(!/reusingexistingrow/.test(dc), "src/lg/data.js: duplicate student inserts must not silently reuse an existing row");
+check(/exportconstsdb=async\(\)=>\{thrownewError\("sdbisdisabled:destructivelocal-cache/.test(dc), "src/lg/data.js: destructive local-cache sync helper must be disabled");
+
 const timetableProjection = "id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status";
 check(dc.includes(`constselect=\"${timetableProjection}\"`), "src/lg/data.js: timetable loader projection is missing");
 check(/from\(\"timetable_entries\"\)\.select\(select\)/.test(dc), "src/lg/data.js: timetable loader must use its verified projection");
