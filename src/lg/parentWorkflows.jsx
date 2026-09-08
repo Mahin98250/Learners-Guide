@@ -81,7 +81,7 @@ export function ParentApp({ user, onLogout }) {
   const childFees = fees.filter(f => String(f.sid) === String(selected?.id));
   const childTests = tests.filter(t => childBatchIds.has(String(t.batch_id)));
   const childResults = results.filter(r => String(r.student_id) === String(selected?.id));
-  const childHomework = homework.filter(h => childBatchIds.has(String(h.batch_id));
+  const childHomework = homework.filter(h => childBatchIds.has(String(h.batch_id)));
   const childTimetable = timetable.filter(t => childBatchIds.has(String(t.batch_id)));
   const attendanceRate = childAttendance.length ? Math.round(childAttendance.filter(a => String(a.status).toLowerCase() === "present").length / childAttendance.length * 100) : null;
   const upcomingTests = childTests.filter(t => !t.test_date || new Date(t.test_date) >= new Date());
