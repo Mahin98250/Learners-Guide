@@ -8,8 +8,7 @@ const normalizeId = (value: unknown) => normalize(value).replace(/[^a-z0-9]/g, "
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const genericMessage = "If the account details match an active account with a verified recovery email, a password reset link has been sent. Check the recovery email inbox and spam folder.";
 const deliveryError = "We could not send the recovery email right now. Please try again in a few minutes or contact the institute administrator.";
-const PRODUCTION_APP_URL = "https://learners-guide.vercel.app/";
-const isRedirectConfigError = (message: string) => /redirect|redirect_to|not allowed|invalid.*url|url.*invalid/i.test(message);
+const PRODUCTION_SITE_URL = "https://learners-guide.vercel.app/";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -27,6 +26,18 @@ Deno.serve(async (req) => {
     if (!identifier) return json({ error: role === "student" ? "Enter your Student ID." : role === "admin" ? "Enter your administrator email." : "Enter your phone number." }, 400);
 
     const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    // Administrator recovery is an account-security operation. Require a
+    // currently authenticated administrator so the public recovery endpoint
+    // cannot be used to target arbitrary administrator accounts.
+    if (role === "admin") {
+      const authorization = req.headers.get("Authorization") || "";
+      const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
+      if (!accessToken) return json({ error: "Administrator authentication is required." }, 401);
+      const { data: callerData, error: callerError } = await admin.auth.getUser(accessToken);
+      if (callerError || callerData.user?.app_metadata?.role !== "admin") return json({ error: "Administrator authentication is required." }, 403);
+    }
+
     let authId = "";
 
     if (role === "admin") {
@@ -68,15 +79,12 @@ Deno.serve(async (req) => {
     if (!emailPattern.test(email) || !confirmed) return json({ message: genericMessage });
 
     const publicClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const redirectUrl = new URL("reset-password", PRODUCTION_APP_URL);
-    redirectUrl.searchParams.set("role", role);
-    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl.toString() });
+    // Use the configured production Site URL rather than a path that may not be
+    // present in Supabase's redirect allow-list. The app root detects the
+    // recovery session and routes it to /reset-password safely.
+    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: PRODUCTION_SITE_URL });
     if (resetError) {
-      const message = String(resetError.message || "");
-      console.error("password-recovery-request reset error", message);
-      if (isRedirectConfigError(message)) {
-        return json({ error: "Password recovery is not configured for the production app URL. Add https://learners-guide.vercel.app/reset-password to Supabase Authentication → URL Configuration → Redirect URLs, then try again." }, 502);
-      }
+      console.error("password-recovery-request reset error", resetError.message || resetError);
       return json({ error: deliveryError }, 502);
     }
 
