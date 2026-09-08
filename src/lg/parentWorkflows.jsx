@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import { Badge, Card, Shell, AppBar, Sec } from "@/lg/ui";
-import { ParentNotifications } from "@/lg/ParentNotifications";
-import { ParentHomework } from "@/lg/ParentHomework";
-import { ParentAnalytics } from "@/lg/ParentAnalytics";
+
+const ParentNotifications = lazy(() => import("@/lg/ParentNotifications").then(m => ({ default: m.ParentNotifications })));
+const ParentHomework = lazy(() => import("@/lg/ParentHomework").then(m => ({ default: m.ParentHomework })));
+const ParentAnalytics = lazy(() => import("@/lg/ParentAnalytics").then(m => ({ default: m.ParentAnalytics })));
+const SECTION_FALLBACK = <Card style={{ padding: 24, textAlign: "center", color: "#747c94" }}>Loading section…</Card>;
 
 const EMPTY = [];
 const statCard = { padding: 14, borderRadius: 16, background: "#fff", border: "1px solid #e8eaf3", boxShadow: "0 5px 18px rgba(31,39,79,.05)" };
@@ -108,14 +110,14 @@ export function ParentApp({ user, onLogout }) {
       </div>
       {tab === "home" && <><Sec title="Quick access" /><div className="pp-home-actions"><button className="pp-home-action" onClick={() => setTab("attendance")}><span>✅</span><b>Attendance</b><small>View daily records</small></button><button className="pp-home-action" onClick={() => setTab("homework")}><span>📝</span><b>Homework</b><small>See assignments and files</small></button><button className="pp-home-action" onClick={() => setTab("results")}><span>🏆</span><b>Results</b><small>View marks and percentages</small></button><button className="pp-home-action" onClick={() => setTab("more")}><span>☰</span><b>More</b><small>Classes, tests & fees</small></button></div></>}
       {tab === "attendance" && <><Sec title="Attendance" /><div className="pp-panel">{childAttendance.length ? childAttendance.map(a => <div style={row} key={a.id}><div className="pp-row-main"><div className="pp-icon">{String(a.status).toLowerCase() === "present" ? "✓" : "•"}</div><div><div className="pp-title">{a.status || "Attendance"}</div><div className="pp-sub">{a.date}</div></div></div><Badge label={a.status} /></div>) : <div className="pp-note">No attendance records found.</div>}</div></>}
-      {tab === "homework" && <><Sec title="Homework" /><ParentHomework homework={childHomework} /></>}
+      {tab === "homework" && <><Sec title="Homework" /><Suspense fallback={SECTION_FALLBACK}><ParentHomework homework={childHomework} /></Suspense></>}
       {tab === "results" && <><Sec title="Results" /><div className="pp-panel">{childResults.length ? childResults.map(r => { const total = Number(r.test?.total_marks); const p = percentage(r.marks, total); return <div style={row} key={r.id}><div style={{ minWidth: 0 }}><div className="pp-title">{r.test?.title || "Assessment result"}</div><div className="pp-sub">{r.test?.subject || "Assessment"}{r.test?.test_date ? ` · ${r.test.test_date}` : ""}</div></div><div style={{ textAlign: "right", whiteSpace: "nowrap" }}><b style={{ display: "block", fontSize: 16 }}>{r.marks}{Number.isFinite(total) && total > 0 ? ` / ${total}` : ""}</b><span style={{ color: "#6258df", fontWeight: 800, fontSize: 12 }}>{p == null ? "Percentage unavailable" : `${p}%`}</span></div></div>; }) : <div className="pp-note">No results recorded yet.</div>}<div className="pp-note" style={{ marginTop: 8 }}>Each percentage is calculated separately from that test's marks obtained and total marks.</div></div></>}
       {tab === "more" && <><Sec title="More sections" /><div className="pp-more-grid">{moreItems.map(([key,icon,label,hint]) => <button key={key} className="pp-more-card" type="button" onClick={() => setTab(key)}><span className="pp-more-icon">{icon}</span><b>{label}</b><small>{hint}</small></button>)}</div></>}
-      {tab === "analytics" && <ParentAnalytics attendance={childAttendance} results={childResults} homework={childHomework} tests={childTests} fees={childFees} />}
+      {tab === "analytics" && <Suspense fallback={SECTION_FALLBACK}><ParentAnalytics attendance={childAttendance} results={childResults} homework={childHomework} tests={childTests} fees={childFees} /></Suspense>}
       {tab === "timetable" && <><Sec title="Classes" /><div className="pp-panel">{childTimetable.length ? childTimetable.map(t => <div style={row} key={t.id}><div><div className="pp-title">{t.subject_name || "Class"}</div><div className="pp-sub">{dayName(t.day_of_week)} · {String(t.start_time || "").slice(0,5)}–{String(t.end_time || "").slice(0,5)}</div></div></div>) : <div className="pp-note">No timetable entries found.</div>}</div></>}
       {tab === "tests" && <><Sec title="Tests" /><div className="pp-panel">{childTests.length ? childTests.map(t => <div style={row} key={t.id}><div><div className="pp-title">{t.title || "Test"}</div><div className="pp-sub">{t.subject || "Assessment"} · {t.test_date || "Date not set"}</div></div><b style={{ whiteSpace: "nowrap" }}>{t.total_marks ?? "—"} marks</b></div>) : <div className="pp-note">No tests scheduled.</div>}</div></>}
       {tab === "fees" && <><Sec title="Fees" /><div className="pp-panel">{childFees.length ? childFees.map(f => <div style={row} key={f.id}><div><div className="pp-title">{f.desc || "Fee"}</div><div className="pp-sub">Due {f.due || "—"} · {f.status || "—"}</div></div><b>₹{Number(f.amount || 0).toLocaleString("en-IN")}</b></div>) : <div className="pp-note">No fee records found.</div>}</div></>}
     </main>;
 
-  return <><Shell header={<AppBar name={user.name} role="parent" userId={user.id} onLogout={onLogout} onNotif={() => setShowNotif(true)} />} tabs={tabs} activeTab={tab} setTab={setTab}>{content}</Shell>{showNotif && <ParentNotifications onClose={() => setShowNotif(false)} />}</>;
+  return <><Shell header={<AppBar name={user.name} role="parent" userId={user.id} onLogout={onLogout} onNotif={() => setShowNotif(true)} />} tabs={tabs} activeTab={tab} setTab={setTab}>{content}</Shell>{showNotif && <Suspense fallback={null}><ParentNotifications onClose={() => setShowNotif(false)} /></Suspense>}</>;
 }
