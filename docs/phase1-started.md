@@ -1,0 +1,1 @@
+Phase 1 has started from the current production baseline. Code changes will be isolated to focused root-cause PRs; the live application will not receive broad refactors or new product features during stabilization.
