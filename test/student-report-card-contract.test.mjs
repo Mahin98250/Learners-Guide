@@ -6,7 +6,7 @@ const print = fs.readFileSync("src/admin/StudentReportCardPrint.tsx", "utf8");
 const analytics = fs.readFileSync("src/admin/PeopleAnalyticsPage.tsx", "utf8");
 
 test("student report card is a dedicated print document", () => {
-  for (const label of ["Student Academic Report", "Student Name", "Academic Performance", "Examination Results", "Attendance", "Homework", "Leave Record", "Overall Performance", "Teacher / Institute Remarks", "Class Teacher", "Parent / Guardian", "Institute / Admin"]) {
+  for (const label of ["Student Report Card", "Student Name", "Academic Performance", "Examination Results", "Attendance", "Homework", "Leave Record", "Overall Performance", "Teacher / Institute Remarks", "Class Teacher", "Parent / Guardian", "Institute / Admin"]) {
     assert.match(print, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(print, /@page\{size:A4/);
