@@ -17,9 +17,10 @@ const normalizeEmail = (value: string) => String(value || "").trim().toLowerCase
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const authEmail = (role: string, id: string, recoveryEmail = "") => {
   const recovery = normalizeEmail(recoveryEmail);
+  if (role === "admin") return isEmail(id) ? normalizeEmail(id) : "";
   if (isEmail(recovery)) return recovery;
   if (String(id).includes("@")) return normalizeEmail(id);
-  return `${({ teacher: "t", student: "s", parent: "p", admin: "u" } as Record<string, string>)[role] || "u"}.${normalize(id)}@learnersguide.in`;
+  return `${({ teacher: "t", student: "s", parent: "p" } as Record<string, string>)[role] || "u"}.${normalize(id)}@learnersguide.in`;
 };
 
 async function listAllUsers(a: ReturnType<typeof createClient>) {
@@ -107,7 +108,10 @@ Deno.serve(async (req) => {
       return json({ admins });
     }
 
+    if (role === "admin" && !isEmail(loginId)) return json({ error: "Administrator login ID must be a valid email address." }, 400);
+    if (role === "admin" && recoveryEmail && recoveryEmail !== normalizeEmail(loginId)) return json({ error: "For administrator accounts, the recovery email must match the login email." }, 400);
     const email = authEmail(role, loginId, recoveryEmail);
+    if (!email) return json({ error: "A valid administrator email address is required." }, 400);
     const existingByEmail = email ? await findUser(admin, email) : null;
     const password = action === "create" ? (suppliedPassword || DEFAULT_PASSWORDS[role] || "") : suppliedPassword;
 
@@ -169,7 +173,7 @@ Deno.serve(async (req) => {
     const { data, error } = await admin.auth.admin.updateUserById(user.id, patch);
     if (error) return json({ error: `Unable to update authentication account: ${error.message}` }, 502);
     if (role === "parent") await syncParentLink(admin, data.user.id, ref);
-    return json({ authId: user.id, email: data.user.email, updated: true, repaired: authId !== data.user.id });
+    return json({ authId: user.id, email: data.user.email, updated: true, repaired: authId !== user.id });
   } catch (error) {
     console.error("admin-provision-user:", error);
     return json({ error: error instanceof Error ? error.message : "Provisioning failed" }, 500);
