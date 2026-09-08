@@ -22,14 +22,23 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const role = normalize(body?.role);
-    const identifier = normalize(body?.identifier);
-    if (!["student", "parent", "teacher"].includes(role)) return json({ error: "Choose a valid account type." }, 400);
-    if (!identifier) return json({ error: role === "student" ? "Enter your Student ID." : "Enter your phone number." }, 400);
+    const identifier = normalize(body?.identifier || body?.email);
+    if (!["student", "parent", "teacher", "admin"].includes(role)) return json({ error: "Choose a valid account type." }, 400);
+    if (!identifier) return json({ error: role === "student" ? "Enter your Student ID." : role === "admin" ? "Enter your administrator email." : "Enter your phone number." }, 400);
 
     const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
     let authId = "";
 
-    if (role === "student") {
+    if (role === "admin") {
+      if (!emailPattern.test(identifier)) return json({ error: "Enter a valid administrator email address." }, 400);
+      for (let page = 1; page <= 100; page += 1) {
+        const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error) throw error;
+        const account = data.users.find((row) => row.app_metadata?.role === "admin" && normalize(row.email) === identifier);
+        if (account) { authId = account.id; break; }
+        if (data.users.length < 1000) break;
+      }
+    } else if (role === "student") {
       const sid = normalizeId(identifier);
       const { data: students, error: studentError } = await admin.from("students").select("id,sid,status").limit(1000);
       if (studentError) throw studentError;
