@@ -4,6 +4,7 @@ import { supabase } from "@/lg/supabase";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
 import { NotifPanel } from "@/lg/panels";
 import { THHome, THSchedule, THAttendance } from "@/lg/teacher";
+import { loadTeacherBatches } from "@/lg/teacherScope";
 import { T6Materials } from "@/lg/teacherWorkflows";
 import { TTests, TTestResults } from "@/lg/teacherTests";
 import { TeacherAnnouncements } from "@/lg/TeacherAnnouncements";
@@ -19,38 +20,6 @@ async function loadTeacherProfile(teacherId) {
     .maybeSingle();
   if (error) throw error;
   return data;
-}
-
-async function loadTeacherBatches(teacherId) {
-  const { data: entries, error } = await supabase
-    .from("timetable_entries")
-    .select("batch_id,subject_name")
-    .eq("teacher_id", teacherId)
-    .eq("status", "active");
-  if (error) throw error;
-
-  const ids = [...new Set((entries || []).map((x) => x.batch_id).filter(Boolean))];
-  if (!ids.length) return [];
-
-  const { data: batches, error: batchError } = await supabase
-    .from("batches")
-    .select("id,name,cls,sec,status")
-    .in("id", ids);
-  if (batchError) throw batchError;
-
-  const subjects = new Map();
-  for (const entry of entries || []) {
-    const key = String(entry.batch_id);
-    if (!subjects.has(key)) subjects.set(key, new Set());
-    if (entry.subject_name) subjects.get(key).add(entry.subject_name);
-  }
-
-  return (batches || [])
-    .filter((batch) => batch.status == null || batch.status === "active")
-    .map((batch) => ({
-      ...batch,
-      subjects: [...(subjects.get(String(batch.id)) || new Set())],
-    }));
 }
 
 const ACCEPT = ".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg";
