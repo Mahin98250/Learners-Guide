@@ -130,7 +130,15 @@ export async function signUp() { return { user: null, needsConfirm: false, error
 export async function getCurrentUser() {
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData?.session?.user) return null;
-  const user = toUser(sessionData.session.user);
+  let authUser = sessionData.session.user;
+  if (!isOffline()) {
+    // getSession() can return a cached JWT whose user_metadata predates an
+    // administrator profile-name correction. Refresh the user record from
+    // Supabase Auth so the portal always uses the current display name.
+    const { data: freshUserData } = await supabase.auth.getUser();
+    if (freshUserData?.user) authUser = freshUserData.user;
+  }
+  const user = toUser(authUser);
   if (!user.role) return null;
   if (isOffline()) return user;
   const profileCheck = await validateProfile(user, user.role);
