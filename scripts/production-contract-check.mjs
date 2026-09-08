@@ -31,10 +31,6 @@ check(/supabase\.from\(t\)\.delete\(\)/.test(dc), "src/lg/data.js: shared delete
 check(/Supabaseinsertfailed/.test(dc), "src/lg/data.js: shared insert failures are not surfaced");
 check(/Supabaseupdatefailed/.test(dc), "src/lg/data.js: shared update failures are not surfaced");
 check(/Supabasedeletefailed/.test(dc), "src/lg/data.js: shared delete failures are not surfaced");
-
-// Phase 1 runtime safety: a duplicate student SID must be surfaced, never
-// silently rebound to an existing student record. The DB uniqueness error is
-// still the source of truth for race-safe enforcement.
 check(/t===\"students\"&&String\(error\.code\|\|\"\"\)==="23505"/.test(dc), "src/lg/data.js: duplicate student SID handling is missing");
 check(/StudentID\$\{sid\}alreadyexists/.test(dc), "src/lg/data.js: duplicate student SID must return an explicit conflict error");
 check(!/reusingexistingrow/.test(dc), "src/lg/data.js: duplicate student inserts must not silently reuse an existing row");
@@ -55,13 +51,14 @@ check(compact(app).includes("ParentApp") && compact(app).includes("@/lg/parentWo
 check(app.includes("event.persisted"), "src/routes/app.tsx: BFCache restore handling is missing");
 check(!app.includes("visibilitychange"), "src/routes/app.tsx: visibility changes must not remount the whole portal");
 
-// Parse only literal projection arguments. Whitespace between chained calls is
-// allowed because CI formats changed files with Prettier before this check.
+// Parse literal projection arguments from the normalized source. Normalizing
+// before matching keeps the contract deterministic across formatting passes
+// while still requiring explicit column lists and never accepting wildcard reads.
 const projectionFields = (source, table) => {
   const escapedTable = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const patterns = [
-    new RegExp(`supabase\\.from\\(\\s*"${escapedTable}"\\s*\\)\\s*\\.select\\(\\s*"([^"]*)"\\s*\\)`, "g"),
-    new RegExp(`supabase\\.from\\(\\s*'${escapedTable}'\\s*\\)\\s*\\.select\\(\\s*'([^']*)'\\s*\\)`, "g"),
+    new RegExp(`supabase\\.from\\(\"${escapedTable}\"\\)\\.select\\(\"([^\"]*)\"\\)`, "g"),
+    new RegExp(`supabase\\.from\\(\\'${escapedTable}\\'\\)\\.select\\(\\'([^\\']*)\\'\\)`, "g"),
   ];
   const fields = [];
   for (const pattern of patterns) {
@@ -74,8 +71,8 @@ const projectionFields = (source, table) => {
 const hasProjection = (source, table, required) => projectionFields(source, table).some(fields => required.every(field => fields.includes(field)));
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const teacherHomeworkFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
-check(hasProjection(teacher, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(hasProjection(teacher, "homework", teacherHomeworkFields), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
+check(hasProjection(tc, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
+check(hasProjection(tc, "homework", teacherHomeworkFields), "src/lg/teacherHomeworkApp.jsx: teacher homework projection is incomplete");
 check(!tc.includes('supabase.from("teachers").select("*")') && !tc.includes("supabase.from('teachers').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!tc.includes('supabase.from("homework").select("*")') && !tc.includes("supabase.from('homework').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
@@ -100,10 +97,10 @@ for (const file of files) {
   if (/supabase\.rpc\(\s*["']get_student_(tests|test_results)["']/i.test(content)) failures.push(`${path.relative(root, file)}: revoked student helper RPC is still called by frontend code`);
 }
 
-// Regression fixtures exercise both quote styles and multiline chaining.
 const parserFixture = `const a = supabase.from("teachers")\n  .select("id,name,tid,subject,phone,classes,status");\nconst b = supabase.from('homework')\n  .select('id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at');`;
-check(hasProjection(parserFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
-check(hasProjection(parserFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
+const normalizedFixture = compact(parserFixture);
+check(hasProjection(normalizedFixture, "teachers", teacherProfileFields), "contract-check parser regression: teacher profile projection was not recognized");
+check(hasProjection(normalizedFixture, "homework", teacherHomeworkFields), "contract-check parser regression: teacher homework projection was not recognized");
 
 if (failures.length) {
   console.error("Production contract checks failed:");
