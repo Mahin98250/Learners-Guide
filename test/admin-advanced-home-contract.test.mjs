@@ -11,7 +11,7 @@ test("current admin landing uses the modern portal", () => {
   assert.match(admin, /<ModernAdminPortal user=\{user\} onLogout=\{onLogout\} \/>/);
   assert.match(portal, /Attendance/);
   assert.match(portal, /Fees/);
-  assert.match(portal, /People & Analytics/);
+  assert.match(portal, /Analytics/);
 });
 
 test("modern admin landing does not retain retired wrappers", () => {

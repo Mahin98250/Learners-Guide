@@ -17,9 +17,10 @@ const normalizeEmail = (value: string) => String(value || "").trim().toLowerCase
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const authEmail = (role: string, id: string, recoveryEmail = "") => {
   const recovery = normalizeEmail(recoveryEmail);
+  if (role === "admin") return isEmail(id) ? normalizeEmail(id) : "";
   if (isEmail(recovery)) return recovery;
   if (String(id).includes("@")) return normalizeEmail(id);
-  return `${({ teacher: "t", student: "s", parent: "p", admin: "u" } as Record<string, string>)[role] || "u"}.${normalize(id)}@learnersguide.in`;
+  return `${({ teacher: "t", student: "s", parent: "p" } as Record<string, string>)[role] || "u"}.${normalize(id)}@learnersguide.in`;
 };
 
 async function listAllUsers(a: ReturnType<typeof createClient>) {
@@ -97,12 +98,21 @@ Deno.serve(async (req) => {
     const ref = body.ref ? String(body.ref) : null;
     const authId = body.authId ? String(body.authId) : null;
     const recoveryEmail = normalizeEmail(String(body.recoveryEmail || ""));
-    if (!["student", "parent", "teacher"].includes(role)) return json({ error: "Invalid role" }, 400);
-    if (!["create", "update", "delete"].includes(action)) return json({ error: "Unsupported action" }, 400);
+    if (!["student", "parent", "teacher", "admin"].includes(role) && action !== "list-admins") return json({ error: "Invalid role" }, 400);
+    if (!["create", "update", "delete", "list-admins"].includes(action)) return json({ error: "Unsupported action" }, 400);
     if (recoveryEmail && !isEmail(recoveryEmail)) return json({ error: "Enter a valid recovery email address." }, 400);
+
+    if (action === "list-admins") {
+      const users = await listAllUsers(admin);
+      const admins = users.filter((u) => u.app_metadata?.role === "admin").map((u) => ({ id: u.id, email: u.email || "", name: u.user_metadata?.name || "Admin", created_at: u.created_at, last_sign_in_at: u.last_sign_in_at || null, confirmed: Boolean(u.email_confirmed_at), current: u.id === callerData.user.id }));
+      return json({ admins });
+    }
+
+    if (role === "admin" && !isEmail(loginId)) return json({ error: "Administrator login ID must be a valid email address." }, 400);
+    if (role === "admin" && recoveryEmail && recoveryEmail !== normalizeEmail(loginId)) return json({ error: "For administrator accounts, the recovery email must match the login email." }, 400);
     const email = authEmail(role, loginId, recoveryEmail);
+    if (!email) return json({ error: "A valid administrator email address is required." }, 400);
     const existingByEmail = email ? await findUser(admin, email) : null;
-    // On create, honor an explicitly supplied password; otherwise fall back to the role default.
     const password = action === "create" ? (suppliedPassword || DEFAULT_PASSWORDS[role] || "") : suppliedPassword;
 
     if (action === "delete") {
@@ -110,6 +120,8 @@ Deno.serve(async (req) => {
       if (!user) user = await findUserByRefRole(admin, ref, role);
       if (!user) user = existingByEmail;
       if (!user) return json({ deleted: true, alreadyMissing: true });
+      if (user.id === callerData.user.id) return json({ error: "You cannot delete the administrator account you are currently using." }, 400);
+      if (user.app_metadata?.role !== role) return json({ error: "The authentication account belongs to a different role." }, 409);
       const { error } = await admin.auth.admin.deleteUser(user.id);
       if (error) return json({ error: `Unable to delete authentication account: ${error.message}` }, 502);
       return json({ authId: user.id, deleted: true });
@@ -118,6 +130,7 @@ Deno.serve(async (req) => {
     if (!loginId) return json({ error: "Login ID is required" }, 400);
     if (action === "create") {
       if (!password) return json({ error: "Password is required" }, 400);
+      if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, 400);
       if (existingByEmail) {
         const existingRole = existingByEmail.app_metadata?.role;
         const existingRef = existingByEmail.app_metadata?.ref;
@@ -139,6 +152,7 @@ Deno.serve(async (req) => {
     if (!user) user = existingByEmail;
     if (!user) {
       if (!password) return json({ error: "Authentication account not found. A password is required to recreate it.", code: "AUTH_ACCOUNT_MISSING" }, 404);
+      if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, 400);
       const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name, phone: loginId }, app_metadata: { role, ref } });
       if (error) return json({ error: `Unable to repair authentication account: ${error.message}` }, 502);
       if (role === "parent") await syncParentLink(admin, data.user.id, ref);
@@ -151,12 +165,15 @@ Deno.serve(async (req) => {
       if (conflict) return json({ error: "That email address is already assigned to another account. Please use a different email address." }, 409);
     }
     const patch: Record<string, unknown> = { user_metadata: { ...(user.user_metadata || {}), name, phone: loginId }, app_metadata: { ...(user.app_metadata || {}), role, ref } };
-    if (password) patch.password = password;
+    if (password) {
+      if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, 400);
+      patch.password = password;
+    }
     if (isEmail(recoveryEmail)) { patch.email = recoveryEmail; patch.email_confirm = true; }
     const { data, error } = await admin.auth.admin.updateUserById(user.id, patch);
     if (error) return json({ error: `Unable to update authentication account: ${error.message}` }, 502);
     if (role === "parent") await syncParentLink(admin, data.user.id, ref);
-    return json({ authId: data.user.id, email: data.user.email, updated: true, repaired: authId !== data.user.id });
+    return json({ authId: user.id, email: data.user.email, updated: true, repaired: authId !== user.id });
   } catch (error) {
     console.error("admin-provision-user:", error);
     return json({ error: error instanceof Error ? error.message : "Provisioning failed" }, 500);
