@@ -26,6 +26,18 @@ Deno.serve(async (req) => {
     if (!identifier) return json({ error: role === "student" ? "Enter your Student ID." : role === "admin" ? "Enter your administrator email." : "Enter your phone number." }, 400);
 
     const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    // Administrator recovery is an account-security operation. Require a
+    // currently authenticated administrator so the public recovery endpoint
+    // cannot be used to target arbitrary administrator accounts.
+    if (role === "admin") {
+      const authorization = req.headers.get("Authorization") || "";
+      const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
+      if (!accessToken) return json({ error: "Administrator authentication is required." }, 401);
+      const { data: callerData, error: callerError } = await admin.auth.getUser(accessToken);
+      if (callerError || callerData.user?.app_metadata?.role !== "admin") return json({ error: "Administrator authentication is required." }, 403);
+    }
+
     let authId = "";
 
     if (role === "admin") {
