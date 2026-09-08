@@ -66,9 +66,11 @@ test("Phase 5: analytics keeps live data and the dedicated institute-report arch
   for (const label of ["Student Progress Report", "Student Information", "Subject Performance", "Assessment History", "Attendance by Month", "Homework & Practice", "Leave Record", "Overall Institute Review", "Teacher's Review", "Focus for Continued Improvement", "Parent / Guardian Acknowledgement"]) {
     assert.match(report, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.match(report, /LOGO_IMG_SRC/);
+  assert.match(report, /<img\b[^>]*className="rc-logo"/i);
+  assert.match(report, /\.rc-logo\{[^}]*width:64px[^}]*height:64px/);
   assert.match(report, /@page\{size:A4/);
   assert.doesNotMatch(report, /page-break-after:\s*always|break-after:\s*page/);
-  assert.doesNotMatch(report, /<img\b/i);
   assert.doesNotMatch(report, /Logout/);
   assert.doesNotMatch(report, /Dashboard/);
   assert.doesNotMatch(report, /Principal/);
