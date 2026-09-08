@@ -8,8 +8,7 @@ const normalizeId = (value: unknown) => normalize(value).replace(/[^a-z0-9]/g, "
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const genericMessage = "If the account details match an active account with a verified recovery email, a password reset link has been sent. Check the recovery email inbox and spam folder.";
 const deliveryError = "We could not send the recovery email right now. Please try again in a few minutes or contact the institute administrator.";
-const PRODUCTION_APP_URL = "https://learners-guide.vercel.app/";
-const isRedirectConfigError = (message: string) => /redirect|redirect_to|not allowed|invalid.*url|url.*invalid/i.test(message);
+const PRODUCTION_SITE_URL = "https://learners-guide.vercel.app/";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -68,15 +67,12 @@ Deno.serve(async (req) => {
     if (!emailPattern.test(email) || !confirmed) return json({ message: genericMessage });
 
     const publicClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const redirectUrl = new URL("reset-password", PRODUCTION_APP_URL);
-    redirectUrl.searchParams.set("role", role);
-    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl.toString() });
+    // Use the configured production Site URL rather than a path that may not be
+    // present in Supabase's redirect allow-list. The app root detects the
+    // recovery session and routes it to /reset-password safely.
+    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: PRODUCTION_SITE_URL });
     if (resetError) {
-      const message = String(resetError.message || "");
-      console.error("password-recovery-request reset error", message);
-      if (isRedirectConfigError(message)) {
-        return json({ error: "Password recovery is not configured for the production app URL. Add https://learners-guide.vercel.app/reset-password to Supabase Authentication → URL Configuration → Redirect URLs, then try again." }, 502);
-      }
+      console.error("password-recovery-request reset error", resetError.message || resetError);
       return json({ error: deliveryError }, 502);
     }
 
