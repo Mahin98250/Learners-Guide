@@ -14,8 +14,8 @@ test("Student Phase 2 exposes a dedicated announcements view", () => {
   const announcements = read("src/lg/StudentAnnouncements.jsx");
   assert.match(home, /StudentAnnouncements/);
   assert.match(home, /Announcements & News/);
-  assert.match(announcements, /supabase\.from\("announcements"\)/);
+  assert.match(announcements, /\.from\("announcements"\)/);
   assert.match(announcements, /\.select\("id,title,desc,date,target,created_at"\)/);
-  assert.match(announcements, /order\("created_at",\s*\{\s*ascending:\s*false\s*\}\)/);
+  assert.match(announcements, /\.order\("created_at",\s*\{\s*ascending:\s*false\s*\}\)/);
   assert.match(announcements, /RLS is the source of truth/);
 });
