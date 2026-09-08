@@ -135,6 +135,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    // Supabase password recovery may redirect to the configured Site URL.
+    // If that URL is the app root, route recovery sessions into the dedicated
+    // reset page without exposing tokens or account identifiers in the UI.
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    if (params.get("type") === "recovery") {
+      window.location.replace(`${window.location.origin}/reset-password`);
+    }
+  }, []);
+
   return (
     <>
       <HeadContent />
