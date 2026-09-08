@@ -43,6 +43,7 @@ const GROUPS: Group[] = [
   { label: "Insights", items: [{ key: "People & Analytics", icon: "↗", label: "Analytics", special: "analytics" }] },
 ];
 const allItems = GROUPS.flatMap((group) => group.items);
+const reportCardsItem = allItems.find((item) => item.special === "report-cards")!;
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -65,7 +66,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
   };
   return (
     <div className="modern-admin">
-      <button type="button" className="modern-admin-mobile-back" onClick={() => { if (mobileOpen) setMobileOpen(false); else choose(allItems[0]); }} aria-label={mobileOpen ? "Close navigation" : "Back to dashboard"}>{mobileOpen ? "×" : "←"}</button>
+      <button type="button" className="modern-admin-mobile-back" onClick={() => setMobileOpen((open) => !open)} aria-label={mobileOpen ? "Close admin navigation" : "Open admin navigation"} aria-expanded={mobileOpen}> {mobileOpen ? "×" : "☰"} </button>
       <aside className={`modern-admin-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="modern-admin-brand"><div className="modern-admin-brand-mark"><LGLogo size={58} showText={false} /></div><div><strong>Learner's Guide</strong><span>Admin Portal</span></div></div>
         <div className="modern-admin-profile"><div className="modern-admin-avatar">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div className="modern-admin-profile-copy"><strong>{user.name || "Admin"}</strong><span>Administrator</span></div><span className="modern-admin-online" title="Signed in" /></div>
@@ -73,7 +74,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
         <div className="modern-admin-sidebar-bottom"><div className="modern-admin-current-admin"><span>Signed in as</span><strong>{user.name || "Admin"}</strong></div><button type="button" className="modern-admin-logout" onClick={onLogout}>↪ <span>Logout</span></button></div>
       </aside>
       <main className="modern-admin-main">
-        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">Learner's Guide <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
+        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">Learner's Guide <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><button type="button" className="modern-admin-mobile-report" onClick={() => choose(reportCardsItem)} aria-label="Open Report Cards">Report Cards</button><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
         <section className="modern-admin-content">{renderPage()}</section>
       </main>
     </div>
