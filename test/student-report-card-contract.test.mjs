@@ -22,9 +22,11 @@ test("student report is a standalone institute progress document", () => {
   ]) {
     assert.match(print, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.match(print, /LOGO_IMG_SRC/);
+  assert.match(print, /<img\b[^>]*className="rc-logo"/i);
+  assert.match(print, /\.rc-logo\{[^}]*width:64px[^}]*height:64px/);
   assert.match(print, /@page\{size:A4/);
   assert.doesNotMatch(print, /page-break-after:\s*always|break-after:\s*page/);
-  assert.doesNotMatch(print, /<img\b/i);
   assert.doesNotMatch(print, /Logout/);
   assert.doesNotMatch(print, /Dashboard/);
   assert.doesNotMatch(print, /Back/);
