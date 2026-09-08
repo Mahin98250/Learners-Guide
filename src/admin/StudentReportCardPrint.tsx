@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { LOGO_IMG_SRC } from "@/lg/ui";
 
 type Row = Record<string, any>;
 type Props = { student: Row; onReady?: () => void; onError?: (message: string) => void };
@@ -145,6 +146,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
         .rc-sheet{width:210mm;height:297mm;padding:12mm 14mm 12mm;position:relative;background:#fff;overflow:hidden}
         .rc-sheet+.rc-sheet{break-before:page}
         .rc-top{text-align:center;border-bottom:2px solid #172033;padding-bottom:6px;margin-bottom:8px}
+        .rc-logo{display:block;width:64px;height:64px;object-fit:contain;margin:0 auto 4px}
         .rc-institute{font-size:17px;font-weight:800;letter-spacing:.9px}.rc-doc{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}.rc-period{font-size:7.5px;color:#687386;margin-top:2px}
         .rc-heading{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #172033;padding-bottom:3px;margin:0 0 5px}
         .rc-info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #aeb7c4;margin-bottom:7px}.rc-field{padding:4.5px 6px;border-right:1px solid #aeb7c4;border-bottom:1px solid #aeb7c4;min-height:27px}.rc-field:nth-child(2n){border-right:0}.rc-field:nth-last-child(-n+2){border-bottom:0}.rc-label{display:block;font-size:6.5px;color:#697386;text-transform:uppercase;font-weight:700;letter-spacing:.35px}.rc-value{font-size:8.7px;font-weight:700;margin-top:1px}
@@ -159,7 +161,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
       `}</style>
 
       <article className="rc-sheet">
-        <header className="rc-top"><div className="rc-institute">LEARNER'S GUIDE</div><div className="rc-doc">Student Progress Report</div><div className="rc-period">Institute Academic Record · {academicYear}</div></header>
+        <header className="rc-top"><img className="rc-logo" src={LOGO_IMG_SRC} alt="Learner's Guide logo"/><div className="rc-institute">LEARNER'S GUIDE</div><div className="rc-doc">Student Progress Report</div><div className="rc-period">Institute Academic Record · {academicYear}</div></header>
         <div className="rc-heading">Student Information</div>
         <div className="rc-info">
           <div className="rc-field"><span className="rc-label">Student Name</span><span className="rc-value">{text(student.name) || "—"}</span></div>
@@ -182,7 +184,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
       </article>
 
       <article className="rc-sheet">
-        <header className="rc-top"><div className="rc-institute">LEARNER'S GUIDE</div><div className="rc-doc">Academic & Assessment Record</div><div className="rc-period">Student: {text(student.name) || "—"}</div></header>
+        <header className="rc-top"><img className="rc-logo" src={LOGO_IMG_SRC} alt="Learner's Guide logo"/><div className="rc-institute">LEARNER'S GUIDE</div><div className="rc-doc">Academic & Assessment Record</div><div className="rc-period">Student: {text(student.name) || "—"}</div></header>
         <section className="rc-section"><h2>Assessment History</h2>{results.length ? <table><thead><tr><th style={{ width: "27%" }}>Assessment</th><th style={{ width: "18%" }}>Subject</th><th style={{ width: "13%" }}>Date</th><th className="center" style={{ width: "11%" }}>Marks</th><th className="center" style={{ width: "11%" }}>Out Of</th><th className="center" style={{ width: "9%" }}>%</th><th className="center" style={{ width: "11%" }}>Grade</th></tr></thead><tbody>{results.map((r, i) => { const score = r.total ? Math.round((r.obtained / r.total) * 100) : null; return <tr key={`${r.name}-${r.date}-${i}`}><td>{r.name}</td><td>{r.subject || "—"}</td><td>{fmtDate(r.date)}</td><td className="center">{r.obtained}</td><td className="center">{r.total || "—"}</td><td className="center">{score == null ? "—" : `${score}%`}</td><td className="center strong">{grade(score)}</td></tr>; })}</tbody></table> : <div className="rc-box">No assessment records are available.</div>}</section>
         <section className="rc-section"><h2>Attendance by Month</h2>{monthly.size ? <table><thead><tr><th>Month</th><th className="center">Present</th><th className="center">Absent</th><th className="center">Leave</th><th className="center">Attendance</th></tr></thead><tbody>{[...monthly.entries()].map(([name, v]) => { const rate = pct(v.present, v.present + v.absent + v.leave); return <tr key={name}><td>{name}</td><td className="center">{v.present}</td><td className="center">{v.absent}</td><td className="center">{v.leave}</td><td className="center strong">{rate == null ? "—" : `${rate}%`}</td></tr>; })}</tbody></table> : <div className="rc-box">No attendance records are available.</div>}</section>
         <section className="rc-section"><h2>Homework & Practice</h2><table><thead><tr><th>Measure</th><th className="center">Count</th><th className="center">Completion</th></tr></thead><tbody><tr><td>Homework assigned</td><td className="center">{computed.homeworkAssigned}</td><td className="center">—</td></tr><tr><td>Homework completed</td><td className="center">{computed.homeworkCompleted}</td><td className="center">{computed.homeworkRate == null ? "—" : `${computed.homeworkRate}%`}</td></tr><tr><td>Homework pending</td><td className="center">{Math.max(0, computed.homeworkAssigned - computed.homeworkCompleted)}</td><td className="center">—</td></tr></tbody></table></section>
@@ -192,7 +194,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
       </article>
 
       <article className="rc-sheet">
-        <header className="rc-top"><div className="rc-institute">LEARNER'S GUIDE</div><div className="rc-doc">Progress Review & Acknowledgement</div><div className="rc-period">Student: {text(student.name) || "—"} · {academicYear}</div></header>
+        <header className="rc-top"><img className="rc-logo" src={LOGO_IMG_SRC} alt="Learner's Guide logo"/><div className="rc-institute">LEARNER'S GUIDE</div><div className="rc-doc">Progress Review & Acknowledgement</div><div className="rc-period">Student: {text(student.name) || "—"} · {academicYear}</div></header>
         <section className="rc-section"><h2>Overall Institute Review</h2><div className="rc-two"><div className="rc-box"><h3>Academic Performance</h3><p>{computed.academicAverage == null ? "Academic performance data is not yet available." : `Current recorded average is ${computed.academicAverage}%, based on ${results.length} assessment${results.length === 1 ? "" : "s"}.`}</p></div><div className="rc-box"><h3>Attendance & Participation</h3><p>{computed.attendanceRate == null ? "Attendance data is not yet available." : `Recorded attendance is ${computed.attendanceRate}%, with ${computed.present} present and ${computed.absent} absent sessions.`}</p></div></div></section>
         <section className="rc-section"><h2>Teacher's Review</h2><div className="rc-box"><p style={{ minHeight: "34mm" }}>Teacher's observations: ____________________________________________________________________________________<br /><br />________________________________________________________________________________________________________<br /><br />________________________________________________________________________________________________________</p></div></section>
         <section className="rc-section"><h2>Focus for Continued Improvement</h2><div className="rc-box"><p style={{ minHeight: "28mm" }}>Areas to continue working on: ____________________________________________________________________________<br /><br />Suggested practice / follow-up: ______________________________________________________________________________<br /><br />________________________________________________________________________________________________________</p></div></section>
