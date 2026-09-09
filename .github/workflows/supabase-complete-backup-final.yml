@@ -92,7 +92,10 @@ PY
 )"
             test -n "$PGHOST" && test -n "$PGUSER" && test -n "$PGPASSWORD"
             psql -v ON_ERROR_STOP=1 -Atqc "select current_database(), current_user, current_setting('server_version');"
-            printf 'PGHOST=%s\nPGPORT=%s\nPGUSER=%s\nPGDATABASE=%s\nPGSSLMODE=require\nPGCONNECT_TIMEOUT=20\n' "$PGHOST" "$PGPORT" "$PGUSER" "$PGDATABASE" >> "$GITHUB_ENV"
+            {
+              printf 'PGHOST=%s\nPGPORT=%s\nPGUSER=%s\nPGDATABASE=%s\nPGSSLMODE=require\nPGCONNECT_TIMEOUT=20\n' "$PGHOST" "$PGPORT" "$PGUSER" "$PGDATABASE"
+              printf 'PGPASSWORD=%s\n' "$PGPASSWORD"
+            } >> "$GITHUB_ENV"
             exit 0
           fi
 
@@ -124,7 +127,10 @@ PY
             if [ "$status" -eq 0 ]; then
               echo "Database connection verified through $host."
               selected_host="$host"
-              printf 'PGHOST=%s\nPGHOSTADDR=%s\nPGPORT=5432\nPGUSER=%s\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCONNECT_TIMEOUT=20\n' "$host" "$ipv4" "$PGUSER" >> "$GITHUB_ENV"
+              {
+                printf 'PGHOST=%s\nPGHOSTADDR=%s\nPGPORT=5432\nPGUSER=%s\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCONNECT_TIMEOUT=20\n' "$host" "$ipv4" "$PGUSER"
+                printf 'PGPASSWORD=%s\n' "$password"
+              } >> "$GITHUB_ENV"
               break
             fi
             last_error="$result"
