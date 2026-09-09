@@ -151,7 +151,11 @@ jobs:
           psql --dbname="$db_url" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
             "select current_database(), current_user, current_setting('server_version');"
 
-          pg_dumpall --dbname="$db_url" --no-role-passwords --roles-only --no-tablespaces --no-comments \
+          # Supabase manages built-in roles, and pg_dumpall role export can fail through
+          # the shared pooler. Preserve the observable role metadata instead of making
+          # the entire recovery archive depend on pg_authid access.
+          psql --dbname="$db_url" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
+            "select rolname || E'\\t' || rolsuper || E'\\t' || rolinherit || E'\\t' || rolcreaterole || E'\\t' || rolcreatedb || E'\\t' || rolcanlogin from pg_roles order by rolname;" \
             > "$BACKUP_DIR/database/roles.sql"
           test -s "$BACKUP_DIR/database/roles.sql"
 
