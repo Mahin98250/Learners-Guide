@@ -1,0 +1,215 @@
+name: Supabase Complete Backup
+
+on:
+  schedule:
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/supabase-complete-backup.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-complete-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup database, storage, and auth metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_DIR: backup
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$SUPABASE_DB_URL" ]] || { echo "::error::Missing SUPABASE_DB_URL repository secret."; exit 1; }
+          [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."; exit 1; }
+          case "$SUPABASE_DB_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "::error::SUPABASE_DB_URL must be a PostgreSQL connection string."; exit 1 ;;
+          esac
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Prepare backup directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$BACKUP_DIR"
+          mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage"
+
+      - name: Backup database roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/database/roles.sql" --role-only
+
+      - name: Backup database schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/database/schema.sql"
+
+      - name: Backup database data
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/database/data.sql" --data-only --use-copy -x "storage.buckets_vectors" -x "storage.vector_indexes"
+
+      - name: Backup Storage objects and buckets
+        shell: bash
+        run: |
+          set -euo pipefail
+          api="$SUPABASE_URL/storage/v1"
+          auth="Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+          apikey="apikey: $SUPABASE_SERVICE_ROLE_KEY"
+
+          curl --fail --silent --show-error \
+            -H "$auth" -H "$apikey" \
+            "$api/bucket" > "$BACKUP_DIR/storage/buckets.json"
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          buckets = json.loads(Path("backup/storage/buckets.json").read_text())
+          if not isinstance(buckets, list):
+              raise SystemExit("Storage bucket response is not a list")
+          Path("backup/storage/bucket-names.txt").write_text("\n".join(b["name"] for b in buckets) + ("\n" if buckets else ""))
+          PY
+
+          while IFS= read -r bucket; do
+            [[ -n "$bucket" ]] || continue
+            mkdir -p "backup/storage/files/$bucket"
+            page=0
+            while :; do
+              response="$(curl --fail --silent --show-error \
+                -H "$auth" -H "$apikey" \
+                -H "Content-Type: application/json" \
+                -X POST "$api/object/list/$bucket" \
+                --data "{\"prefix\":\"\",\"limit\":1000,\"offset\":$((page * 1000)),\"sortBy\":{\"column\":\"name\",\"order\":\"asc\"}}")"
+              printf '%s\n' "$response" > "backup/storage/.objects-${bucket}-${page}.json"
+
+              count="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' <<< "$response")"
+              python3 - "$bucket" "$page" <<'PY'
+          import json, sys
+          from pathlib import Path
+          bucket, page = sys.argv[1], sys.argv[2]
+          items = json.loads(Path(f"backup/storage/.objects-{bucket}-{page}.json").read_text())
+          out = Path(f"backup/storage/.objects-{bucket}.jsonl")
+          with out.open("a", encoding="utf-8") as f:
+              for item in items:
+                  if item.get("name"):
+                      f.write(json.dumps({"bucket": bucket, "name": item["name"]}) + "\n")
+          PY
+
+              (( count < 1000 )) && break
+              page=$((page + 1))
+            done
+          done < "backup/storage/bucket-names.txt"
+
+          find backup/storage -name '.objects-*' -type f -delete
+
+          while IFS= read -r record; do
+            [[ -n "$record" ]] || continue
+            bucket="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["bucket"])' "$record")"
+            object="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["name"])' "$record")"
+            target="backup/storage/files/$bucket/$object"
+            mkdir -p "$(dirname "$target")"
+            curl --fail --silent --show-error \
+              -H "$auth" -H "$apikey" \
+              "$api/object/authenticated/$bucket/$object" \
+              -o "$target"
+          done < <(find backup/storage -name '.objects-*.jsonl' -type f -print0 | xargs -0 cat 2>/dev/null || true)
+
+      - name: Backup Auth user metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          page=1
+          : > "$BACKUP_DIR/auth-users.jsonl"
+          while :; do
+            response="$(curl --fail --silent --show-error \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              "$SUPABASE_URL/auth/v1/admin/users?page=$page&per_page=1000")"
+            python3 - "$response" <<'PY'
+          import json, sys
+          from pathlib import Path
+          payload = json.loads(sys.argv[1])
+          users = payload.get("users", [])
+          with Path("backup/auth-users.jsonl").open("a", encoding="utf-8") as f:
+              for user in users:
+                  safe = {k: user.get(k) for k in (
+                      "id", "aud", "role", "email", "phone", "created_at", "updated_at",
+                      "email_confirmed_at", "phone_confirmed_at", "last_sign_in_at",
+                      "app_metadata", "user_metadata", "identities", "is_anonymous"
+                  ) if k in user}
+                  f.write(json.dumps(safe, separators=(",", ":")) + "\n")
+          print(len(users))
+          PY
+            count="$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1]).get("users", [])))' "$response")"
+            (( count < 1000 )) && break
+            page=$((page + 1))
+          done
+
+      - name: Validate backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in "$BACKUP_DIR/database/roles.sql" "$BACKUP_DIR/database/schema.sql" "$BACKUP_DIR/database/data.sql" "$BACKUP_DIR/storage/buckets.json" "$BACKUP_DIR/auth-users.jsonl"; do
+            [[ -s "$file" ]] || { echo "::error::Missing or empty backup file: $file"; exit 1; }
+          done
+          find "$BACKUP_DIR/storage/files" -type f -printf '%p\n' | sort > "$BACKUP_DIR/storage/file-manifest.txt"
+
+      - name: Package and checksum backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
+          cat > "$BACKUP_DIR/manifest.txt" <<EOF
+          Backup: Learner's Guide Supabase complete recovery set
+          Created UTC: ${stamp}
+          Repository: ${GITHUB_REPOSITORY}
+          Commit: ${GITHUB_SHA}
+          Workflow run: ${GITHUB_RUN_ID}
+          Contents: database roles/schema/data, Storage buckets/object files, Auth user metadata
+          Important: Auth passwords/session secrets are not exportable and are not included.
+          EOF
+          tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.jsonl manifest.txt
+          tar -tzf "$archive" >/dev/null
+          sha256sum "$archive" | tee "$BACKUP_DIR/sha256.txt"
+
+      - name: Upload private recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-complete-backup-${{ github.run_id }}
+          path: |
+            backup/learners-guide-complete-*.tar.gz
+            backup/sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Final summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Complete backup created and validated."
+          echo "Includes: database + Storage files + Auth metadata."
+          echo "Does not include: Auth passwords/session secrets."
+          echo "Artifact retention: 30 days."
