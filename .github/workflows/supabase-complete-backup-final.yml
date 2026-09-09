@@ -56,45 +56,49 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import os, socket, urllib.parse
+          import os
+          import socket
+          import urllib.parse
 
-          raw = os.environ.get("SUPABASE_DB_URL", "").strip()
-          password_secret = os.environ.get("SUPABASE_DB_PASSWORD", "")
           project_ref = os.environ["SUPABASE_PROJECT_REF"]
           region = os.environ["SUPABASE_REGION"]
+          password_secret = os.environ.get("SUPABASE_DB_PASSWORD", "")
+          raw_url = os.environ.get("SUPABASE_DB_URL", "").strip()
 
-          # Prefer the exact connection string copied from Supabase Connect.
-          # This prevents a constructed tenant/user from being wrong.
-          if raw:
-              if not raw.startswith(("postgres://", "postgresql://")):
+          # Prefer the exact Session Pooler URL supplied by Supabase when present.
+          # This preserves the dashboard-provided tenant username.
+          if raw_url:
+              if not raw_url.startswith(("postgres://", "postgresql://")):
                   raise SystemExit("SUPABASE_DB_URL is not a PostgreSQL connection string.")
-              parsed = urllib.parse.urlsplit(raw)
+              parsed = urllib.parse.urlsplit(raw_url)
               host = parsed.hostname or ""
               user = urllib.parse.unquote(parsed.username or "")
               password = urllib.parse.unquote(parsed.password or "")
               database = (parsed.path or "/postgres").lstrip("/") or "postgres"
               if "pooler.supabase.com" not in host:
-                  raise SystemExit("SUPABASE_DB_URL must be the Supabase Shared Pooler URL from Connect, not db.*.")
+                  raise SystemExit("SUPABASE_DB_URL must use the Supabase Shared Pooler (*.pooler.supabase.com), not the direct db.* endpoint.")
               if not user:
                   raise SystemExit("SUPABASE_DB_URL has no database user.")
-              # pg_dump needs a persistent session. Use Supavisor session mode.
-              port = 5432
           else:
               if not password_secret:
                   raise SystemExit("No database credential was supplied.")
-              host = f"aws-0-{region}.pooler.supabase.com"
+              # Current Supabase Shared Pooler hostname format for session mode.
+              # Port 5432 selects Supavisor session mode and is IPv4 compatible.
+              host = f"aws-{region}.pooler.supabase.com"
               user = f"postgres.{project_ref}"
               password = password_secret
               database = "postgres"
-              port = 5432
 
+          port = 5432
           if not password:
               raise SystemExit("Database password is empty.")
 
+          # Resolve only IPv4 and pin libpq to the returned address so GitHub's
+          # IPv4-only runner never attempts an IPv6 database connection.
           try:
               ipv4 = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
           except Exception as exc:
-              raise SystemExit(f"Could not resolve Supabase pooler to IPv4: {exc}")
+              raise SystemExit(f"Could not resolve Supabase Shared Pooler to IPv4: {exc}")
 
           print(f"::add-mask::{password}")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as out:
@@ -106,7 +110,7 @@ jobs:
               out.write("PGSSLMODE=require\n")
               out.write(f"PGPASSWORD={password}\n")
 
-          print(f"Using Supabase pooler: {host}:{port} via IPv4 {ipv4}")
+          print(f"Using Supabase Shared Pooler session mode: {host}:{port} via IPv4 {ipv4}")
           print(f"Database user: {user}")
           print(f"Database: {database}")
           PY
@@ -193,7 +197,8 @@ jobs:
                           return response.read()
                   except Exception as exc:
                       last = exc
-                      if attempt == 5: raise
+                      if attempt == 5:
+                          raise
                       time.sleep(min(10, attempt * 2))
               raise last
 
@@ -234,7 +239,8 @@ jobs:
           total_bytes = 0
           with ThreadPoolExecutor(max_workers=8) as pool:
               futures = [pool.submit(download, r) for r in records]
-              for future in as_completed(futures): total_bytes += future.result()
+              for future in as_completed(futures):
+                  total_bytes += future.result()
 
           (root / "summary.json").write_text(json.dumps({
               "bucket_count": len(buckets),
@@ -339,4 +345,5 @@ jobs:
         run: |
           echo "Complete backup created and validated."
           echo "Includes database + Storage files + Auth metadata."
+          echo "Does not include Auth passwords/session secrets or Supabase-managed secrets."
           echo "Artifact retention: 30 days."
