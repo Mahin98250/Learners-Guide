@@ -39,10 +39,10 @@ jobs:
           set -euo pipefail
           [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."; exit 1; }
 
-          # GitHub Actions is IPv4-only. Supabase's direct database endpoint can
-          # resolve to IPv6, so backups must use the Shared Pooler in session mode
-          # on port 5432. Session mode is also the appropriate pooler mode for
-          # pg_dump/backup-style long-lived PostgreSQL operations.
+          # GitHub Actions is IPv4-only. Always prefer the password secret when
+          # available so a stale/misconfigured SUPABASE_DB_URL cannot override it.
+          # Build an IPv4 Shared Pooler session-mode URL (port 5432), which is
+          # suitable for pg_dump from GitHub Actions.
           if [[ -n "$SUPABASE_DB_PASSWORD" ]]; then
             encoded_password="$(SUPABASE_DB_PASSWORD="$SUPABASE_DB_PASSWORD" python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')"
             printf 'SUPABASE_DB_URL=postgresql://postgres.%s:%s@aws-0-%s.pooler.supabase.com:5432/postgres?sslmode=require\n' \\
@@ -61,29 +61,35 @@ jobs:
           if not parsed.hostname or not parsed.username or parsed.password is None:
               raise SystemExit("SUPABASE_DB_URL is missing required database connection fields.")
 
-          # Rebuild through the Shared Pooler session endpoint so a direct
-          # IPv6-only hostname or transaction-pooler port cannot break pg_dump.
-          password = urllib.parse.quote(parsed.password, safe="")
-          user = urllib.parse.quote(parsed.username, safe="")
-          # Dashboard-generated Supabase URLs use postgres.PROJECT_REF as the
-          # pooler tenant username. Preserve the actual DB username when it is
-          # already a pooler username; otherwise use the canonical tenant form.
+          # The URL may come from Direct, Transaction Pooler, or Session Pooler.
+          # Rebuild it against the IPv4 Shared Pooler in session mode so the job
+          # is independent of GitHub Actions' lack of IPv6 support and of a stale
+          # pooler port in the stored secret.
+          password = urllib.parse.quote(urllib.parse.unquote(parsed.password), safe="")
+          user = urllib.parse.unquote(parsed.username)
           if user == "postgres":
               user = f"postgres.{os.environ['SUPABASE_PROJECT_REF']}"
-
-          query = parsed.query
-          if "sslmode=" not in query.lower():
-              query = (query + "&" if query else "") + "sslmode=require"
+          user = urllib.parse.quote(user, safe=".")
 
           host = f"aws-0-{os.environ['SUPABASE_REGION']}.pooler.supabase.com"
           path = parsed.path or "/postgres"
-          print(f"postgresql://{user}:{password}@{host}:5432{path}?{query}" if query else f"postgresql://{user}:{password}@{host}:5432{path}")
+          query = parsed.query
+          # Avoid duplicate sslmode parameters while retaining any other query
+          # parameters supplied by the dashboard connection string.
+          query_items = urllib.parse.parse_qsl(query, keep_blank_values=True)
+          query_items = [(k, v) for k, v in query_items if k.lower() != "sslmode"]
+          query_items.append(("sslmode", "require"))
+          query = urllib.parse.urlencode(query_items)
+
+          normalized = urllib.parse.urlunsplit(("postgresql", "", "", "", ""))
+          print(f"postgresql://{user}:{password}@{host}:5432{path}?{query}")
           PY
-          )"
+            )"
+            # Never print normalized_url: it contains the database password.
             printf 'SUPABASE_DB_URL=%s\n' "$normalized_url" >> "$GITHUB_ENV"
             echo "Normalized SUPABASE_DB_URL to Supabase Shared Pooler session mode (IPv4)."
           else
-            echo "::error::Missing database credentials. Add either SUPABASE_DB_URL or SUPABASE_DB_PASSWORD as a repository secret." 
+            echo "::error::Missing database credentials. Add either SUPABASE_DB_URL or SUPABASE_DB_PASSWORD as a repository secret."
             exit 1
           fi
 
