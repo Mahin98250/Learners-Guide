@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "30 0 * * *"
+  push:
+    paths:
+      - ".github/workflows/supabase-complete-backup-final.yml"
 permissions:
   contents: read
 jobs:
@@ -76,8 +79,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -s "$BACKUP_DIR/database/schema.sql" "$BACKUP_DIR/database/data.sql"
-          test -f "$BACKUP_DIR/storage/buckets.json" "$BACKUP_DIR/storage/objects.json" "$BACKUP_DIR/auth-users.json"
+          test -s "$BACKUP_DIR/database/schema.sql"
+          test -s "$BACKUP_DIR/database/data.sql"
+          test -f "$BACKUP_DIR/storage/buckets.json"
+          test -f "$BACKUP_DIR/storage/objects.json"
+          test -f "$BACKUP_DIR/auth-users.json"
           stamp=$(date -u +%Y%m%dT%H%M%SZ); archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
           printf 'Learner\x27s Guide complete Supabase recovery set\nCommit: %s\nRun: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$BACKUP_DIR/manifest.txt"
           tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.json manifest.txt
