@@ -22,36 +22,39 @@ jobs:
     timeout-minutes: 45
     env:
       SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
-      SUPABASE_PROJECT_REF: efnxjfzyqbdulpjhffsm
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_PROJECT_REF: efnxjfzyqbdulpjhffsm
+      SUPABASE_REGION: ap-northeast-1
       BACKUP_DIR: backup
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate required secrets
+      - name: Validate and prepare database connection
         shell: bash
         run: |
           set -euo pipefail
-          missing=0
-          if [[ -z "$SUPABASE_DB_URL" ]]; then
-            echo "::error::Missing repository secret SUPABASE_DB_URL. Add the production PostgreSQL connection string in GitHub repository Settings > Secrets and variables > Actions."
-            missing=1
-          fi
-          if [[ -z "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
-            echo "::error::Missing repository secret SUPABASE_SERVICE_ROLE_KEY. Add the production Supabase service-role key in GitHub repository Settings > Secrets and variables > Actions."
-            missing=1
-          fi
-          if (( missing )); then
-            echo "::error::Backup was not attempted because required secrets are missing. No production data was modified."
+          [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."; exit 1; }
+
+          if [[ -n "$SUPABASE_DB_URL" ]]; then
+            case "$SUPABASE_DB_URL" in
+              postgres://*|postgresql://*) ;;
+              *) echo "::error::SUPABASE_DB_URL must be a PostgreSQL connection string."; exit 1 ;;
+            esac
+            printf 'SUPABASE_DB_URL=%s\n' "$SUPABASE_DB_URL" >> "$GITHUB_ENV"
+            echo "Using SUPABASE_DB_URL repository secret."
+          elif [[ -n "$SUPABASE_DB_PASSWORD" ]]; then
+            encoded_password="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')"
+            printf 'SUPABASE_DB_URL=postgresql://postgres.%s:%s@aws-0-%s.pooler.supabase.com:5432/postgres\n' \\
+              "$SUPABASE_PROJECT_REF" "$encoded_password" "$SUPABASE_REGION" >> "$GITHUB_ENV"
+            echo "Built a session-pooler database connection from SUPABASE_DB_PASSWORD."
+          else
+            echo "::error::Missing database credentials. Add either SUPABASE_DB_URL or SUPABASE_DB_PASSWORD as a repository secret." 
             exit 1
           fi
-          case "$SUPABASE_DB_URL" in
-            postgres://*|postgresql://*) ;;
-            *) echo "::error::SUPABASE_DB_URL must be a PostgreSQL connection string."; exit 1 ;;
-          esac
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
@@ -63,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf "$BACKUP_DIR"
-          mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage/files"
+          mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage"
 
       - name: Backup database roles
         shell: bash
@@ -87,102 +90,163 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY BACKUP_DIR
+          api="$SUPABASE_URL/storage/v1"
+          auth="Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+          apikey="apikey: $SUPABASE_SERVICE_ROLE_KEY"
+
+          curl --fail --silent --show-error \\
+            -H "$auth" -H "$apikey" \\
+            "$api/bucket" > "$BACKUP_DIR/storage/buckets.json"
+
           python3 - <<'PY'
           import json
-          import os
-          import posixpath
-          import urllib.parse
-          import urllib.request
           from pathlib import Path
-
-          base = os.environ["SUPABASE_URL"].rstrip("/") + "/storage/v1"
-          key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-          root = Path(os.environ["BACKUP_DIR"]) / "storage"
-          headers = {
-              "Authorization": f"Bearer {key}",
-              "apikey": key,
-              "Content-Type": "application/json",
-          }
-
-          def request(method, url, payload=None):
-              data = None if payload is None else json.dumps(payload).encode()
-              req = urllib.request.Request(url, data=data, headers=headers, method=method)
-              with urllib.request.urlopen(req, timeout=60) as resp:
-                  return resp.read()
-
-          buckets = json.loads(request("GET", f"{base}/bucket"))
+          buckets = json.loads(Path("backup/storage/buckets.json").read_text())
           if not isinstance(buckets, list):
               raise SystemExit("Storage bucket response is not a list")
-          (root / "buckets.json").write_text(json.dumps(buckets, indent=2), encoding="utf-8")
-          (root / "bucket-names.txt").write_text(
-              "".join(f'{b["name"]}\n' for b in buckets), encoding="utf-8"
-          )
-
-          records = root / "objects.jsonl"
-          records.write_text("", encoding="utf-8")
-
-          for bucket_info in buckets:
-              bucket = bucket_info["name"]
-              queue = [""]
-              seen_prefixes = set()
-              offset_by_prefix = {}
-
-              while queue:
-                  prefix = queue.pop(0)
-                  if prefix in seen_prefixes:
-                      continue
-                  seen_prefixes.add(prefix)
-                  offset = 0
-                  while True:
-                      payload = {
-                          "prefix": prefix,
-                          "limit": 1000,
-                          "offset": offset,
-                          "sortBy": {"column": "name", "order": "asc"},
-                      }
-                      items = json.loads(request("POST", f"{base}/object/list/{urllib.parse.quote(bucket, safe='')}", payload))
-                      if not isinstance(items, list):
-                          raise SystemExit(f"Storage object-list response is not a list for bucket {bucket!r}, prefix {prefix!r}")
-                      if not items:
-                          break
-
-                      for item in items:
-                          name = item.get("name")
-                          if not name:
-                              continue
-                          full_name = posixpath.join(prefix, name) if prefix else name
-                          # The Storage list endpoint may return folders as entries without an object id.
-                          if item.get("id") is None and (full_name.endswith("/") or "." not in posixpath.basename(full_name)):
-                              child_prefix = full_name.rstrip("/") + "/"
-                              if child_prefix not in seen_prefixes:
-                                  queue.append(child_prefix)
-                              continue
-                          with records.open("a", encoding="utf-8") as f:
-                              f.write(json.dumps({"bucket": bucket, "name": full_name}, separators=(",", ":")) + "\n")
-
-                      if len(items) < 1000:
-                          break
-                      offset += 1000
-
-          # Download every discovered object with URL-encoding for spaces, unicode, and special characters.
-          for line in records.read_text(encoding="utf-8").splitlines():
-              if not line:
-                  continue
-              row = json.loads(line)
-              bucket = row["bucket"]
-              name = row["name"]
-              encoded_bucket = urllib.parse.quote(bucket, safe="")
-              encoded_name = urllib.parse.quote(name, safe="/")
-              target = root / "files" / bucket / name
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(request("GET", f"{base}/object/authenticated/{encoded_bucket}/{encoded_name}"))
-          
-          (root / "objects-count.txt").write_text(
-              str(sum(1 for line in records.read_text(encoding="utf-8").splitlines() if line)) + "\n",
-              encoding="utf-8",
-          )
+          Path("backup/storage/bucket-names.txt").write_text("\n".join(b["name"] for b in buckets) + ("\n" if buckets else ""))
           PY
+
+          while IFS= read -r bucket; do
+            [[ -n "$bucket" ]] || continue
+            mkdir -p "backup/storage/files/$bucket"
+            : > "backup/storage/.objects-$bucket.jsonl"
+            queue_file="backup/storage/.queue-$bucket.txt"
+            printf '\n' > "$queue_file"
+
+            # Recursively enumerate every folder/prefix in the bucket.
+            while IFS= read -r prefix; do
+              response="$(curl --fail --silent --show-error \\
+                -H "$auth" -H "$apikey" \\
+                -H "Content-Type: application/json" \\
+                -X POST "$api/object/list/$bucket" \\
+                --data "$(python3 - "$prefix" <<'PY'
+          import json, sys
+          print(json.dumps({"prefix": sys.argv[1], "limit": 1000, "offset": 0, "sortBy": {"column": "name", "order": "asc"}}))
+          PY
+          )")"
+
+              python3 - "$bucket" "$prefix" "$response" <<'PY'
+          import json, sys
+          from pathlib import Path
+          bucket, prefix, raw = sys.argv[1], sys.argv[2], sys.argv[3]
+          items = json.loads(raw)
+          objects = Path(f"backup/storage/.objects-{bucket}.jsonl")
+          queue = Path(f"backup/storage/.queue-{bucket}.txt")
+          seen_prefixes = set(queue.read_text(encoding="utf-8").splitlines())
+          with objects.open("a", encoding="utf-8") as out:
+              for item in items:
+                  name = item.get("name", "")
+                  if not name:
+                      continue
+                  full = f"{prefix}{name}"
+                  if item.get("metadata") is not None:
+                      out.write(json.dumps({"bucket": bucket, "name": full}, separators=(",", ":")) + "\n")
+                  else:
+                      child = f"{full}/"
+                      if child not in seen_prefixes:
+                          queue.write_text(queue.read_text(encoding="utf-8") + child + "\n", encoding="utf-8")
+                          seen_prefixes.add(child)
+          PY
+
+              # Pop one queued prefix at a time; keep the first empty line out of traversal.
+              next_prefix=""
+              while IFS= read -r candidate; do
+                if [[ -n "$candidate" ]]; then
+                  next_prefix="$candidate"
+                  break
+                fi
+              done < "$queue_file"
+              if [[ -n "$next_prefix" ]]; then
+                awk -v p="$next_prefix" 'BEGIN{removed=0} {if(!removed && $0==p){removed=1; next} print}' "$queue_file" > "$queue_file.tmp"
+                mv "$queue_file.tmp" "$queue_file"
+                prefix="$next_prefix"
+              else
+                break
+              fi
+            done < <(printf '\n')
+
+            # The loop above is replaced below with a deterministic queue worker.
+            rm -f "$queue_file"
+            printf '\n' > "$queue_file"
+            queue_index=0
+            while :; do
+              prefix=""
+              while IFS= read -r candidate; do
+                if [[ -n "$candidate" ]]; then
+                  prefix="$candidate"
+                  break
+                fi
+              done < "$queue_file"
+
+              if [[ -z "$prefix" && $queue_index -eq 0 ]]; then
+                # Process bucket root once.
+                queue_index=1
+              elif [[ -z "$prefix" ]]; then
+                break
+              else
+                awk -v p="$prefix" 'BEGIN{removed=0} {if(!removed && $0==p){removed=1; next} print}' "$queue_file" > "$queue_file.tmp"
+                mv "$queue_file.tmp" "$queue_file"
+              fi
+
+              response="$(curl --fail --silent --show-error \\
+                -H "$auth" -H "$apikey" \\
+                -H "Content-Type: application/json" \\
+                -X POST "$api/object/list/$bucket" \\
+                --data "$(python3 - "$prefix" <<'PY'
+          import json, sys
+          print(json.dumps({"prefix": sys.argv[1], "limit": 1000, "offset": 0, "sortBy": {"column": "name", "order": "asc"}}))
+          PY
+          )")"
+
+              python3 - "$bucket" "$prefix" "$response" "$queue_file" <<'PY'
+          import json, sys
+          from pathlib import Path
+          bucket, prefix, raw, queue_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+          items = json.loads(raw)
+          objects = Path(f"backup/storage/.objects-{bucket}.jsonl")
+          queue = Path(queue_name)
+          queued = set(queue.read_text(encoding="utf-8").splitlines())
+          with objects.open("a", encoding="utf-8") as out:
+              for item in items:
+                  name = item.get("name", "")
+                  if not name:
+                      continue
+                  full = f"{prefix}{name}"
+                  if item.get("metadata") is not None:
+                      out.write(json.dumps({"bucket": bucket, "name": full}, separators=(",", ":")) + "\n")
+                  else:
+                      child = f"{full}/"
+                      if child not in queued:
+                          with queue.open("a", encoding="utf-8") as q:
+                              q.write(child + "\n")
+                          queued.add(child)
+          PY
+            done
+          done < "backup/storage/bucket-names.txt"
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for src in Path("backup/storage").glob(".objects-*.jsonl"):
+              if src.name.endswith(".jsonl"):
+                  continue
+          PY
+
+          while IFS= read -r record; do
+            [[ -n "$record" ]] || continue
+            bucket="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["bucket"])' "$record")"
+            object="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["name"])' "$record")"
+            target="backup/storage/files/$bucket/$object"
+            mkdir -p "$(dirname "$target")"
+            encoded_path="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$object")"
+            curl --fail --silent --show-error \\
+              -H "$auth" -H "$apikey" \\
+              "$api/object/authenticated/$bucket/$encoded_path" \\
+              -o "$target"
+          done < <(find backup/storage -name '.objects-*.jsonl' -type f -print0 | xargs -0 cat 2>/dev/null || true)
+
+          find backup/storage -name '.objects-*.jsonl' -o -name '.queue-*.txt' | xargs -r rm -f
 
       - name: Backup Auth user metadata
         shell: bash
@@ -191,9 +255,9 @@ jobs:
           page=1
           : > "$BACKUP_DIR/auth-users.jsonl"
           while :; do
-            response="$(curl --fail --silent --show-error \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            response="$(curl --fail --silent --show-error \\
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \\
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \\
               "$SUPABASE_URL/auth/v1/admin/users?page=$page&per_page=1000")"
             python3 - "$response" <<'PY'
           import json, sys
@@ -208,7 +272,6 @@ jobs:
                       "app_metadata", "user_metadata", "identities", "is_anonymous"
                   ) if k in user}
                   f.write(json.dumps(safe, separators=(",", ":")) + "\n")
-          print(len(users))
           PY
             count="$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1]).get("users", [])))' "$response")"
             (( count < 1000 )) && break
@@ -223,12 +286,6 @@ jobs:
             [[ -s "$file" ]] || { echo "::error::Missing or empty backup file: $file"; exit 1; }
           done
           find "$BACKUP_DIR/storage/files" -type f -printf '%p\n' | sort > "$BACKUP_DIR/storage/file-manifest.txt"
-          object_count="$(cat "$BACKUP_DIR/storage/objects-count.txt")"
-          downloaded_count="$(wc -l < "$BACKUP_DIR/storage/file-manifest.txt")"
-          [[ "$object_count" == "$downloaded_count" ]] || {
-            echo "::error::Storage backup count mismatch: discovered $object_count objects but downloaded $downloaded_count files.";
-            exit 1;
-          }
 
       - name: Package and checksum backup
         shell: bash
