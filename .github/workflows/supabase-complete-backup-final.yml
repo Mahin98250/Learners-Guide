@@ -1,4 +1,5 @@
 name: Supabase Complete Backup
+
 on:
   workflow_dispatch:
   schedule:
@@ -6,8 +7,10 @@ on:
   push:
     paths:
       - ".github/workflows/supabase-complete-backup-final.yml"
+
 permissions:
   contents: read
+
 jobs:
   backup:
     name: Backup database, storage, and auth metadata
@@ -17,78 +20,240 @@ jobs:
       SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
       SUPABASE_PROJECT_REF: efnxjfzyqbdulpjhffsm
       SUPABASE_REGION: ap-northeast-1
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BACKUP_DIR: backup
       PGCONNECT_TIMEOUT: "20"
       PGSSLMODE: require
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Validate secrets
         run: |
           set -euo pipefail
-          test -n "$SUPABASE_DB_PASSWORD"
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          if [ -z "${SUPABASE_DB_URL:-}" ] && [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "Missing database credentials: set SUPABASE_DB_URL or SUPABASE_DB_PASSWORD in GitHub Actions secrets."
+            exit 1
+          fi
+          echo "Database credential source: $([ -n "${SUPABASE_DB_URL:-}" ] && echo DB_URL || echo DB_PASSWORD)"
+
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update -y
           sudo apt-get install -y postgresql-client
+
       - name: Configure and verify database
         shell: bash
         run: |
           set -euo pipefail
-          PGHOST="aws-${SUPABASE_REGION}.pooler.supabase.com"
-          PGPORT=5432
-          PGUSER="postgres.${SUPABASE_PROJECT_REF}"
-          PGDATABASE=postgres
-          PGSSLMODE=require
-          PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          unset PGHOST PGHOSTADDR PGPORT PGUSER PGDATABASE PGPASSWORD
+
+          if [ -n "${SUPABASE_DB_URL:-}" ]; then
+            db_url="$SUPABASE_DB_URL"
+            echo "Using the exact Session Pooler connection string from SUPABASE_DB_URL."
+            case "$db_url" in
+              *:5432/*) ;;
+              *)
+                echo "SUPABASE_DB_URL must use Session Pooler port 5432 for pg_dump."
+                exit 1
+                ;;
+            esac
+            export PGCONNECT_TIMEOUT=20 PGSSLMODE=require
+            export PGPASSWORD="$(python3 - <<'PY'
+import os, urllib.parse
+u=urllib.parse.urlsplit(os.environ['SUPABASE_DB_URL'])
+print(urllib.parse.unquote(u.password or ''))
+PY
+)"
+            echo "::add-mask::$PGPASSWORD"
+            export PGHOST="$(python3 - <<'PY'
+import os, urllib.parse
+print(urllib.parse.urlsplit(os.environ['SUPABASE_DB_URL']).hostname or '')
+PY
+)"
+            export PGPORT="$(python3 - <<'PY'
+import os, urllib.parse
+print(urllib.parse.urlsplit(os.environ['SUPABASE_DB_URL']).port or 5432)
+PY
+)"
+            export PGUSER="$(python3 - <<'PY'
+import os, urllib.parse
+print(urllib.parse.unquote(urllib.parse.urlsplit(os.environ['SUPABASE_DB_URL']).username or ''))
+PY
+)"
+            export PGDATABASE="$(python3 - <<'PY'
+import os, urllib.parse
+p=urllib.parse.urlsplit(os.environ['SUPABASE_DB_URL']).path.lstrip('/')
+print(p or 'postgres')
+PY
+)"
+            test -n "$PGHOST" && test -n "$PGUSER" && test -n "$PGPASSWORD"
+            psql -v ON_ERROR_STOP=1 -Atqc "select current_database(), current_user, current_setting('server_version');"
+            printf 'PGHOST=%s\nPGPORT=%s\nPGUSER=%s\nPGDATABASE=%s\nPGSSLMODE=require\nPGCONNECT_TIMEOUT=20\n' "$PGHOST" "$PGPORT" "$PGUSER" "$PGDATABASE" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          password="$SUPABASE_DB_PASSWORD"
+          echo "Using SUPABASE_DB_PASSWORD with Supavisor Session Pooler candidates."
+          echo "::add-mask::$password"
+
+          candidates=(
+            "aws-${SUPABASE_REGION}.pooler.supabase.com"
+            "aws-0-${SUPABASE_REGION}.pooler.supabase.com"
+            "aws-1-${SUPABASE_REGION}.pooler.supabase.com"
+          )
+
+          selected_host=""
+          last_error=""
+          for host in "${candidates[@]}"; do
+            ipv4="$(getent ahostsv4 "$host" | awk 'NR==1{print $1}')"
+            if [ -z "$ipv4" ]; then
+              echo "Skipping $host: no IPv4 address."
+              continue
+            fi
+            echo "Testing Supavisor Session Pooler endpoint $host:5432"
+            export PGHOST="$host" PGHOSTADDR="$ipv4" PGPORT=5432
+            export PGUSER="postgres.${SUPABASE_PROJECT_REF}" PGDATABASE=postgres PGPASSWORD="$password" PGSSLMODE=require
+            set +e
+            result="$(psql -v ON_ERROR_STOP=1 -Atqc "select current_database(), current_user, current_setting('server_version');" 2>&1)"
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              echo "Database connection verified through $host."
+              selected_host="$host"
+              printf 'PGHOST=%s\nPGHOSTADDR=%s\nPGPORT=5432\nPGUSER=%s\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCONNECT_TIMEOUT=20\n' "$host" "$ipv4" "$PGUSER" >> "$GITHUB_ENV"
+              break
+            fi
+            last_error="$result"
+            echo "Endpoint $host rejected the connection; trying the next documented Supavisor endpoint."
+          done
+
+          if [ -z "$selected_host" ]; then
+            echo "No Supavisor Session Pooler endpoint accepted the configured database credential."
+            echo "The database itself is reachable, so verify that SUPABASE_DB_PASSWORD matches the current Supabase database password or provide the exact Dashboard Connect Session Pooler URL as SUPABASE_DB_URL."
+            echo "Last safe connection error: ${last_error:0:240}"
+            exit 1
+          fi
+
           echo "::add-mask::$PGPASSWORD"
-          ipv4=$(getent ahostsv4 "$PGHOST" | awk 'NR==1{print $1}')
-          test -n "$ipv4"
-          printf 'PGHOST=%s\nPGHOSTADDR=%s\nPGPORT=%s\nPGUSER=%s\nPGDATABASE=%s\nPGSSLMODE=%s\nPGPASSWORD=%s\n' "$PGHOST" "$ipv4" "$PGPORT" "$PGUSER" "$PGDATABASE" "$PGSSLMODE" "$PGPASSWORD" >> "$GITHUB_ENV"
-          psql -v ON_ERROR_STOP=1 -Atqc "select current_database(), current_user, current_setting('server_version');"
+
       - name: Prepare backup directory
         run: mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage/files"
+
       - name: Backup database schema
         run: |
-          pg_dump --schema-only --no-owner --no-privileges --exclude-schema=auth --exclude-schema=storage --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=realtime --exclude-schema=supabase_migrations --exclude-schema=vault > "$BACKUP_DIR/database/schema.sql"
+          pg_dump --schema-only --no-owner --no-privileges \
+            --exclude-schema=auth \
+            --exclude-schema=storage \
+            --exclude-schema=graphql \
+            --exclude-schema=graphql_public \
+            --exclude-schema=net \
+            --exclude-schema=realtime \
+            --exclude-schema=supabase_migrations \
+            --exclude-schema=vault \
+            > "$BACKUP_DIR/database/schema.sql"
           test -s "$BACKUP_DIR/database/schema.sql"
+
       - name: Backup database data
         run: |
-          pg_dump --data-only --no-owner --no-privileges --no-publications --no-subscriptions --exclude-schema=auth --exclude-schema=storage --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=realtime --exclude-schema=supabase_migrations --exclude-schema=vault > "$BACKUP_DIR/database/data.sql"
+          pg_dump --data-only --no-owner --no-privileges --no-publications --no-subscriptions \
+            --exclude-schema=auth \
+            --exclude-schema=storage \
+            --exclude-schema=graphql \
+            --exclude-schema=graphql_public \
+            --exclude-schema=net \
+            --exclude-schema=realtime \
+            --exclude-schema=supabase_migrations \
+            --exclude-schema=vault \
+            > "$BACKUP_DIR/database/data.sql"
           test -s "$BACKUP_DIR/database/data.sql"
+
+      - name: Backup database role metadata
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -Atqc "select coalesce(json_agg(x), '[]'::json) from (select rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls from pg_roles where rolname not like 'pg_%' order by rolname) x;" > "$BACKUP_DIR/database/roles.json"
+          test -s "$BACKUP_DIR/database/roles.json"
+
       - name: Backup Storage and Auth
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json,os,pathlib,urllib.parse,urllib.request
-          root=pathlib.Path(os.environ['BACKUP_DIR']); sup=os.environ['SUPABASE_URL'].rstrip('/'); key=os.environ['SUPABASE_SERVICE_ROLE_KEY']; h={'Authorization':f'Bearer {key}','apikey':key}
-          def get(u):
-            with urllib.request.urlopen(urllib.request.Request(u,headers=h),timeout=90) as r:return r.read()
-          s=root/'storage'; (s/'files').mkdir(parents=True,exist_ok=True)
-          buckets=json.loads(get(f'{sup}/storage/v1/bucket')); (s/'buckets.json').write_text(json.dumps(buckets,indent=2))
-          q=urllib.parse.urlencode({'select':'bucket_id,name,id,metadata,created_at,updated_at,owner','order':'bucket_id.asc,name.asc','limit':'1000'}); objs=json.loads(get(f'{sup}/rest/v1/storage.objects?{q}')); (s/'objects.json').write_text(json.dumps(objs,indent=2))
-          for o in objs:
-            b=urllib.parse.quote(o['bucket_id'],safe=''); p='/'.join(urllib.parse.quote(x,safe='') for x in o['name'].split('/')); t=s/'files'/o['bucket_id']/o['name']; t.parent.mkdir(parents=True,exist_ok=True); t.write_bytes(get(f'{sup}/storage/v1/object/authenticated/{b}/{p}'))
-          users=json.loads(get(f'{sup}/auth/v1/admin/users?page=1&per_page=1000')).get('users',[]); safe=[{k:u.get(k) for k in ('id','aud','role','email','phone','created_at','updated_at','email_confirmed_at','phone_confirmed_at','last_sign_in_at','app_metadata','user_metadata','identities','is_anonymous') if k in u} for u in users]; (root/'auth-users.json').write_text(json.dumps(safe,indent=2))
-          print(f'Storage objects: {len(objs)}; Auth users: {len(safe)}')
+          import json, os, pathlib, urllib.parse, urllib.request
+          root = pathlib.Path(os.environ['BACKUP_DIR'])
+          sup = os.environ['SUPABASE_URL'].rstrip('/')
+          key = os.environ['SUPABASE_SERVICE_ROLE_KEY']
+          headers = {'Authorization': f'Bearer {key}', 'apikey': key}
+
+          def get(url):
+              with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=90) as response:
+                  return response.read()
+
+          storage = root / 'storage'
+          files = storage / 'files'
+          files.mkdir(parents=True, exist_ok=True)
+
+          buckets = json.loads(get(f'{sup}/storage/v1/bucket'))
+          (storage / 'buckets.json').write_text(json.dumps(buckets, indent=2), encoding='utf-8')
+
+          query = urllib.parse.urlencode({
+              'select': 'bucket_id,name,id,metadata,created_at,updated_at,owner',
+              'order': 'bucket_id.asc,name.asc',
+              'limit': '1000',
+          })
+          objects = json.loads(get(f'{sup}/rest/v1/storage.objects?{query}'))
+          (storage / 'objects.json').write_text(json.dumps(objects, indent=2), encoding='utf-8')
+
+          for obj in objects:
+              bucket_id = urllib.parse.quote(obj['bucket_id'], safe='')
+              object_path = '/'.join(urllib.parse.quote(part, safe='') for part in obj['name'].split('/'))
+              target = files / obj['bucket_id'] / obj['name']
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(get(f'{sup}/storage/v1/object/authenticated/{bucket_id}/{object_path}'))
+
+          users = []
+          page = 1
+          while True:
+              payload = json.loads(get(f'{sup}/auth/v1/admin/users?page={page}&per_page=1000'))
+              batch = payload.get('users', [])
+              if not batch:
+                  break
+              users.extend(batch)
+              if len(batch) < 1000:
+                  break
+              page += 1
+
+          safe = []
+          fields = ('id','aud','role','email','phone','created_at','updated_at','email_confirmed_at','phone_confirmed_at','last_sign_in_at','app_metadata','user_metadata','identities','is_anonymous')
+          for user in users:
+              safe.append({field: user.get(field) for field in fields if field in user})
+          (root / 'auth-users.json').write_text(json.dumps(safe, indent=2), encoding='utf-8')
+
+          print(f'Storage objects: {len(objects)}; Auth users: {len(safe)}')
           PY
+
       - name: Validate and package
         shell: bash
         run: |
           set -euo pipefail
           test -s "$BACKUP_DIR/database/schema.sql"
           test -s "$BACKUP_DIR/database/data.sql"
+          test -s "$BACKUP_DIR/database/roles.json"
           test -f "$BACKUP_DIR/storage/buckets.json"
           test -f "$BACKUP_DIR/storage/objects.json"
           test -f "$BACKUP_DIR/auth-users.json"
-          stamp=$(date -u +%Y%m%dT%H%M%SZ); archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
-          printf 'Learner\x27s Guide complete Supabase recovery set\nCommit: %s\nRun: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$BACKUP_DIR/manifest.txt"
+
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
+          printf 'Learner\x27s Guide complete Supabase recovery set\nCommit: %s\nRun: %s\nCreated: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$stamp" > "$BACKUP_DIR/manifest.txt"
           tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.json manifest.txt
           tar -tzf "$archive" >/dev/null
           sha256sum "$archive" | tee "$BACKUP_DIR/sha256.txt"
+          ls -lh "$archive" "$BACKUP_DIR/sha256.txt" "$BACKUP_DIR/manifest.txt"
+
       - name: Upload private recovery artifact
         uses: actions/upload-artifact@v4
         with:
