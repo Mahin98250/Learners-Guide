@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."; exit 1; }
-          [[ -n "$SUPABASE_DB_PASSWORD" || -n "$SUPABASE_DB_URL" ]] || { echo "::error::Missing database credentials. Set SUPABASE_DB_PASSWORD (recommended) or SUPABASE_DB_URL."; exit 1; }
+          [[ -n "$SUPABASE_DB_PASSWORD" || -n "$SUPABASE_DB_URL" ]] || { echo "::error::Missing database credentials. Set SUPABASE_DB_PASSWORD or SUPABASE_DB_URL."; exit 1; }
           echo "Required backup secrets are present."
 
       - name: Install PostgreSQL client
@@ -59,8 +59,6 @@ jobs:
               "$SUPABASE_PROJECT_REF" "$encoded_password" "$SUPABASE_REGION" >> "$GITHUB_ENV"
             echo "Using password secret with Supabase Shared Pooler session mode (IPv4, port 5432)."
           else
-            # Normalize any supplied URL so a stale direct/transaction endpoint cannot
-            # force GitHub Actions onto IPv6 or transaction pooling.
             normalized_url="$(SUPABASE_DB_URL="$SUPABASE_DB_URL" SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_REGION="$SUPABASE_REGION" python3 - <<'PY'
 import os
 import urllib.parse
@@ -68,21 +66,16 @@ import urllib.parse
 raw = os.environ["SUPABASE_DB_URL"].strip()
 if not raw.startswith(("postgres://", "postgresql://")):
     raise SystemExit("SUPABASE_DB_URL must be a PostgreSQL connection string.")
-
 parsed = urllib.parse.urlsplit(raw)
 if not parsed.hostname or not parsed.username or parsed.password is None:
     raise SystemExit("SUPABASE_DB_URL is missing required connection fields.")
-
 user = urllib.parse.unquote(parsed.username)
 password = urllib.parse.unquote(parsed.password)
 if user == "postgres":
     user = f"postgres.{os.environ['SUPABASE_PROJECT_REF']}"
 user = urllib.parse.quote(user, safe=".")
 password = urllib.parse.quote(password, safe="")
-path = parsed.path or "/postgres"
-print(
-    f"postgresql://{user}:{password}@aws-{os.environ['SUPABASE_REGION']}.pooler.supabase.com:5432{path}?sslmode=require"
-)
+print(f"postgresql://{user}:{password}@aws-{os.environ['SUPABASE_REGION']}.pooler.supabase.com:5432/postgres?sslmode=require")
 PY
 )"
             printf 'SUPABASE_DB_URL=%s\n' "$normalized_url" >> "$GITHUB_ENV"
@@ -95,14 +88,12 @@ PY
           set -euo pipefail
           host="$(python3 - <<'PY'
 import os, urllib.parse
-p=urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"])
-print(p.hostname)
+print(urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"]).hostname)
 PY
 )"
           port="$(python3 - <<'PY'
 import os, urllib.parse
-p=urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"])
-print(p.port or 5432)
+print(urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"]).port or 5432)
 PY
 )"
           echo "Checking PostgreSQL endpoint: ${host}:${port}"
@@ -151,191 +142,150 @@ PY
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import time
-          import urllib.parse
-          import urllib.request
-          from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
+import os
+import pathlib
+import time
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-          base = os.environ["SUPABASE_URL"].rstrip("/") + "/storage/v1"
-          key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-          root = pathlib.Path(os.environ["BACKUP_DIR"]) / "storage"
-          files_root = root / "files"
-          headers = {"Authorization": f"Bearer {key}", "apikey": key, "Content-Type": "application/json"}
+base = os.environ["SUPABASE_URL"].rstrip("/") + "/storage/v1"
+key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+root = pathlib.Path(os.environ["BACKUP_DIR"]) / "storage"
+files_root = root / "files"
+headers = {"Authorization": f"Bearer {key}", "apikey": key, "Content-Type": "application/json"}
 
-          def request(url, method="GET", body=None, attempts=4):
-              payload = None if body is None else json.dumps(body).encode()
-              last = None
-              for attempt in range(1, attempts + 1):
-                  try:
-                      req = urllib.request.Request(url, data=payload, method=method, headers=headers)
-                      with urllib.request.urlopen(req, timeout=90) as response:
-                          return response.read()
-                  except Exception as exc:
-                      last = exc
-                      if attempt == attempts:
-                          raise
-                      time.sleep(attempt * 2)
-              raise last
+def request(url, method="GET", body=None, attempts=4):
+    payload = None if body is None else json.dumps(body).encode()
+    last = None
+    for attempt in range(1, attempts + 1):
+        try:
+            req = urllib.request.Request(url, data=payload, method=method, headers=headers)
+            with urllib.request.urlopen(req, timeout=90) as response:
+                return response.read()
+        except Exception as exc:
+            last = exc
+            if attempt == attempts:
+                raise
+            time.sleep(attempt * 2)
+    raise last
 
-          buckets = json.loads(request(f"{base}/bucket").decode())
-          if not isinstance(buckets, list):
-              raise SystemExit("Storage bucket response is not a list")
-          (root / "buckets.json").write_text(json.dumps(buckets, indent=2), encoding="utf-8")
+buckets = json.loads(request(f"{base}/bucket").decode())
+if not isinstance(buckets, list):
+    raise SystemExit("Storage bucket response is not a list")
+(root / "buckets.json").write_text(json.dumps(buckets, indent=2), encoding="utf-8")
 
-          records = []
-          for bucket in buckets:
-              bucket_name = bucket["name"]
-              pending = [""]
-              seen = {""}
-              while pending:
-                  prefix = pending.pop()
-                  offset = 0
-                  while True:
-                      payload = {
-                          "prefix": prefix,
-                          "limit": 1000,
-                          "offset": offset,
-                          "sortBy": {"column": "name", "order": "asc"},
-                      }
-                      items = json.loads(request(f"{base}/object/list/{urllib.parse.quote(bucket_name, safe='')}", "POST", payload).decode())
-                      if not isinstance(items, list):
-                          raise SystemExit(f"Storage list response for bucket {bucket_name!r} is not a list")
-                      if not items:
-                          break
-                      for item in items:
-                          name = item.get("name", "")
-                          if not name:
-                              continue
-                          full_path = f"{prefix}{name}"
-                          if item.get("metadata") is None:
-                              child = full_path.rstrip("/") + "/"
-                              if child not in seen:
-                                  seen.add(child)
-                                  pending.append(child)
-                          else:
-                              records.append({
-                                  "bucket": bucket_name,
-                                  "name": full_path,
-                                  "metadata": item.get("metadata"),
-                                  "id": item.get("id"),
-                                  "updated_at": item.get("updated_at"),
-                                  "created_at": item.get("created_at"),
-                              })
-                      if len(items) < 1000:
-                          break
-                      offset += len(items)
+records = []
+for bucket in buckets:
+    bucket_name = bucket["name"]
+    pending = [""]
+    seen = {""}
+    while pending:
+        prefix = pending.pop()
+        offset = 0
+        while True:
+            payload = {"prefix": prefix, "limit": 1000, "offset": offset, "sortBy": {"column": "name", "order": "asc"}}
+            items = json.loads(request(f"{base}/object/list/{urllib.parse.quote(bucket_name, safe='')}", "POST", payload).decode())
+            if not isinstance(items, list):
+                raise SystemExit(f"Storage list response for bucket {bucket_name!r} is not a list")
+            if not items:
+                break
+            for item in items:
+                name = item.get("name", "")
+                if not name:
+                    continue
+                full_path = f"{prefix}{name}"
+                if item.get("metadata") is None:
+                    child = full_path.rstrip("/") + "/"
+                    if child not in seen:
+                        seen.add(child)
+                        pending.append(child)
+                else:
+                    records.append({"bucket": bucket_name, "name": full_path, "metadata": item.get("metadata"), "id": item.get("id"), "updated_at": item.get("updated_at"), "created_at": item.get("created_at")})
+            if len(items) < 1000:
+                break
+            offset += len(items)
 
-          objects_file = root / "objects.jsonl"
-          with objects_file.open("w", encoding="utf-8") as handle:
-              for record in records:
-                  handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+objects_file = root / "objects.jsonl"
+with objects_file.open("w", encoding="utf-8") as handle:
+    for record in records:
+        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
 
-          def download(record):
-              bucket_name = record["bucket"]
-              full_path = record["name"]
-              encoded_bucket = urllib.parse.quote(bucket_name, safe="")
-              encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in full_path.split("/"))
-              data = request(f"{base}/object/authenticated/{encoded_bucket}/{encoded_path}")
-              target = files_root / bucket_name / full_path
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(data)
-              return len(data)
+def download(record):
+    bucket_name = record["bucket"]
+    full_path = record["name"]
+    encoded_bucket = urllib.parse.quote(bucket_name, safe="")
+    encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in full_path.split("/"))
+    data = request(f"{base}/object/authenticated/{encoded_bucket}/{encoded_path}")
+    target = files_root / bucket_name / full_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return len(data)
 
-          total_bytes = 0
-          with ThreadPoolExecutor(max_workers=8) as pool:
-              futures = [pool.submit(download, record) for record in records]
-              for future in as_completed(futures):
-                  total_bytes += future.result()
+total_bytes = 0
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures = [pool.submit(download, record) for record in records]
+    for future in as_completed(futures):
+        total_bytes += future.result()
 
-          summary = {
-              "bucket_count": len(buckets),
-              "object_count": len(records),
-              "downloaded_bytes": total_bytes,
-          }
-          (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-          print(f"Backed up {len(buckets)} Storage buckets and {len(records)} objects ({total_bytes} bytes).")
-          PY
+summary = {"bucket_count": len(buckets), "object_count": len(records), "downloaded_bytes": total_bytes}
+(root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+print(f"Backed up {len(buckets)} Storage buckets and {len(records)} objects ({total_bytes} bytes).")
+PY
 
       - name: Backup Auth user metadata
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import time
-          import urllib.request
+import json
+import os
+import pathlib
+import time
+import urllib.request
 
-          base = os.environ["SUPABASE_URL"].rstrip("/") + "/auth/v1/admin/users"
-          key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-          headers = {"Authorization": f"Bearer {key}", "apikey": key}
-          out = pathlib.Path(os.environ["BACKUP_DIR"]) / "auth-users.jsonl"
-          out.write_text("", encoding="utf-8")
-          page = 1
-          total = 0
+base = os.environ["SUPABASE_URL"].rstrip("/") + "/auth/v1/admin/users"
+key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+headers = {"Authorization": f"Bearer {key}", "apikey": key}
+out = pathlib.Path(os.environ["BACKUP_DIR"]) / "auth-users.jsonl"
+out.write_text("", encoding="utf-8")
+page = 1
+total = 0
 
-          while True:
-              url = f"{base}?page={page}&per_page=1000"
-              last = None
-              for attempt in range(1, 5):
-                  try:
-                      req = urllib.request.Request(url, headers=headers)
-                      with urllib.request.urlopen(req, timeout=60) as response:
-                          payload = json.loads(response.read().decode())
-                      break
-                  except Exception as exc:
-                      last = exc
-                      if attempt == 4:
-                          raise
-                      time.sleep(attempt * 2)
-              else:
-                  raise last
+while True:
+    url = f"{base}?page={page}&per_page=1000"
+    for attempt in range(1, 5):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=60) as response:
+                payload = json.loads(response.read().decode())
+            break
+        except Exception:
+            if attempt == 4:
+                raise
+            time.sleep(attempt * 2)
+    users = payload.get("users", [])
+    if not isinstance(users, list):
+        raise SystemExit("Auth user response does not contain a users list")
+    with out.open("a", encoding="utf-8") as handle:
+        for user in users:
+            safe = {k: user.get(k) for k in ("id", "aud", "role", "email", "phone", "created_at", "updated_at", "email_confirmed_at", "phone_confirmed_at", "last_sign_in_at", "app_metadata", "user_metadata", "identities", "is_anonymous") if k in user}
+            handle.write(json.dumps(safe, separators=(",", ":")) + "\n")
+    total += len(users)
+    if len(users) < 1000:
+        break
+    page += 1
 
-              users = payload.get("users", [])
-              if not isinstance(users, list):
-                  raise SystemExit("Auth user response does not contain a users list")
-              with out.open("a", encoding="utf-8") as handle:
-                  for user in users:
-                      safe = {
-                          k: user.get(k)
-                          for k in (
-                              "id", "aud", "role", "email", "phone", "created_at", "updated_at",
-                              "email_confirmed_at", "phone_confirmed_at", "last_sign_in_at",
-                              "app_metadata", "user_metadata", "identities", "is_anonymous"
-                          )
-                          if k in user
-                      }
-                      handle.write(json.dumps(safe, separators=(",", ":")) + "\n")
-              total += len(users)
-              if len(users) < 1000:
-                  break
-              page += 1
-
-          pathlib.Path(os.environ["BACKUP_DIR"], "auth-summary.json").write_text(
-              json.dumps({"user_count": total}, indent=2), encoding="utf-8"
-          )
-          echo_msg = f"Backed up metadata for {total} Auth users."
-          print(echo_msg)
-          PY
+pathlib.Path(os.environ["BACKUP_DIR"], "auth-summary.json").write_text(json.dumps({"user_count": total}, indent=2), encoding="utf-8")
+print(f"Backed up metadata for {total} Auth users.")
+PY
 
       - name: Validate complete backup
         shell: bash
         run: |
           set -euo pipefail
-          required=(
-            "$BACKUP_DIR/database/roles.sql"
-            "$BACKUP_DIR/database/schema.sql"
-            "$BACKUP_DIR/database/data.sql"
-            "$BACKUP_DIR/storage/buckets.json"
-            "$BACKUP_DIR/storage/objects.jsonl"
-            "$BACKUP_DIR/storage/summary.json"
-            "$BACKUP_DIR/auth-users.jsonl"
-            "$BACKUP_DIR/auth-summary.json"
-          )
+          required=("$BACKUP_DIR/database/roles.sql" "$BACKUP_DIR/database/schema.sql" "$BACKUP_DIR/database/data.sql" "$BACKUP_DIR/storage/buckets.json" "$BACKUP_DIR/storage/objects.jsonl" "$BACKUP_DIR/storage/summary.json" "$BACKUP_DIR/auth-users.jsonl" "$BACKUP_DIR/auth-summary.json")
           for file in "${required[@]}"; do
             [[ -f "$file" ]] || { echo "::error::Missing backup file: $file"; exit 1; }
           done
