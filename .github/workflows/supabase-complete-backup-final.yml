@@ -61,7 +61,7 @@ jobs:
             -X POST "$BACKUP_BROKER_URL" \
             -H "Authorization: Bearer $oidc_token" \
             -H "Content-Type: application/json" \
-            -d '{}')"
+            -d '{"mode":"database"}')"
           echo "broker-http-status=$status" >> "$BACKUP_DIR/diagnostics/stage.log"
 
           python3 - "$response_file" "$BACKUP_DIR" "$status" <<'PY'
@@ -88,12 +88,6 @@ jobs:
           (root / 'diagnostics/database-verification.json').write_text(
               json.dumps(db.get('verification') or {}, indent=2), encoding='utf-8'
           )
-          storage = response.get('storage') or {}
-          (root / 'diagnostics/counts.json').write_text(json.dumps({
-              'storage_buckets': len(storage.get('buckets') or []),
-              'storage_objects': len(storage.get('objects') or []),
-              'auth_users': len(response.get('auth_users') or []),
-          }, indent=2), encoding='utf-8')
           response_path.unlink()
           PY
 
@@ -118,11 +112,16 @@ jobs:
           echo 'database-connection:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Record Supabase CLI version
         shell: bash
         run: |
           set -euo pipefail
           echo 'supabase-cli:start' >> "$BACKUP_DIR/diagnostics/stage.log"
-          npx --yes supabase@latest --version | tee "$BACKUP_DIR/diagnostics/supabase-cli-version.txt"
+          supabase --version | tee "$BACKUP_DIR/diagnostics/supabase-cli-version.txt"
           echo 'supabase-cli:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Dump database with Supabase filtering
@@ -140,7 +139,7 @@ jobs:
             shift
             echo "===== START $label =====" | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
             set +e
-            npx --yes supabase@latest db dump --db-url "$DB_URL" "$@" 2>&1 | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
+            supabase db dump --db-url "$DB_URL" "$@" 2>&1 | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
             status=${PIPESTATUS[0]}
             set -e
             echo "===== END $label status=$status =====" | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
@@ -148,7 +147,7 @@ jobs:
           }
 
           dump roles -f "$BACKUP_DIR/database/roles.sql" --role-only
-          test -f "$BACKUP_DIR/database/roles.sql"
+          test -s "$BACKUP_DIR/database/roles.sql"
           wc -c < "$BACKUP_DIR/database/roles.sql" | xargs printf 'roles-bytes=%s\n' >> "$BACKUP_DIR/diagnostics/database-dump.log"
 
           dump schema -f "$BACKUP_DIR/database/schema.sql"
@@ -161,7 +160,7 @@ jobs:
           wc -c < "$BACKUP_DIR/database/data.sql" | xargs printf 'data-bytes=%s\n' >> "$BACKUP_DIR/diagnostics/database-dump.log"
           echo 'database-dump:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
-      - name: Download every Storage object
+      - name: Download every Storage object and Auth metadata through OIDC broker
         shell: bash
         run: |
           set -euo pipefail
@@ -181,11 +180,11 @@ jobs:
             -o "$response_file" -w '%{http_code}' \
             -X POST "$BACKUP_BROKER_URL" \
             -H "Authorization: Bearer $oidc_token" \
-            -H "Content-Type: application/json" -d '{}')"
+            -H "Content-Type: application/json" -d '{"mode":"storage"}')"
           echo "storage-broker-http-status=$status" >> "$BACKUP_DIR/diagnostics/stage.log"
 
           python3 - "$response_file" "$BACKUP_DIR" "$status" <<'PY'
-          import json, pathlib, sys, urllib.request
+          import json, pathlib, sys, time, urllib.request
           response_path = pathlib.Path(sys.argv[1])
           root = pathlib.Path(sys.argv[2])
           status = int(sys.argv[3])
@@ -199,6 +198,7 @@ jobs:
                   f'HTTP {status}: {error}\n', encoding='utf-8'
               )
               raise SystemExit(f'storage broker failed (HTTP {status}): {error}')
+
           storage = response.get('storage') or {}
           root.joinpath('storage/buckets.json').write_text(
               json.dumps(storage.get('buckets') or [], indent=2), encoding='utf-8'
@@ -211,8 +211,22 @@ jobs:
               objects.append({k: item.get(k) for k in ('bucket','name','id','metadata','created_at','updated_at','owner')})
               target = root / 'storage' / 'files' / str(item['bucket']) / str(item['name'])
               target.parent.mkdir(parents=True, exist_ok=True)
-              with urllib.request.urlopen(signed, timeout=180) as r:
-                  target.write_bytes(r.read())
+              last_error = None
+              for attempt in range(1, 4):
+                  temp = target.with_name(target.name + '.part')
+                  try:
+                      with urllib.request.urlopen(signed, timeout=180) as r:
+                          temp.write_bytes(r.read())
+                      temp.replace(target)
+                      last_error = None
+                      break
+                  except Exception as exc:
+                      last_error = exc
+                      temp.unlink(missing_ok=True)
+                      if attempt < 3:
+                          time.sleep(2 ** (attempt - 1))
+              if last_error is not None:
+                  raise SystemExit(f"failed downloading {item.get('bucket')}/{item.get('name')}: {last_error}")
           root.joinpath('storage/objects.json').write_text(json.dumps(objects, indent=2), encoding='utf-8')
           root.joinpath('auth-users.json').write_text(json.dumps(response.get('auth_users') or [], indent=2), encoding='utf-8')
           response_path.unlink()
@@ -238,14 +252,17 @@ jobs:
           import json, pathlib, sys
           root = pathlib.Path(sys.argv[1])
           objects = json.loads(root.joinpath('storage/objects.json').read_text(encoding='utf-8'))
-          files = [p for p in (root / 'storage' / 'files').rglob('*') if p.is_file()]
+          files = [p for p in (root / 'storage' / 'files').rglob('*') if p.is_file() and not p.name.endswith('.part')]
+          auth_users = json.loads(root.joinpath('auth-users.json').read_text(encoding='utf-8'))
           if len(files) != len(objects):
               raise SystemExit(f'Storage verification failed: metadata={len(objects)} downloaded={len(files)}')
+          if any(not isinstance(user, dict) or not user.get('id') for user in auth_users):
+              raise SystemExit('Auth metadata verification failed: at least one user record is malformed')
           root.joinpath('diagnostics/validation.json').write_text(json.dumps({
               'database': 'verified before dump',
               'storage_objects': len(objects),
               'storage_files': len(files),
-              'auth_users': len(json.loads(root.joinpath('auth-users.json').read_text(encoding='utf-8'))),
+              'auth_users': len(auth_users),
               'ok': True,
           }, indent=2), encoding='utf-8')
           PY
