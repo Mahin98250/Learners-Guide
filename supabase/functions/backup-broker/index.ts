@@ -55,6 +55,43 @@ function responseJson(data: unknown, status = 200) {
   });
 }
 
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    const details = error as Error & Record<string, unknown>;
+    const fields = [
+      "message",
+      "code",
+      "errno",
+      "syscall",
+      "hostname",
+      "port",
+      "address",
+      "severity",
+      "detail",
+      "hint",
+    ];
+    const parts = fields
+      .filter((field) => details[field] !== undefined && details[field] !== null)
+      .map((field) => `${field}=${String(details[field])}`);
+    return parts.length > 0 ? parts.join("; ") : error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    try {
+      const safe = JSON.parse(
+        JSON.stringify(error, (key, value) =>
+          ["password", "url", "connectionString"].includes(key) ? "[redacted]" : value,
+        ),
+      );
+      return JSON.stringify(safe);
+    } catch {
+      return Object.prototype.toString.call(error);
+    }
+  }
+
+  return String(error);
+}
+
 function bearerToken(req: Request) {
   const value = req.headers.get("authorization") || "";
   const match = value.match(/^Bearer\s+(.+)$/i);
@@ -136,8 +173,7 @@ async function getVerifiedSessionPoolerUrl() {
         verification: await verifyDatabaseUrl(candidate),
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failures.push(`${host}: ${message}`);
+      failures.push(`${host}: ${formatError(error)}`);
     }
   }
 
@@ -233,7 +269,8 @@ Deno.serve(async (req) => {
       issued_at: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("backup broker failure", error);
-    return responseJson({ error: error instanceof Error ? error.message : String(error) }, 500);
+    const message = formatError(error);
+    console.error("backup broker failure", message);
+    return responseJson({ error: message }, 500);
   }
 });
