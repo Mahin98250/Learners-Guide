@@ -1,1 +1,94 @@
-# trigger
+name: Supabase Complete Backup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 0 * * *"
+permissions:
+  contents: read
+jobs:
+  backup:
+    name: Backup database, storage, and auth metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
+      SUPABASE_PROJECT_REF: efnxjfzyqbdulpjhffsm
+      SUPABASE_REGION: ap-northeast-1
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_DIR: backup
+      PGCONNECT_TIMEOUT: "20"
+      PGSSLMODE: require
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate secrets
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_PASSWORD"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+      - name: Configure and verify database
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGHOST="aws-${SUPABASE_REGION}.pooler.supabase.com"
+          PGPORT=5432
+          PGUSER="postgres.${SUPABASE_PROJECT_REF}"
+          PGDATABASE=postgres
+          PGSSLMODE=require
+          PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          echo "::add-mask::$PGPASSWORD"
+          ipv4=$(getent ahostsv4 "$PGHOST" | awk 'NR==1{print $1}')
+          test -n "$ipv4"
+          printf 'PGHOST=%s\nPGHOSTADDR=%s\nPGPORT=%s\nPGUSER=%s\nPGDATABASE=%s\nPGSSLMODE=%s\nPGPASSWORD=%s\n' "$PGHOST" "$ipv4" "$PGPORT" "$PGUSER" "$PGDATABASE" "$PGSSLMODE" "$PGPASSWORD" >> "$GITHUB_ENV"
+          psql -v ON_ERROR_STOP=1 -Atqc "select current_database(), current_user, current_setting('server_version');"
+      - name: Prepare backup directory
+        run: mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage/files"
+      - name: Backup database schema
+        run: |
+          pg_dump --schema-only --no-owner --no-privileges --exclude-schema=auth --exclude-schema=storage --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=realtime --exclude-schema=supabase_migrations --exclude-schema=vault > "$BACKUP_DIR/database/schema.sql"
+          test -s "$BACKUP_DIR/database/schema.sql"
+      - name: Backup database data
+        run: |
+          pg_dump --data-only --no-owner --no-privileges --no-publications --no-subscriptions --exclude-schema=auth --exclude-schema=storage --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=realtime --exclude-schema=supabase_migrations --exclude-schema=vault > "$BACKUP_DIR/database/data.sql"
+          test -s "$BACKUP_DIR/database/data.sql"
+      - name: Backup Storage and Auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,pathlib,urllib.parse,urllib.request
+          root=pathlib.Path(os.environ['BACKUP_DIR']); sup=os.environ['SUPABASE_URL'].rstrip('/'); key=os.environ['SUPABASE_SERVICE_ROLE_KEY']; h={'Authorization':f'Bearer {key}','apikey':key}
+          def get(u):
+            with urllib.request.urlopen(urllib.request.Request(u,headers=h),timeout=90) as r:return r.read()
+          s=root/'storage'; (s/'files').mkdir(parents=True,exist_ok=True)
+          buckets=json.loads(get(f'{sup}/storage/v1/bucket')); (s/'buckets.json').write_text(json.dumps(buckets,indent=2))
+          q=urllib.parse.urlencode({'select':'bucket_id,name,id,metadata,created_at,updated_at,owner','order':'bucket_id.asc,name.asc','limit':'1000'}); objs=json.loads(get(f'{sup}/rest/v1/storage.objects?{q}')); (s/'objects.json').write_text(json.dumps(objs,indent=2))
+          for o in objs:
+            b=urllib.parse.quote(o['bucket_id'],safe=''); p='/'.join(urllib.parse.quote(x,safe='') for x in o['name'].split('/')); t=s/'files'/o['bucket_id']/o['name']; t.parent.mkdir(parents=True,exist_ok=True); t.write_bytes(get(f'{sup}/storage/v1/object/authenticated/{b}/{p}'))
+          users=json.loads(get(f'{sup}/auth/v1/admin/users?page=1&per_page=1000')).get('users',[]); safe=[{k:u.get(k) for k in ('id','aud','role','email','phone','created_at','updated_at','email_confirmed_at','phone_confirmed_at','last_sign_in_at','app_metadata','user_metadata','identities','is_anonymous') if k in u} for u in users]; (root/'auth-users.json').write_text(json.dumps(safe,indent=2))
+          print(f'Storage objects: {len(objs)}; Auth users: {len(safe)}')
+          PY
+      - name: Validate and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$BACKUP_DIR/database/schema.sql" "$BACKUP_DIR/database/data.sql"
+          test -f "$BACKUP_DIR/storage/buckets.json" "$BACKUP_DIR/storage/objects.json" "$BACKUP_DIR/auth-users.json"
+          stamp=$(date -u +%Y%m%dT%H%M%SZ); archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
+          printf 'Learner\x27s Guide complete Supabase recovery set\nCommit: %s\nRun: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$BACKUP_DIR/manifest.txt"
+          tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.json manifest.txt
+          tar -tzf "$archive" >/dev/null
+          sha256sum "$archive" | tee "$BACKUP_DIR/sha256.txt"
+      - name: Upload private recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-complete-backup-${{ github.run_id }}
+          path: |
+            backup/learners-guide-complete-*.tar.gz
+            backup/sha256.txt
+            backup/manifest.txt
+          retention-days: 30
