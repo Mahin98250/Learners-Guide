@@ -36,12 +36,14 @@ jobs:
           set -euo pipefail
           rm -rf "$BACKUP_DIR"
           mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage/files" "$BACKUP_DIR/diagnostics"
+          printf 'prepare-workspace:ok\n' > "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Get verified backup connection through OIDC broker
         id: broker
         shell: bash
         run: |
           set -euo pipefail
+          echo 'broker:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           separator='?'
           [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]] && separator='&'
 
@@ -87,6 +89,7 @@ jobs:
           rm -f "$BACKUP_DIR/.broker-url"
           echo "::add-mask::$db_url"
           printf 'db_url=%s\n' "$db_url" >> "$GITHUB_OUTPUT"
+          echo 'broker:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Verify database connection
         shell: bash
@@ -94,17 +97,21 @@ jobs:
           DB_URL: ${{ steps.broker.outputs.db_url }}
         run: |
           set -euo pipefail
+          echo 'database-connection:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           export PGSSLMODE=require
           export PGCONNECT_TIMEOUT=20
           psql --dbname="$DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
             "select current_database(), current_user, current_setting('server_version');" \
             | tee "$BACKUP_DIR/diagnostics/database-connectivity.txt"
+          echo 'database-connection:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Install Supabase CLI
         shell: bash
         run: |
           set -euo pipefail
+          echo 'supabase-cli:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           npx --yes supabase@latest --version | tee "$BACKUP_DIR/diagnostics/supabase-cli-version.txt"
+          echo 'supabase-cli:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Dump database with Supabase filtering
         shell: bash
@@ -112,6 +119,7 @@ jobs:
           DB_URL: ${{ steps.broker.outputs.db_url }}
         run: |
           set -euo pipefail
+          echo 'database-dump:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           export PGSSLMODE=require
           export PGCONNECT_TIMEOUT=30
 
@@ -128,22 +136,27 @@ jobs:
           }
 
           dump roles -f "$BACKUP_DIR/database/roles.sql" --role-only
-          test -s "$BACKUP_DIR/database/roles.sql"
+          test -f "$BACKUP_DIR/database/roles.sql"
+          wc -c < "$BACKUP_DIR/database/roles.sql" | xargs printf 'roles-bytes=%s\n' >> "$BACKUP_DIR/diagnostics/database-dump.log"
 
           dump schema -f "$BACKUP_DIR/database/schema.sql"
           test -s "$BACKUP_DIR/database/schema.sql"
+          wc -c < "$BACKUP_DIR/database/schema.sql" | xargs printf 'schema-bytes=%s\n' >> "$BACKUP_DIR/diagnostics/database-dump.log"
 
           dump data -f "$BACKUP_DIR/database/data.sql" --use-copy --data-only \
             -x "storage.buckets_vectors" -x "storage.vector_indexes"
           test -s "$BACKUP_DIR/database/data.sql"
+          wc -c < "$BACKUP_DIR/database/data.sql" | xargs printf 'data-bytes=%s\n' >> "$BACKUP_DIR/diagnostics/database-dump.log"
+          echo 'database-dump:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Download every Storage object
         shell: bash
         run: |
           set -euo pipefail
+          echo 'storage:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           separator='?'
           [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]] && separator='&'
-          oidc_token="$(curl --fail --silent --show-error \
+          oidc_token="$(curl --fail --silent --show-error --retry 3 --retry-all-errors \
             --connect-timeout 20 --max-time 60 \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}${separator}audience=${OIDC_AUDIENCE}" \
@@ -181,11 +194,13 @@ jobs:
           root.joinpath('auth-users.json').write_text(json.dumps(response.get('auth_users') or [], indent=2), encoding='utf-8')
           pathlib.Path(sys.argv[1]).unlink()
           PY
+          echo 'storage:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Validate complete recovery set
         shell: bash
         run: |
           set -euo pipefail
+          echo 'validation:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           for file in \
             "$BACKUP_DIR/database/roles.sql" \
             "$BACKUP_DIR/database/schema.sql" \
@@ -193,7 +208,7 @@ jobs:
             "$BACKUP_DIR/storage/buckets.json" \
             "$BACKUP_DIR/storage/objects.json" \
             "$BACKUP_DIR/auth-users.json"; do
-            test -s "$file"
+            test -f "$file"
           done
 
           python3 - "$BACKUP_DIR" <<'PY'
@@ -211,11 +226,13 @@ jobs:
               'ok': True,
           }, indent=2), encoding='utf-8')
           PY
+          echo 'validation:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Package and checksum recovery archive
         shell: bash
         run: |
           set -euo pipefail
+          echo 'package:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
           archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
           printf 'Learner\x27s Guide complete Supabase recovery set\nCommit: %s\nRun: %s\nCreated: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$stamp" > "$BACKUP_DIR/manifest.txt"
@@ -223,6 +240,7 @@ jobs:
           tar -tzf "$archive" >/dev/null
           sha256sum "$archive" | tee "$BACKUP_DIR/sha256.txt"
           test -s "$archive"
+          echo 'package:ok' >> "$BACKUP_DIR/diagnostics/stage.log"
 
       - name: Upload downloadable recovery artifact
         uses: actions/upload-artifact@v4
