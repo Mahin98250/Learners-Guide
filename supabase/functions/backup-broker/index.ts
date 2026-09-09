@@ -116,26 +116,22 @@ async function getVerifiedSessionPoolerUrl() {
   const source = parseConnectionString(sourceDbUrl!);
   const username = `postgres.${PROJECT_REF}`;
   const database = source.database || "postgres";
-  const candidates = [
-    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
-    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-0-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
-    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-1-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
-  ];
+  const candidate =
+    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-0-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`;
 
   if (source.port === 5432 && source.hostname.endsWith("pooler.supabase.com")) {
     return { url: sourceDbUrl, verification: await verifyDatabaseUrl(sourceDbUrl!) };
   }
 
-  let lastError = "";
-  for (const candidate of candidates) {
-    try {
-      return { url: candidate, verification: await verifyDatabaseUrl(candidate) };
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    }
+  try {
+    return {
+      url: candidate,
+      verification: await verifyDatabaseUrl(candidate),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`canonical Session Pooler connection failed: ${message}`);
   }
-
-  throw new Error(`no Session Pooler endpoint accepted the Supabase database credentials: ${lastError}`);
 }
 
 async function collectStorage() {
