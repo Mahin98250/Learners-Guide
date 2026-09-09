@@ -42,7 +42,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           separator='?'
           [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]] && separator='&'
 
@@ -67,30 +66,27 @@ jobs:
           root = pathlib.Path(sys.argv[2])
           if response.get('ok') is not True:
               raise SystemExit(response.get('error', 'backup broker rejected request'))
-
           db = response.get('db') or {}
           db_url = db.get('url')
           if not isinstance(db_url, str) or not db_url.startswith('postgres'):
               raise SystemExit('backup broker returned no usable database URL')
-
-          # Keep the URL only in the runner environment and never in a failure artifact.
-          with root.joinpath('diagnostics/database-verification.json').open('w', encoding='utf-8') as fh:
-              json.dump(db.get('verification') or {}, fh, indent=2)
-          with root.joinpath('diagnostics/counts.json').open('w', encoding='utf-8') as fh:
-              storage = response.get('storage') or {}
-              json.dump({
-                  'storage_buckets': len(storage.get('buckets') or []),
-                  'storage_objects': len(storage.get('objects') or []),
-                  'auth_users': len(response.get('auth_users') or []),
-              }, fh, indent=2)
-
-          pathlib.Path(sys.argv[1]).unlink()
-          print(f"db_url={db_url}")
-          # GITHUB_OUTPUT handles multiline-safe encoding here because the URL has no newlines.
-          pathlib.Path(pathlib.os.environ['GITHUB_OUTPUT']).write_text(
-              f"db_url={db_url}\n", encoding='utf-8', append=True
+          (root / '.broker-url').write_text(db_url, encoding='utf-8')
+          (root / 'diagnostics/database-verification.json').write_text(
+              json.dumps(db.get('verification') or {}, indent=2), encoding='utf-8'
           )
+          storage = response.get('storage') or {}
+          (root / 'diagnostics/counts.json').write_text(json.dumps({
+              'storage_buckets': len(storage.get('buckets') or []),
+              'storage_objects': len(storage.get('objects') or []),
+              'auth_users': len(response.get('auth_users') or []),
+          }, indent=2), encoding='utf-8')
+          pathlib.Path(sys.argv[1]).unlink()
           PY
+
+          db_url="$(cat "$BACKUP_DIR/.broker-url")"
+          rm -f "$BACKUP_DIR/.broker-url"
+          echo "::add-mask::$db_url"
+          printf 'db_url=%s\n' "$db_url" >> "$GITHUB_OUTPUT"
 
       - name: Verify database connection
         shell: bash
@@ -131,13 +127,13 @@ jobs:
             return "$status"
           }
 
-          dump roles --file "$BACKUP_DIR/database/roles.sql" --role-only
+          dump roles -f "$BACKUP_DIR/database/roles.sql" --role-only
           test -s "$BACKUP_DIR/database/roles.sql"
 
-          dump schema --file "$BACKUP_DIR/database/schema.sql"
+          dump schema -f "$BACKUP_DIR/database/schema.sql"
           test -s "$BACKUP_DIR/database/schema.sql"
 
-          dump data --file "$BACKUP_DIR/database/data.sql" --use-copy --data-only \
+          dump data -f "$BACKUP_DIR/database/data.sql" --use-copy --data-only \
             -x "storage.buckets_vectors" -x "storage.vector_indexes"
           test -s "$BACKUP_DIR/database/data.sql"
 
@@ -145,18 +141,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Broker response is intentionally no longer stored locally, so reconstruct the
-          # download manifest from a short-lived broker call is not possible here. The
-          # broker endpoint is therefore called again only for storage metadata/URLs.
           separator='?'
           [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]] && separator='&'
           oidc_token="$(curl --fail --silent --show-error \
+            --connect-timeout 20 --max-time 60 \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}${separator}audience=${OIDC_AUDIENCE}" \
             | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           echo "::add-mask::$oidc_token"
+
           response_file="$BACKUP_DIR/diagnostics/storage-broker.json"
           curl --fail --silent --show-error --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 \
             -X POST "$BACKUP_BROKER_URL" \
             -H "Authorization: Bearer $oidc_token" \
             -H "Content-Type: application/json" -d '{}' > "$response_file"
@@ -182,8 +178,7 @@ jobs:
               with urllib.request.urlopen(signed, timeout=180) as r:
                   target.write_bytes(r.read())
           root.joinpath('storage/objects.json').write_text(json.dumps(objects, indent=2), encoding='utf-8')
-          auth_users = response.get('auth_users') or []
-          root.joinpath('auth-users.json').write_text(json.dumps(auth_users, indent=2), encoding='utf-8')
+          root.joinpath('auth-users.json').write_text(json.dumps(response.get('auth_users') or [], indent=2), encoding='utf-8')
           pathlib.Path(sys.argv[1]).unlink()
           PY
 
