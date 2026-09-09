@@ -24,8 +24,8 @@ jobs:
       SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
       SUPABASE_PROJECT_REF: efnxjfzyqbdulpjhffsm
       SUPABASE_REGION: ap-northeast-1
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BACKUP_DIR: backup
       PGCONNECT_TIMEOUT: "20"
@@ -39,15 +39,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || {
-            echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."
-            exit 1
-          }
-          [[ -n "$SUPABASE_DB_PASSWORD" || -n "$SUPABASE_DB_URL" ]] || {
-            echo "::error::Missing database credentials. Set SUPABASE_DB_PASSWORD or SUPABASE_DB_URL."
-            exit 1
-          }
-          echo "Required backup secrets are present."
+          [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY."; exit 1; }
+          [[ -n "$SUPABASE_DB_URL" || -n "$SUPABASE_DB_PASSWORD" ]] || { echo "::error::Set SUPABASE_DB_URL or SUPABASE_DB_PASSWORD."; exit 1; }
 
       - name: Install PostgreSQL client
         shell: bash
@@ -58,54 +51,53 @@ jobs:
           pg_dump --version
           psql --version
 
-      - name: Configure IPv4 Session Pooler connection
+      - name: Configure database connection
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import os
-          import socket
-          import urllib.parse
+          import os, socket, urllib.parse
 
+          raw = os.environ.get("SUPABASE_DB_URL", "").strip()
+          password_secret = os.environ.get("SUPABASE_DB_PASSWORD", "")
           project_ref = os.environ["SUPABASE_PROJECT_REF"]
           region = os.environ["SUPABASE_REGION"]
-          password_secret = os.environ.get("SUPABASE_DB_PASSWORD", "")
-          raw_url = os.environ.get("SUPABASE_DB_URL", "").strip()
 
-          # Prefer the dedicated password secret. This intentionally ignores a
-          # stale SUPABASE_DB_URL whenever SUPABASE_DB_PASSWORD is configured.
-          if password_secret:
-              host = f"aws-0-{region}.pooler.supabase.com"
-              user = f"postgres.{project_ref}"
-              database = "postgres"
-              port = 5432
-              password = password_secret
-          else:
-              if not raw_url.startswith(("postgres://", "postgresql://")):
-                  raise SystemExit("SUPABASE_DB_URL must be a PostgreSQL connection string.")
-              parsed = urllib.parse.urlsplit(raw_url)
+          # Prefer the exact connection string copied from Supabase Connect.
+          # This prevents a constructed tenant/user from being wrong.
+          if raw:
+              if not raw.startswith(("postgres://", "postgresql://")):
+                  raise SystemExit("SUPABASE_DB_URL is not a PostgreSQL connection string.")
+              parsed = urllib.parse.urlsplit(raw)
               host = parsed.hostname or ""
-              if "pooler.supabase.com" not in host:
-                  raise SystemExit("SUPABASE_DB_URL must use a Supavisor pooler host, not the direct db.* endpoint.")
               user = urllib.parse.unquote(parsed.username or "")
               password = urllib.parse.unquote(parsed.password or "")
               database = (parsed.path or "/postgres").lstrip("/") or "postgres"
+              if "pooler.supabase.com" not in host:
+                  raise SystemExit("SUPABASE_DB_URL must be the Supabase Shared Pooler URL from Connect, not db.*.")
+              if not user:
+                  raise SystemExit("SUPABASE_DB_URL has no database user.")
+              # pg_dump needs a persistent session. Use Supavisor session mode.
               port = 5432
-              if user == "postgres":
-                  user = f"postgres.{project_ref}"
+          else:
+              if not password_secret:
+                  raise SystemExit("No database credential was supplied.")
+              host = f"aws-0-{region}.pooler.supabase.com"
+              user = f"postgres.{project_ref}"
+              password = password_secret
+              database = "postgres"
+              port = 5432
+
+          if not password:
+              raise SystemExit("Database password is empty.")
 
           try:
               ipv4 = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
           except Exception as exc:
-              raise SystemExit(f"Could not resolve Supabase Session Pooler to IPv4: {exc}")
+              raise SystemExit(f"Could not resolve Supabase pooler to IPv4: {exc}")
 
-          if not password:
-              raise SystemExit("Database password is empty after parsing the selected credential.")
-
-          # Mask the password before exporting it for subsequent steps.
           print(f"::add-mask::{password}")
-          env_path = os.environ["GITHUB_ENV"]
-          with open(env_path, "a", encoding="utf-8") as out:
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as out:
               out.write(f"PGHOST={host}\n")
               out.write(f"PGHOSTADDR={ipv4}\n")
               out.write(f"PGPORT={port}\n")
@@ -114,9 +106,9 @@ jobs:
               out.write("PGSSLMODE=require\n")
               out.write(f"PGPASSWORD={password}\n")
 
-          print(f"Configured IPv4 Session Pooler: {host}:{port} ({ipv4})")
+          print(f"Using Supabase pooler: {host}:{port} via IPv4 {ipv4}")
           print(f"Database user: {user}")
-          print(f"Database name: {database}")
+          print(f"Database: {database}")
           PY
 
       - name: Verify database connectivity
@@ -137,12 +129,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          psql -v ON_ERROR_STOP=1 -At -F '|' -c \
-            "select rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin from pg_roles order by rolname" \
-            > "$BACKUP_DIR/database/roles.csv"
+          psql -v ON_ERROR_STOP=1 -At -F '|' -c "select rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin from pg_roles order by rolname" > "$BACKUP_DIR/database/roles.csv"
           {
-            echo "# PostgreSQL role inventory for Learner's Guide"
-            echo "# Metadata only; managed role passwords/session secrets are not exported."
+            echo "# Learner's Guide PostgreSQL role inventory"
+            echo "# Metadata only; managed passwords and session secrets are not exported."
           } > "$BACKUP_DIR/database/roles.sql"
           cat "$BACKUP_DIR/database/roles.csv" >> "$BACKUP_DIR/database/roles.sql"
           test -s "$BACKUP_DIR/database/roles.csv"
@@ -151,45 +141,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pg_dump \
-            --schema-only \
-            --no-owner \
-            --no-privileges \
-            --exclude-schema=auth \
-            --exclude-schema=storage \
-            --exclude-schema=graphql \
-            --exclude-schema=graphql_public \
-            --exclude-schema=net \
-            --exclude-schema=realtime \
-            --exclude-schema=supabase_migrations \
-            --exclude-schema=vault \
-            --dbname="$PGDATABASE" \
-            > "$BACKUP_DIR/database/schema.sql"
+          pg_dump --schema-only --no-owner --no-privileges \
+            --exclude-schema=auth --exclude-schema=storage \
+            --exclude-schema=graphql --exclude-schema=graphql_public \
+            --exclude-schema=net --exclude-schema=realtime \
+            --exclude-schema=supabase_migrations --exclude-schema=vault \
+            --dbname="$PGDATABASE" > "$BACKUP_DIR/database/schema.sql"
           test -s "$BACKUP_DIR/database/schema.sql"
-          echo "Application schema backup created."
 
       - name: Backup application database data
         shell: bash
         run: |
           set -euo pipefail
-          pg_dump \
-            --data-only \
-            --no-owner \
-            --no-privileges \
-            --no-publications \
-            --no-subscriptions \
-            --exclude-schema=auth \
-            --exclude-schema=storage \
-            --exclude-schema=graphql \
-            --exclude-schema=graphql_public \
-            --exclude-schema=net \
-            --exclude-schema=realtime \
-            --exclude-schema=supabase_migrations \
-            --exclude-schema=vault \
-            --dbname="$PGDATABASE" \
-            > "$BACKUP_DIR/database/data.sql"
+          pg_dump --data-only --no-owner --no-privileges --no-publications --no-subscriptions \
+            --exclude-schema=auth --exclude-schema=storage \
+            --exclude-schema=graphql --exclude-schema=graphql_public \
+            --exclude-schema=net --exclude-schema=realtime \
+            --exclude-schema=supabase_migrations --exclude-schema=vault \
+            --dbname="$PGDATABASE" > "$BACKUP_DIR/database/data.sql"
           test -s "$BACKUP_DIR/database/data.sql"
-          echo "Application data backup created."
 
       - name: Validate database dumps
         shell: bash
@@ -199,97 +169,78 @@ jobs:
           grep -q '^--' "$BACKUP_DIR/database/data.sql"
           echo "Database backup validation passed."
 
-      - name: Backup Storage buckets and objects
+      - name: Backup Storage objects and files
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import time
-          import urllib.parse
-          import urllib.request
+          import json, os, pathlib, time, urllib.parse, urllib.request
           from concurrent.futures import ThreadPoolExecutor, as_completed
 
-          base = os.environ["SUPABASE_URL"].rstrip("/") + "/storage/v1"
-          rest_base = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/storage.objects"
+          supabase = os.environ["SUPABASE_URL"].rstrip("/")
           key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
           root = pathlib.Path(os.environ["BACKUP_DIR"]) / "storage"
           files_root = root / "files"
           headers = {"Authorization": f"Bearer {key}", "apikey": key, "Content-Type": "application/json"}
 
-          def request(url, method="GET", body=None, attempts=5, extra_headers=None):
+          def request(url, method="GET", body=None):
               payload = None if body is None else json.dumps(body).encode()
               last = None
-              for attempt in range(1, attempts + 1):
+              for attempt in range(1, 6):
                   try:
-                      req_headers = dict(headers)
-                      if extra_headers:
-                          req_headers.update(extra_headers)
-                      req = urllib.request.Request(url, data=payload, method=method, headers=req_headers)
+                      req = urllib.request.Request(url, data=payload, method=method, headers=headers)
                       with urllib.request.urlopen(req, timeout=90) as response:
-                          return response.read(), response.headers
+                          return response.read()
                   except Exception as exc:
                       last = exc
-                      if attempt == attempts:
-                          raise
+                      if attempt == 5: raise
                       time.sleep(min(10, attempt * 2))
               raise last
 
-          buckets_raw, _ = request(f"{base}/bucket")
-          buckets = json.loads(buckets_raw.decode())
-          if not isinstance(buckets, list):
-              raise SystemExit("Storage bucket response is not a list")
+          buckets = json.loads(request(f"{supabase}/storage/v1/bucket").decode())
+          if not isinstance(buckets, list): raise SystemExit("Invalid Storage bucket response")
           (root / "buckets.json").write_text(json.dumps(buckets, indent=2), encoding="utf-8")
 
-          # Use the storage.objects API table for deterministic full-path enumeration.
           records = []
           offset = 0
           while True:
-              params = urllib.parse.urlencode({
+              query = urllib.parse.urlencode({
                   "select": "bucket_id,name,id,metadata,created_at,updated_at,owner",
                   "order": "bucket_id.asc,name.asc",
                   "limit": "1000",
                   "offset": str(offset),
               })
-              raw, _ = request(f"{rest_base}?{params}", extra_headers={"Accept": "application/json"})
-              page = json.loads(raw.decode())
-              if not isinstance(page, list):
-                  raise SystemExit("Storage object metadata response is not a list")
+              page = json.loads(request(f"{supabase}/rest/v1/storage.objects?{query}").decode())
+              if not isinstance(page, list): raise SystemExit("Invalid Storage object response")
               records.extend(page)
-              if len(page) < 1000:
-                  break
+              if len(page) < 1000: break
               offset += len(page)
 
-          with (root / "objects.jsonl").open("w", encoding="utf-8") as handle:
+          with (root / "objects.jsonl").open("w", encoding="utf-8") as f:
               for record in records:
-                  handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+                  f.write(json.dumps(record, separators=(",", ":")) + "\n")
 
           def download(record):
               bucket = record["bucket_id"]
               name = record["name"]
-              encoded_bucket = urllib.parse.quote(bucket, safe="")
-              encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in name.split("/"))
-              raw, _ = request(f"{base}/object/authenticated/{encoded_bucket}/{encoded_path}")
+              eb = urllib.parse.quote(bucket, safe="")
+              ep = "/".join(urllib.parse.quote(part, safe="") for part in name.split("/"))
+              data = request(f"{supabase}/storage/v1/object/authenticated/{eb}/{ep}")
               target = files_root / bucket / name
               target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(raw)
-              return len(raw)
+              target.write_bytes(data)
+              return len(data)
 
           total_bytes = 0
           with ThreadPoolExecutor(max_workers=8) as pool:
-              futures = [pool.submit(download, record) for record in records]
-              for future in as_completed(futures):
-                  total_bytes += future.result()
+              futures = [pool.submit(download, r) for r in records]
+              for future in as_completed(futures): total_bytes += future.result()
 
-          summary = {
+          (root / "summary.json").write_text(json.dumps({
               "bucket_count": len(buckets),
               "object_count": len(records),
-              "downloaded_bytes": total_bytes,
-              "storage_objects_source": "PostgREST storage.objects",
-          }
-          (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+              "downloaded_bytes": total_bytes
+          }, indent=2), encoding="utf-8")
           print(f"Backed up {len(buckets)} Storage buckets and {len(records)} objects ({total_bytes} bytes).")
           PY
 
@@ -298,62 +249,36 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import time
-          import urllib.parse
-          import urllib.request
-
+          import json, os, pathlib, time, urllib.request
           base = os.environ["SUPABASE_URL"].rstrip("/") + "/auth/v1/admin/users"
           key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
           out = pathlib.Path(os.environ["BACKUP_DIR"]) / "auth-users.jsonl"
           headers = {"Authorization": f"Bearer {key}", "apikey": key}
-          page = 1
-          total = 0
           out.write_text("", encoding="utf-8")
-
+          page, total = 1, 0
           while True:
               url = f"{base}?page={page}&per_page=1000"
-              last = None
               for attempt in range(1, 6):
                   try:
                       req = urllib.request.Request(url, headers=headers)
-                      with urllib.request.urlopen(req, timeout=90) as response:
-                          payload = json.loads(response.read().decode())
-                      last = None
+                      with urllib.request.urlopen(req, timeout=90) as response: payload = json.loads(response.read().decode())
                       break
-                  except Exception as exc:
-                      last = exc
-                      if attempt == 5:
-                          raise
+                  except Exception:
+                      if attempt == 5: raise
                       time.sleep(min(10, attempt * 2))
-              if last:
-                  raise last
-
               users = payload.get("users", [])
-              if not isinstance(users, list):
-                  raise SystemExit("Auth admin users response does not contain a users list")
-              with out.open("a", encoding="utf-8") as handle:
+              with out.open("a", encoding="utf-8") as f:
                   for user in users:
-                      safe = {
-                          k: user.get(k)
-                          for k in (
-                              "id", "aud", "role", "email", "phone", "created_at", "updated_at",
-                              "email_confirmed_at", "phone_confirmed_at", "last_sign_in_at",
-                              "app_metadata", "user_metadata", "identities", "is_anonymous"
-                          ) if k in user
-                      }
-                      handle.write(json.dumps(safe, separators=(",", ":")) + "\n")
+                      safe = {k: user.get(k) for k in (
+                          "id","aud","role","email","phone","created_at","updated_at",
+                          "email_confirmed_at","phone_confirmed_at","last_sign_in_at",
+                          "app_metadata","user_metadata","identities","is_anonymous"
+                      ) if k in user}
+                      f.write(json.dumps(safe, separators=(",", ":")) + "\n")
               total += len(users)
-              if len(users) < 1000:
-                  break
+              if len(users) < 1000: break
               page += 1
-
-          pathlib.Path(os.environ["BACKUP_DIR"], "auth-summary.json").write_text(
-              json.dumps({"user_count": total}, indent=2),
-              encoding="utf-8",
-          )
+          pathlib.Path(os.environ["BACKUP_DIR"], "auth-summary.json").write_text(json.dumps({"user_count": total}, indent=2), encoding="utf-8")
           print(f"Backed up metadata for {total} Auth users.")
           PY
 
@@ -361,26 +286,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files=(
-            "$BACKUP_DIR/database/roles.sql"
-            "$BACKUP_DIR/database/roles.csv"
-            "$BACKUP_DIR/database/schema.sql"
-            "$BACKUP_DIR/database/data.sql"
-            "$BACKUP_DIR/storage/buckets.json"
-            "$BACKUP_DIR/storage/objects.jsonl"
-            "$BACKUP_DIR/storage/summary.json"
-            "$BACKUP_DIR/auth-users.jsonl"
-            "$BACKUP_DIR/auth-summary.json"
-          )
-          for file in "${files[@]}"; do
+          for file in \
+            "$BACKUP_DIR/database/roles.sql" "$BACKUP_DIR/database/roles.csv" \
+            "$BACKUP_DIR/database/schema.sql" "$BACKUP_DIR/database/data.sql" \
+            "$BACKUP_DIR/storage/buckets.json" "$BACKUP_DIR/storage/objects.jsonl" \
+            "$BACKUP_DIR/storage/summary.json" "$BACKUP_DIR/auth-users.jsonl" \
+            "$BACKUP_DIR/auth-summary.json"; do
             [[ -f "$file" ]] || { echo "::error::Missing backup file: $file"; exit 1; }
           done
-          storage_objects=$(find "$BACKUP_DIR/storage/files" -type f | wc -l)
-          expected_objects=$(python3 -c 'import json; print(json.load(open("backup/storage/summary.json"))["object_count"])')
-          [[ "$storage_objects" == "$expected_objects" ]] || {
-            echo "::error::Storage file count mismatch: downloaded=$storage_objects expected=$expected_objects"
-            exit 1
-          }
+          downloaded=$(find "$BACKUP_DIR/storage/files" -type f | wc -l)
+          expected=$(python3 -c 'import json; print(json.load(open("backup/storage/summary.json"))["object_count"])')
+          [[ "$downloaded" == "$expected" ]] || { echo "::error::Storage file count mismatch: $downloaded vs $expected"; exit 1; }
           find "$BACKUP_DIR/storage/files" -type f -printf '%P\n' | sort > "$BACKUP_DIR/storage/file-manifest.txt"
           echo "Complete recovery set validation passed."
 
@@ -399,8 +315,8 @@ jobs:
           Database: application schema + data + role metadata
           Storage: bucket metadata + object metadata + file bytes
           Auth: sanitized user metadata
-          Note: Auth passwords/session secrets are not exportable and are not included.
-          Note: Supabase-managed credentials are not included.
+          Auth passwords/session secrets: not included
+          Supabase-managed secrets: not included
           EOF
           tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.jsonl auth-summary.json manifest.txt
           tar -tzf "$archive" >/dev/null
@@ -421,7 +337,6 @@ jobs:
       - name: Final summary
         shell: bash
         run: |
-          set -euo pipefail
           echo "Complete backup created and validated."
-          echo "Includes: database + Storage files + Auth metadata."
+          echo "Includes database + Storage files + Auth metadata."
           echo "Artifact retention: 30 days."
