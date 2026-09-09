@@ -38,18 +38,50 @@ jobs:
         run: |
           set -euo pipefail
           [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."; exit 1; }
-          if [[ -n "$SUPABASE_DB_URL" ]]; then
-            case "$SUPABASE_DB_URL" in
-              postgres://*|postgresql://*) ;;
-              *) echo "::error::SUPABASE_DB_URL must be a PostgreSQL connection string."; exit 1 ;;
-            esac
-            printf 'SUPABASE_DB_URL=%s\n' "$SUPABASE_DB_URL" >> "$GITHUB_ENV"
-            echo "Using SUPABASE_DB_URL repository secret."
-          elif [[ -n "$SUPABASE_DB_PASSWORD" ]]; then
+
+          # GitHub Actions is IPv4-only. Supabase's direct database endpoint can
+          # resolve to IPv6, so backups must use the Shared Pooler in session mode
+          # on port 5432. Session mode is also the appropriate pooler mode for
+          # pg_dump/backup-style long-lived PostgreSQL operations.
+          if [[ -n "$SUPABASE_DB_PASSWORD" ]]; then
             encoded_password="$(SUPABASE_DB_PASSWORD="$SUPABASE_DB_PASSWORD" python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')"
-            printf 'SUPABASE_DB_URL=postgresql://postgres.%s:%s@aws-0-%s.pooler.supabase.com:5432/postgres\n' \\
+            printf 'SUPABASE_DB_URL=postgresql://postgres.%s:%s@aws-0-%s.pooler.supabase.com:5432/postgres?sslmode=require\n' \\
               "$SUPABASE_PROJECT_REF" "$encoded_password" "$SUPABASE_REGION" >> "$GITHUB_ENV"
-            echo "Built a session-pooler database connection from SUPABASE_DB_PASSWORD."
+            echo "Using Supabase Shared Pooler session mode (IPv4) from SUPABASE_DB_PASSWORD."
+          elif [[ -n "$SUPABASE_DB_URL" ]]; then
+            normalized_url="$(SUPABASE_DB_URL="$SUPABASE_DB_URL" SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_REGION="$SUPABASE_REGION" python3 - <<'PY'
+          import os
+          import urllib.parse
+
+          raw = os.environ["SUPABASE_DB_URL"].strip()
+          if not raw.startswith(("postgres://", "postgresql://")):
+              raise SystemExit("SUPABASE_DB_URL must be a PostgreSQL connection string.")
+
+          parsed = urllib.parse.urlsplit(raw)
+          if not parsed.hostname or not parsed.username or parsed.password is None:
+              raise SystemExit("SUPABASE_DB_URL is missing required database connection fields.")
+
+          # Rebuild through the Shared Pooler session endpoint so a direct
+          # IPv6-only hostname or transaction-pooler port cannot break pg_dump.
+          password = urllib.parse.quote(parsed.password, safe="")
+          user = urllib.parse.quote(parsed.username, safe="")
+          # Dashboard-generated Supabase URLs use postgres.PROJECT_REF as the
+          # pooler tenant username. Preserve the actual DB username when it is
+          # already a pooler username; otherwise use the canonical tenant form.
+          if user == "postgres":
+              user = f"postgres.{os.environ['SUPABASE_PROJECT_REF']}"
+
+          query = parsed.query
+          if "sslmode=" not in query.lower():
+              query = (query + "&" if query else "") + "sslmode=require"
+
+          host = f"aws-0-{os.environ['SUPABASE_REGION']}.pooler.supabase.com"
+          path = parsed.path or "/postgres"
+          print(f"postgresql://{user}:{password}@{host}:5432{path}?{query}" if query else f"postgresql://{user}:{password}@{host}:5432{path}")
+          PY
+          )"
+            printf 'SUPABASE_DB_URL=%s\n' "$normalized_url" >> "$GITHUB_ENV"
+            echo "Normalized SUPABASE_DB_URL to Supabase Shared Pooler session mode (IPv4)."
           else
             echo "::error::Missing database credentials. Add either SUPABASE_DB_URL or SUPABASE_DB_PASSWORD as a repository secret." 
             exit 1
@@ -172,7 +204,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json, os, pathlib, urllib.parse, urllib.request
+          import json, os, pathlib, urllib.request
           base = os.environ["SUPABASE_URL"].rstrip("/") + "/auth/v1/admin/users"
           key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
           headers = {"Authorization": f"Bearer {key}", "apikey": key}
