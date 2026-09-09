@@ -10,6 +10,7 @@ const EXPECTED_REF = "refs/heads/main";
 const EXPECTED_WORKFLOW_REF = `${EXPECTED_REPOSITORY}/.github/workflows/supabase-complete-backup-final.yml@${EXPECTED_REF}`;
 const OIDC_AUDIENCE = "learners-guide-supabase-backup";
 const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
+const DEFAULT_POOLER_HOST = `aws-1-${REGION}.pooler.supabase.com`;
 
 const githubJWKS = createRemoteJWKSet(
   new URL("https://token.actions.githubusercontent.com/.well-known/jwks"),
@@ -153,11 +154,18 @@ async function getVerifiedSessionPoolerUrl() {
   const source = parseConnectionString(sourceDbUrl!);
   const username = `postgres.${PROJECT_REF}`;
   const database = source.database || "postgres";
+
+  // Prefer the currently assigned Tokyo pooler hostname. The numbered pooler
+  // hostname is project-assignment-specific; never assume aws-0 is universal.
+  const configuredHost = Deno.env.get("SUPABASE_SESSION_POOLER_HOST")?.trim();
   const hosts = [
+    configuredHost,
+    DEFAULT_POOLER_HOST,
     `aws-${REGION}.pooler.supabase.com`,
     `aws-0-${REGION}.pooler.supabase.com`,
-    `aws-1-${REGION}.pooler.supabase.com`,
-  ];
+  ].filter((host, index, list): host is string =>
+    Boolean(host) && list.indexOf(host) === index,
+  );
 
   if (source.port === 5432 && source.hostname.endsWith("pooler.supabase.com")) {
     return { url: sourceDbUrl, verification: await verifyDatabaseUrl(sourceDbUrl!) };
@@ -200,7 +208,7 @@ async function collectStorage() {
       const page = result.data || [];
 
       for (const object of page) {
-        const signed = await admin.storage.from(bucket.id).createSignedUrl(object.name, 1200);
+        const signed = await admin.storage.from(bucket.id).createSignedUrl(object.name, 3600);
         if (signed.error || !signed.data?.signedUrl) {
           throw signed.error || new Error(`failed to create signed URL for ${bucket.id}/${object.name}`);
         }
@@ -253,17 +261,39 @@ async function collectAuthUsers() {
   return users;
 }
 
+async function requestMode(req: Request) {
+  try {
+    const body = await req.json();
+    const mode = body?.mode;
+    if (mode === "database" || mode === "storage") return mode;
+  } catch {
+    // Empty/invalid JSON uses the complete compatibility mode.
+  }
+  return "complete" as const;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return responseJson({ error: "POST required" }, 405);
   try {
     await authorizeGitHub(req);
+    const mode = await requestMode(req);
     const db = await getVerifiedSessionPoolerUrl();
+
+    if (mode === "database") {
+      return responseJson({
+        ok: true,
+        project_ref: PROJECT_REF,
+        db,
+        issued_at: new Date().toISOString(),
+      });
+    }
+
     const storage = await collectStorage();
     const authUsers = await collectAuthUsers();
     return responseJson({
       ok: true,
       project_ref: PROJECT_REF,
-      db,
+      db: mode === "complete" ? db : undefined,
       storage,
       auth_users: authUsers,
       issued_at: new Date().toISOString(),
