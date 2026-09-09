@@ -19,79 +19,96 @@ jobs:
   backup:
     name: Backup database, storage, and auth metadata
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SUPABASE_PROJECT_REF: efnxjfzyqbdulpjhffsm
       SUPABASE_REGION: ap-northeast-1
       BACKUP_DIR: backup
+      PGCONNECT_TIMEOUT: "20"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate and prepare database connection
+      - name: Validate required secrets
         shell: bash
         run: |
           set -euo pipefail
           [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY repository secret."; exit 1; }
+          [[ -n "$SUPABASE_DB_PASSWORD" || -n "$SUPABASE_DB_URL" ]] || { echo "::error::Missing database credentials. Set SUPABASE_DB_PASSWORD (recommended) or SUPABASE_DB_URL."; exit 1; }
+          echo "Required backup secrets are present."
 
-          # GitHub Actions is IPv4-only. Always prefer the password secret when
-          # available so a stale/misconfigured SUPABASE_DB_URL cannot override it.
-          # Build an IPv4 Shared Pooler session-mode URL (port 5432), which is
-          # suitable for pg_dump from GitHub Actions.
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Build IPv4 session-pooler connection
+        shell: bash
+        run: |
+          set -euo pipefail
           if [[ -n "$SUPABASE_DB_PASSWORD" ]]; then
-            encoded_password="$(SUPABASE_DB_PASSWORD="$SUPABASE_DB_PASSWORD" python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')"
-            printf 'SUPABASE_DB_URL=postgresql://postgres.%s:%s@aws-0-%s.pooler.supabase.com:5432/postgres?sslmode=require\n' \\
+            encoded_password="$(SUPABASE_DB_PASSWORD="$SUPABASE_DB_PASSWORD" python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')"
+            printf 'SUPABASE_DB_URL=postgresql://postgres.%s:%s@aws-%s.pooler.supabase.com:5432/postgres?sslmode=require\n' \
               "$SUPABASE_PROJECT_REF" "$encoded_password" "$SUPABASE_REGION" >> "$GITHUB_ENV"
-            echo "Using Supabase Shared Pooler session mode (IPv4) from SUPABASE_DB_PASSWORD."
-          elif [[ -n "$SUPABASE_DB_URL" ]]; then
-            normalized_url="$(SUPABASE_DB_URL="$SUPABASE_DB_URL" SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_REGION="$SUPABASE_REGION" python3 - <<'PY'
-          import os
-          import urllib.parse
-
-          raw = os.environ["SUPABASE_DB_URL"].strip()
-          if not raw.startswith(("postgres://", "postgresql://")):
-              raise SystemExit("SUPABASE_DB_URL must be a PostgreSQL connection string.")
-
-          parsed = urllib.parse.urlsplit(raw)
-          if not parsed.hostname or not parsed.username or parsed.password is None:
-              raise SystemExit("SUPABASE_DB_URL is missing required database connection fields.")
-
-          # The URL may come from Direct, Transaction Pooler, or Session Pooler.
-          # Rebuild it against the IPv4 Shared Pooler in session mode so the job
-          # is independent of GitHub Actions' lack of IPv6 support and of a stale
-          # pooler port in the stored secret.
-          password = urllib.parse.quote(urllib.parse.unquote(parsed.password), safe="")
-          user = urllib.parse.unquote(parsed.username)
-          if user == "postgres":
-              user = f"postgres.{os.environ['SUPABASE_PROJECT_REF']}"
-          user = urllib.parse.quote(user, safe=".")
-
-          host = f"aws-0-{os.environ['SUPABASE_REGION']}.pooler.supabase.com"
-          path = parsed.path or "/postgres"
-          query = parsed.query
-          # Avoid duplicate sslmode parameters while retaining any other query
-          # parameters supplied by the dashboard connection string.
-          query_items = urllib.parse.parse_qsl(query, keep_blank_values=True)
-          query_items = [(k, v) for k, v in query_items if k.lower() != "sslmode"]
-          query_items.append(("sslmode", "require"))
-          query = urllib.parse.urlencode(query_items)
-
-          normalized = urllib.parse.urlunsplit(("postgresql", "", "", "", ""))
-          print(f"postgresql://{user}:{password}@{host}:5432{path}?{query}")
-          PY
-            )"
-            # Never print normalized_url: it contains the database password.
-            printf 'SUPABASE_DB_URL=%s\n' "$normalized_url" >> "$GITHUB_ENV"
-            echo "Normalized SUPABASE_DB_URL to Supabase Shared Pooler session mode (IPv4)."
+            echo "Using password secret with Supabase Shared Pooler session mode (IPv4, port 5432)."
           else
-            echo "::error::Missing database credentials. Add either SUPABASE_DB_URL or SUPABASE_DB_PASSWORD as a repository secret."
-            exit 1
+            # Normalize any supplied URL so a stale direct/transaction endpoint cannot
+            # force GitHub Actions onto IPv6 or transaction pooling.
+            normalized_url="$(SUPABASE_DB_URL="$SUPABASE_DB_URL" SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_REGION="$SUPABASE_REGION" python3 - <<'PY'
+import os
+import urllib.parse
+
+raw = os.environ["SUPABASE_DB_URL"].strip()
+if not raw.startswith(("postgres://", "postgresql://")):
+    raise SystemExit("SUPABASE_DB_URL must be a PostgreSQL connection string.")
+
+parsed = urllib.parse.urlsplit(raw)
+if not parsed.hostname or not parsed.username or parsed.password is None:
+    raise SystemExit("SUPABASE_DB_URL is missing required connection fields.")
+
+user = urllib.parse.unquote(parsed.username)
+password = urllib.parse.unquote(parsed.password)
+if user == "postgres":
+    user = f"postgres.{os.environ['SUPABASE_PROJECT_REF']}"
+user = urllib.parse.quote(user, safe=".")
+password = urllib.parse.quote(password, safe="")
+path = parsed.path or "/postgres"
+print(
+    f"postgresql://{user}:{password}@aws-{os.environ['SUPABASE_REGION']}.pooler.supabase.com:5432{path}?sslmode=require"
+)
+PY
+)"
+            printf 'SUPABASE_DB_URL=%s\n' "$normalized_url" >> "$GITHUB_ENV"
+            echo "Normalized SUPABASE_DB_URL to Supabase Shared Pooler session mode (IPv4, port 5432)."
           fi
+
+      - name: Check database connectivity and authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          host="$(python3 - <<'PY'
+import os, urllib.parse
+p=urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"])
+print(p.hostname)
+PY
+)"
+          port="$(python3 - <<'PY'
+import os, urllib.parse
+p=urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"])
+print(p.port or 5432)
+PY
+)"
+          echo "Checking PostgreSQL endpoint: ${host}:${port}"
+          getent ahostsv4 "$host" | head -n 3 || { echo "::error::Supabase pooler hostname did not resolve to IPv4."; exit 1; }
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atqc 'select current_database(), current_user, version();'
+          echo "Database connection and authentication succeeded."
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
@@ -110,20 +127,26 @@ jobs:
         run: |
           set -euo pipefail
           supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/database/roles.sql" --role-only
+          test -s "$BACKUP_DIR/database/roles.sql"
+          echo "Database roles backup created."
 
       - name: Backup database schema
         shell: bash
         run: |
           set -euo pipefail
           supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/database/schema.sql"
+          test -s "$BACKUP_DIR/database/schema.sql"
+          echo "Database schema backup created."
 
       - name: Backup database data
         shell: bash
         run: |
           set -euo pipefail
           supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/database/data.sql" --data-only --use-copy -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          test -s "$BACKUP_DIR/database/data.sql"
+          echo "Database data backup created."
 
-      - name: Backup Storage objects and buckets
+      - name: Backup Storage buckets and objects
         shell: bash
         run: |
           set -euo pipefail
@@ -131,37 +154,42 @@ jobs:
           import json
           import os
           import pathlib
+          import time
           import urllib.parse
           import urllib.request
+          from concurrent.futures import ThreadPoolExecutor, as_completed
 
           base = os.environ["SUPABASE_URL"].rstrip("/") + "/storage/v1"
           key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
           root = pathlib.Path(os.environ["BACKUP_DIR"]) / "storage"
           files_root = root / "files"
-          headers = {"Authorization": f"Bearer {key}", "apikey": key}
+          headers = {"Authorization": f"Bearer {key}", "apikey": key, "Content-Type": "application/json"}
 
-          def request(url, method="GET", body=None):
-              data = None if body is None else json.dumps(body).encode()
-              req = urllib.request.Request(url, data=data, method=method, headers={**headers, "Content-Type": "application/json"})
-              with urllib.request.urlopen(req, timeout=60) as response:
-                  return response.read()
+          def request(url, method="GET", body=None, attempts=4):
+              payload = None if body is None else json.dumps(body).encode()
+              last = None
+              for attempt in range(1, attempts + 1):
+                  try:
+                      req = urllib.request.Request(url, data=payload, method=method, headers=headers)
+                      with urllib.request.urlopen(req, timeout=90) as response:
+                          return response.read()
+                  except Exception as exc:
+                      last = exc
+                      if attempt == attempts:
+                          raise
+                      time.sleep(attempt * 2)
+              raise last
 
           buckets = json.loads(request(f"{base}/bucket").decode())
           if not isinstance(buckets, list):
               raise SystemExit("Storage bucket response is not a list")
           (root / "buckets.json").write_text(json.dumps(buckets, indent=2), encoding="utf-8")
 
-          all_objects = root / "objects.jsonl"
-          all_objects.write_text("", encoding="utf-8")
-
-          total_files = 0
+          records = []
           for bucket in buckets:
               bucket_name = bucket["name"]
-              bucket_root = files_root / bucket_name
-              bucket_root.mkdir(parents=True, exist_ok=True)
               pending = [""]
               seen = {""}
-
               while pending:
                   prefix = pending.pop()
                   offset = 0
@@ -173,9 +201,10 @@ jobs:
                           "sortBy": {"column": "name", "order": "asc"},
                       }
                       items = json.loads(request(f"{base}/object/list/{urllib.parse.quote(bucket_name, safe='')}", "POST", payload).decode())
+                      if not isinstance(items, list):
+                          raise SystemExit(f"Storage list response for bucket {bucket_name!r} is not a list")
                       if not items:
                           break
-
                       for item in items:
                           name = item.get("name", "")
                           if not name:
@@ -187,22 +216,47 @@ jobs:
                                   seen.add(child)
                                   pending.append(child)
                           else:
-                              record = {"bucket": bucket_name, "name": full_path, "metadata": item.get("metadata")}
-                              with all_objects.open("a", encoding="utf-8") as handle:
-                                  handle.write(json.dumps(record, separators=(",", ":")) + "\n")
-                              encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in full_path.split("/"))
-                              target = bucket_root / full_path
-                              target.parent.mkdir(parents=True, exist_ok=True)
-                              data = request(f"{base}/object/authenticated/{urllib.parse.quote(bucket_name, safe='')}/{encoded_path}")
-                              target.write_bytes(data)
-                              total_files += 1
-
+                              records.append({
+                                  "bucket": bucket_name,
+                                  "name": full_path,
+                                  "metadata": item.get("metadata"),
+                                  "id": item.get("id"),
+                                  "updated_at": item.get("updated_at"),
+                                  "created_at": item.get("created_at"),
+                              })
                       if len(items) < 1000:
                           break
                       offset += len(items)
 
-          (root / "summary.json").write_text(json.dumps({"bucket_count": len(buckets), "object_count": total_files}, indent=2), encoding="utf-8")
-          print(f"Backed up {len(buckets)} Storage buckets and {total_files} objects.")
+          objects_file = root / "objects.jsonl"
+          with objects_file.open("w", encoding="utf-8") as handle:
+              for record in records:
+                  handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+          def download(record):
+              bucket_name = record["bucket"]
+              full_path = record["name"]
+              encoded_bucket = urllib.parse.quote(bucket_name, safe="")
+              encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in full_path.split("/"))
+              data = request(f"{base}/object/authenticated/{encoded_bucket}/{encoded_path}")
+              target = files_root / bucket_name / full_path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(data)
+              return len(data)
+
+          total_bytes = 0
+          with ThreadPoolExecutor(max_workers=8) as pool:
+              futures = [pool.submit(download, record) for record in records]
+              for future in as_completed(futures):
+                  total_bytes += future.result()
+
+          summary = {
+              "bucket_count": len(buckets),
+              "object_count": len(records),
+              "downloaded_bytes": total_bytes,
+          }
+          (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+          print(f"Backed up {len(buckets)} Storage buckets and {len(records)} objects ({total_bytes} bytes).")
           PY
 
       - name: Backup Auth user metadata
@@ -210,7 +264,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json, os, pathlib, urllib.request
+          import json
+          import os
+          import pathlib
+          import time
+          import urllib.request
+
           base = os.environ["SUPABASE_URL"].rstrip("/") + "/auth/v1/admin/users"
           key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
           headers = {"Authorization": f"Bearer {key}", "apikey": key}
@@ -218,39 +277,73 @@ jobs:
           out.write_text("", encoding="utf-8")
           page = 1
           total = 0
+
           while True:
               url = f"{base}?page={page}&per_page=1000"
-              req = urllib.request.Request(url, headers=headers)
-              with urllib.request.urlopen(req, timeout=60) as response:
-                  payload = json.loads(response.read().decode())
+              last = None
+              for attempt in range(1, 5):
+                  try:
+                      req = urllib.request.Request(url, headers=headers)
+                      with urllib.request.urlopen(req, timeout=60) as response:
+                          payload = json.loads(response.read().decode())
+                      break
+                  except Exception as exc:
+                      last = exc
+                      if attempt == 4:
+                          raise
+                      time.sleep(attempt * 2)
+              else:
+                  raise last
+
               users = payload.get("users", [])
+              if not isinstance(users, list):
+                  raise SystemExit("Auth user response does not contain a users list")
               with out.open("a", encoding="utf-8") as handle:
                   for user in users:
-                      safe = {k: user.get(k) for k in (
-                          "id", "aud", "role", "email", "phone", "created_at", "updated_at",
-                          "email_confirmed_at", "phone_confirmed_at", "last_sign_in_at",
-                          "app_metadata", "user_metadata", "identities", "is_anonymous"
-                      ) if k in user}
+                      safe = {
+                          k: user.get(k)
+                          for k in (
+                              "id", "aud", "role", "email", "phone", "created_at", "updated_at",
+                              "email_confirmed_at", "phone_confirmed_at", "last_sign_in_at",
+                              "app_metadata", "user_metadata", "identities", "is_anonymous"
+                          )
+                          if k in user
+                      }
                       handle.write(json.dumps(safe, separators=(",", ":")) + "\n")
               total += len(users)
               if len(users) < 1000:
                   break
               page += 1
-          pathlib.Path(os.environ["BACKUP_DIR"], "auth-summary.json").write_text(json.dumps({"user_count": total}, indent=2), encoding="utf-8")
-          print(f"Backed up metadata for {total} Auth users.")
+
+          pathlib.Path(os.environ["BACKUP_DIR"], "auth-summary.json").write_text(
+              json.dumps({"user_count": total}, indent=2), encoding="utf-8"
+          )
+          echo_msg = f"Backed up metadata for {total} Auth users."
+          print(echo_msg)
           PY
 
-      - name: Validate backup
+      - name: Validate complete backup
         shell: bash
         run: |
           set -euo pipefail
-          for file in "$BACKUP_DIR/database/roles.sql" "$BACKUP_DIR/database/schema.sql" "$BACKUP_DIR/database/data.sql" "$BACKUP_DIR/storage/buckets.json" "$BACKUP_DIR/storage/summary.json" "$BACKUP_DIR/auth-users.jsonl" "$BACKUP_DIR/auth-summary.json"; do
+          required=(
+            "$BACKUP_DIR/database/roles.sql"
+            "$BACKUP_DIR/database/schema.sql"
+            "$BACKUP_DIR/database/data.sql"
+            "$BACKUP_DIR/storage/buckets.json"
+            "$BACKUP_DIR/storage/objects.jsonl"
+            "$BACKUP_DIR/storage/summary.json"
+            "$BACKUP_DIR/auth-users.jsonl"
+            "$BACKUP_DIR/auth-summary.json"
+          )
+          for file in "${required[@]}"; do
             [[ -f "$file" ]] || { echo "::error::Missing backup file: $file"; exit 1; }
           done
           find "$BACKUP_DIR/storage/files" -type f -printf '%p\n' | sort > "$BACKUP_DIR/storage/file-manifest.txt"
           tar -czf /tmp/backup-validation.tar.gz -C "$BACKUP_DIR" database storage auth-users.jsonl auth-summary.json
           tar -tzf /tmp/backup-validation.tar.gz >/dev/null
           rm -f /tmp/backup-validation.tar.gz
+          echo "Complete backup validation succeeded."
 
       - name: Package and checksum backup
         shell: bash
@@ -265,7 +358,7 @@ jobs:
           Commit: ${GITHUB_SHA}
           Workflow run: ${GITHUB_RUN_ID}
           Contents: database roles/schema/data, Storage buckets/object files, Auth user metadata
-          Important: Auth passwords/session secrets are not included because they are not exportable.
+          Important: Auth passwords and session secrets are not included.
           EOF
           tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.jsonl auth-summary.json manifest.txt
           tar -tzf "$archive" >/dev/null
