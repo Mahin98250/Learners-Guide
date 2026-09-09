@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local database backup output — backups must never be committed to git.
+backup/
+*.sql
+*.sql.gz
+*.tar.gz
