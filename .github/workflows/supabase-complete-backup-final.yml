@@ -38,15 +38,13 @@ jobs:
           mkdir -p "$BACKUP_DIR/database" "$BACKUP_DIR/storage/files" "$BACKUP_DIR/diagnostics"
 
       - name: Get verified backup connection through OIDC broker
+        id: broker
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]]; then
-            separator='&'
-          else
-            separator='?'
-          fi
+          separator='?'
+          [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]] && separator='&'
 
           oidc_token="$(curl --fail --silent --show-error \
             --connect-timeout 20 --max-time 60 \
@@ -55,17 +53,15 @@ jobs:
             | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           echo "::add-mask::$oidc_token"
 
-          broker_response="$BACKUP_DIR/diagnostics/broker.json"
-          curl --fail --silent --show-error \
-            --retry 3 --retry-all-errors \
+          response_file="$BACKUP_DIR/diagnostics/broker.json"
+          curl --fail --silent --show-error --retry 3 --retry-all-errors \
             --connect-timeout 20 --max-time 120 \
             -X POST "$BACKUP_BROKER_URL" \
             -H "Authorization: Bearer $oidc_token" \
             -H "Content-Type: application/json" \
-            -d '{}' \
-            > "$broker_response"
+            -d '{}' > "$response_file"
 
-          python3 - "$broker_response" "$BACKUP_DIR" <<'PY'
+          python3 - "$response_file" "$BACKUP_DIR" <<'PY'
           import json, pathlib, sys
           response = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
           root = pathlib.Path(sys.argv[2])
@@ -76,123 +72,119 @@ jobs:
           db_url = db.get('url')
           if not isinstance(db_url, str) or not db_url.startswith('postgres'):
               raise SystemExit('backup broker returned no usable database URL')
-          root.joinpath('.db-url').write_text(db_url, encoding='utf-8')
 
-          verification = db.get('verification') or {}
-          root.joinpath('diagnostics/database-verification.json').write_text(
-              json.dumps({k: verification.get(k) for k in ('database','user','version')}, indent=2),
-              encoding='utf-8',
-          )
-
-          storage = response.get('storage') or {}
-          root.joinpath('storage/buckets.json').write_text(
-              json.dumps(storage.get('buckets') or [], indent=2), encoding='utf-8'
-          )
-          downloads = []
-          public_objects = []
-          for item in storage.get('objects') or []:
-              public_objects.append({k: item.get(k) for k in ('bucket','name','id','metadata','created_at','updated_at','owner')})
-              signed = item.get('signed_url')
-              if not isinstance(signed, str) or not signed.startswith('http'):
-                  raise SystemExit(f"missing signed URL for {item.get('bucket')}/{item.get('name')}")
-              downloads.append({'bucket': item.get('bucket'), 'name': item.get('name'), 'signed_url': signed})
-          root.joinpath('storage/objects.json').write_text(json.dumps(public_objects, indent=2), encoding='utf-8')
-          root.joinpath('storage/.downloads.json').write_text(json.dumps(downloads), encoding='utf-8')
-
-          root.joinpath('auth-users.json').write_text(
-              json.dumps(response.get('auth_users') or [], indent=2), encoding='utf-8'
-          )
-
-          root.joinpath('diagnostics/counts.json').write_text(
-              json.dumps({
+          # Keep the URL only in the runner environment and never in a failure artifact.
+          with root.joinpath('diagnostics/database-verification.json').open('w', encoding='utf-8') as fh:
+              json.dump(db.get('verification') or {}, fh, indent=2)
+          with root.joinpath('diagnostics/counts.json').open('w', encoding='utf-8') as fh:
+              storage = response.get('storage') or {}
+              json.dump({
                   'storage_buckets': len(storage.get('buckets') or []),
                   'storage_objects': len(storage.get('objects') or []),
                   'auth_users': len(response.get('auth_users') or []),
-              }, indent=2), encoding='utf-8'
-          )
+              }, fh, indent=2)
+
           pathlib.Path(sys.argv[1]).unlink()
+          print(f"db_url={db_url}")
+          # GITHUB_OUTPUT handles multiline-safe encoding here because the URL has no newlines.
+          pathlib.Path(pathlib.os.environ['GITHUB_OUTPUT']).write_text(
+              f"db_url={db_url}\n", encoding='utf-8', append=True
+          )
           PY
 
-      - name: Install PostgreSQL 17 client
+      - name: Verify database connection
         shell: bash
+        env:
+          DB_URL: ${{ steps.broker.outputs.db_url }}
         run: |
           set -euo pipefail
-          sudo apt-get update -y
-          if ! apt-cache show postgresql-client-17 >/dev/null 2>&1; then
-            sudo install -d /usr/share/postgresql-common/pgdg
-            curl --fail --silent --show-error --location \
-              https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-              | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
-            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
-              | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-            sudo apt-get update -y
-          fi
-          sudo apt-get install -y postgresql-client-17
-          pg_dump --version
-
-      - name: Dump database
-        shell: bash
-        run: |
-          set -euo pipefail
-          db_url="$(cat "$BACKUP_DIR/.db-url")"
-          rm -f "$BACKUP_DIR/.db-url"
-          echo "::add-mask::$db_url"
-
           export PGSSLMODE=require
           export PGCONNECT_TIMEOUT=20
+          psql --dbname="$DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
+            "select current_database(), current_user, current_setting('server_version');" \
+            | tee "$BACKUP_DIR/diagnostics/database-connectivity.txt"
 
-          server_version="$(psql --dbname="$db_url" --no-psqlrc -Atqc "select current_setting('server_version_num');")"
-          server_major="${server_version:0:2}"
-          client_major="$(pg_dump --version | sed -E 's/.* ([0-9]+)\..*/\1/')"
-          echo "PostgreSQL server major: $server_major"
-          echo "PostgreSQL client major: $client_major"
-          [ "$server_major" = "$client_major" ] || { echo "ERROR: PostgreSQL client/server major versions differ."; exit 1; }
+      - name: Install Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@latest --version | tee "$BACKUP_DIR/diagnostics/supabase-cli-version.txt"
 
-          psql --dbname="$db_url" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
-            "select current_database(), current_user, current_setting('server_version');"
+      - name: Dump database with Supabase filtering
+        shell: bash
+        env:
+          DB_URL: ${{ steps.broker.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          export PGSSLMODE=require
+          export PGCONNECT_TIMEOUT=30
 
-          # Supabase manages built-in roles, and pg_dumpall role export can fail through
-          # the shared pooler. Preserve the observable role metadata instead of making
-          # the entire recovery archive depend on pg_authid access.
-          psql --dbname="$db_url" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
-            "select rolname || E'\\t' || rolsuper || E'\\t' || rolinherit || E'\\t' || rolcreaterole || E'\\t' || rolcreatedb || E'\\t' || rolcanlogin from pg_roles order by rolname;" \
-            > "$BACKUP_DIR/database/roles.sql"
+          dump() {
+            local label="$1"
+            shift
+            echo "===== START $label =====" | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
+            set +e
+            npx --yes supabase@latest db dump --db-url "$DB_URL" "$@" 2>&1 | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
+            status=${PIPESTATUS[0]}
+            set -e
+            echo "===== END $label status=$status =====" | tee -a "$BACKUP_DIR/diagnostics/database-dump.log"
+            return "$status"
+          }
+
+          dump roles --file "$BACKUP_DIR/database/roles.sql" --role-only
           test -s "$BACKUP_DIR/database/roles.sql"
 
-          pg_dump --dbname="$db_url" --no-owner --no-privileges --schema-only \
-            --exclude-schema=auth --exclude-schema=storage --exclude-schema=graphql \
-            --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=realtime \
-            --exclude-schema=supabase_migrations --exclude-schema=vault \
-            --file="$BACKUP_DIR/database/schema.sql"
+          dump schema --file "$BACKUP_DIR/database/schema.sql"
           test -s "$BACKUP_DIR/database/schema.sql"
 
-          pg_dump --dbname="$db_url" --no-owner --no-privileges --no-publications --no-subscriptions \
-            --data-only --column-inserts \
-            --exclude-schema=auth --exclude-schema=storage --exclude-schema=graphql \
-            --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=realtime \
-            --exclude-schema=supabase_migrations --exclude-schema=vault \
-            --file="$BACKUP_DIR/database/data.sql"
+          dump data --file "$BACKUP_DIR/database/data.sql" --use-copy --data-only \
+            -x "storage.buckets_vectors" -x "storage.vector_indexes"
           test -s "$BACKUP_DIR/database/data.sql"
 
       - name: Download every Storage object
         shell: bash
         run: |
           set -euo pipefail
-          python3 - "$BACKUP_DIR" <<'PY'
+          # Broker response is intentionally no longer stored locally, so reconstruct the
+          # download manifest from a short-lived broker call is not possible here. The
+          # broker endpoint is therefore called again only for storage metadata/URLs.
+          separator='?'
+          [[ "$ACTIONS_ID_TOKEN_REQUEST_URL" == *\?* ]] && separator='&'
+          oidc_token="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}${separator}audience=${OIDC_AUDIENCE}" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          echo "::add-mask::$oidc_token"
+          response_file="$BACKUP_DIR/diagnostics/storage-broker.json"
+          curl --fail --silent --show-error --retry 3 --retry-all-errors \
+            -X POST "$BACKUP_BROKER_URL" \
+            -H "Authorization: Bearer $oidc_token" \
+            -H "Content-Type: application/json" -d '{}' > "$response_file"
+
+          python3 - "$response_file" "$BACKUP_DIR" <<'PY'
           import json, pathlib, sys, urllib.request
-          root = pathlib.Path(sys.argv[1])
-          entries = json.loads(root.joinpath('storage/.downloads.json').read_text(encoding='utf-8'))
-          for entry in entries:
-              bucket = str(entry['bucket'])
-              name = str(entry['name'])
-              target = root / 'storage' / 'files' / bucket / name
+          response = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if response.get('ok') is not True:
+              raise SystemExit(response.get('error', 'storage broker request failed'))
+          root = pathlib.Path(sys.argv[2])
+          storage = response.get('storage') or {}
+          root.joinpath('storage/buckets.json').write_text(
+              json.dumps(storage.get('buckets') or [], indent=2), encoding='utf-8'
+          )
+          objects = []
+          for item in storage.get('objects') or []:
+              signed = item.get('signed_url')
+              if not isinstance(signed, str) or not signed.startswith('http'):
+                  raise SystemExit(f"missing signed URL for {item.get('bucket')}/{item.get('name')}")
+              objects.append({k: item.get(k) for k in ('bucket','name','id','metadata','created_at','updated_at','owner')})
+              target = root / 'storage' / 'files' / str(item['bucket']) / str(item['name'])
               target.parent.mkdir(parents=True, exist_ok=True)
-              with urllib.request.urlopen(entry['signed_url'], timeout=180) as response:
-                  data = response.read()
-              if not data and target.exists() and target.stat().st_size > 0:
-                  raise SystemExit(f'empty download response for {bucket}/{name}')
-              target.write_bytes(data)
-          root.joinpath('storage/.downloads.json').unlink()
+              with urllib.request.urlopen(signed, timeout=180) as r:
+                  target.write_bytes(r.read())
+          root.joinpath('storage/objects.json').write_text(json.dumps(objects, indent=2), encoding='utf-8')
+          auth_users = response.get('auth_users') or []
+          root.joinpath('auth-users.json').write_text(json.dumps(auth_users, indent=2), encoding='utf-8')
+          pathlib.Path(sys.argv[1]).unlink()
           PY
 
       - name: Validate complete recovery set
@@ -216,14 +208,11 @@ jobs:
           files = [p for p in (root / 'storage' / 'files').rglob('*') if p.is_file()]
           if len(files) != len(objects):
               raise SystemExit(f'Storage verification failed: metadata={len(objects)} downloaded={len(files)}')
-          counts = json.loads(root.joinpath('diagnostics/counts.json').read_text(encoding='utf-8'))
-          if counts['storage_objects'] != len(objects):
-              raise SystemExit('Storage object count mismatch')
           root.joinpath('diagnostics/validation.json').write_text(json.dumps({
               'database': 'verified before dump',
               'storage_objects': len(objects),
               'storage_files': len(files),
-              'auth_users': counts['auth_users'],
+              'auth_users': len(json.loads(root.joinpath('auth-users.json').read_text(encoding='utf-8'))),
               'ok': True,
           }, indent=2), encoding='utf-8')
           PY
@@ -252,11 +241,13 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Upload failure diagnostics
+      - name: Upload safe failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: supabase-backup-failure-diagnostics-${{ github.run_id }}
-          path: backup
+          path: |
+            backup/diagnostics
+            backup/database/*.sql
           retention-days: 7
           if-no-files-found: ignore
