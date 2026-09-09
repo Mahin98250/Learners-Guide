@@ -17,15 +17,29 @@ const githubJWKS = createRemoteJWKSet(
 
 const supabaseUrl =
   Deno.env.get("SUPABASE_URL") || `https://${PROJECT_REF}.supabase.co`;
-const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+function getSupabaseAdminKey() {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+
+  const encoded = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (encoded) {
+    try {
+      const keys = JSON.parse(encoded);
+      const defaultKey = keys?.default;
+      if (typeof defaultKey === "string" && defaultKey.length > 0) return defaultKey;
+    } catch {
+      // Fall through to the explicit error below.
+    }
+  }
+
+  throw new Error("Supabase privileged key is unavailable to backup broker");
+}
+
+const serviceKey = getSupabaseAdminKey();
 const sourceDbUrl = Deno.env.get("SUPABASE_DB_URL");
 
-if (!serviceKey) {
-  throw new Error("Supabase service role key is unavailable to backup broker");
-}
-if (!sourceDbUrl) {
-  throw new Error("Supabase DB URL is unavailable to backup broker");
-}
+if (!sourceDbUrl) throw new Error("Supabase DB URL is unavailable to backup broker");
 
 const admin = createClient(supabaseUrl, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -57,21 +71,13 @@ async function authorizeGitHub(req: Request) {
     algorithms: ["RS256"],
   });
 
-  const repository = String(payload.repository || "");
-  const repositoryOwner = String(payload.repository_owner || "");
-  const ref = String(payload.ref || "");
-  const workflowRef = String(payload.workflow_ref || "");
+  if (String(payload.repository || "") !== EXPECTED_REPOSITORY) throw new Error("unauthorized repository");
+  if (String(payload.repository_owner || "") !== "Mahin98250") throw new Error("unauthorized repository owner");
+  if (String(payload.ref || "") !== EXPECTED_REF) throw new Error("unauthorized ref");
 
-  if (repository !== EXPECTED_REPOSITORY) {
-    throw new Error("unauthorized repository");
-  }
-  if (repositoryOwner !== "Mahin98250") {
-    throw new Error("unauthorized repository owner");
-  }
-  if (ref !== EXPECTED_REF) {
-    throw new Error("unauthorized ref");
-  }
-  if (workflowRef !== EXPECTED_WORKFLOW_REF) {
+  const workflowRef = String(payload.workflow_ref || "");
+  const jobWorkflowRef = String(payload.job_workflow_ref || "");
+  if (workflowRef !== EXPECTED_WORKFLOW_REF && jobWorkflowRef !== EXPECTED_WORKFLOW_REF) {
     throw new Error("unauthorized workflow");
   }
 }
@@ -79,7 +85,6 @@ async function authorizeGitHub(req: Request) {
 function parseConnectionString(input: string) {
   const parsed = new URL(input);
   return {
-    username: decodeURIComponent(parsed.username),
     password: decodeURIComponent(parsed.password),
     database: decodeURIComponent(parsed.pathname.replace(/^\//, "") || "postgres"),
     hostname: parsed.hostname,
@@ -97,10 +102,9 @@ async function verifyDatabaseUrl(url: string) {
   });
   try {
     const rows = await client`
-      select
-        current_database() as database,
-        current_user as user,
-        current_setting('server_version') as version
+      select current_database() as database,
+             current_user as user,
+             current_setting('server_version') as version
     `;
     return rows[0];
   } finally {
@@ -112,45 +116,37 @@ async function getVerifiedSessionPoolerUrl() {
   const source = parseConnectionString(sourceDbUrl!);
   const username = `postgres.${PROJECT_REF}`;
   const database = source.database || "postgres";
-  const password = source.password;
-
   const candidates = [
-    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@aws-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
-    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@aws-0-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
-    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@aws-1-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
+    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
+    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-0-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
+    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(source.password)}@aws-1-${REGION}.pooler.supabase.com:5432/${encodeURIComponent(database)}`,
   ];
 
   if (source.port === 5432 && source.hostname.endsWith("pooler.supabase.com")) {
-    const verification = await verifyDatabaseUrl(sourceDbUrl!);
-    return { url: sourceDbUrl, verification };
+    return { url: sourceDbUrl, verification: await verifyDatabaseUrl(sourceDbUrl!) };
   }
 
   let lastError = "";
   for (const candidate of candidates) {
     try {
-      const verification = await verifyDatabaseUrl(candidate);
-      return { url: candidate, verification };
+      return { url: candidate, verification: await verifyDatabaseUrl(candidate) };
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
   }
 
-  throw new Error(
-    `no Session Pooler endpoint accepted the Supabase database credentials: ${lastError}`,
-  );
+  throw new Error(`no Session Pooler endpoint accepted the Supabase database credentials: ${lastError}`);
 }
 
 async function collectStorage() {
   const bucketsResult = await admin.storage.listBuckets();
   if (bucketsResult.error) throw bucketsResult.error;
-
   const buckets = bucketsResult.data || [];
   const objects: Array<Record<string, unknown>> = [];
 
   for (const bucket of buckets) {
     let offset = 0;
     const limit = 1000;
-
     while (true) {
       const result = await admin
         .from("storage.objects")
@@ -158,20 +154,14 @@ async function collectStorage() {
         .eq("bucket_id", bucket.id)
         .order("name", { ascending: true })
         .range(offset, offset + limit - 1);
-
       if (result.error) throw result.error;
-
       const page = result.data || [];
+
       for (const object of page) {
-        const signed = await admin.storage
-          .from(bucket.id)
-          .createSignedUrl(object.name, 1200);
-
+        const signed = await admin.storage.from(bucket.id).createSignedUrl(object.name, 1200);
         if (signed.error || !signed.data?.signedUrl) {
-          throw signed.error ||
-            new Error(`failed to create signed URL for ${bucket.id}/${object.name}`);
+          throw signed.error || new Error(`failed to create signed URL for ${bucket.id}/${object.name}`);
         }
-
         objects.push({
           bucket: bucket.id,
           name: object.name,
@@ -195,47 +185,39 @@ async function collectStorage() {
 async function collectAuthUsers() {
   const users: unknown[] = [];
   let page = 1;
-
   while (true) {
     const result = await admin.auth.admin.listUsers({ page, perPage: 1000 });
     if (result.error) throw result.error;
-
     const batch = result.data.users || [];
-    users.push(
-      ...batch.map((user) => ({
-        id: user.id,
-        aud: user.aud,
-        role: user.role,
-        email: user.email,
-        phone: user.phone,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-        email_confirmed_at: user.email_confirmed_at,
-        phone_confirmed_at: user.phone_confirmed_at,
-        last_sign_in_at: user.last_sign_in_at,
-        app_metadata: user.app_metadata,
-        user_metadata: user.user_metadata,
-        identities: user.identities,
-        is_anonymous: user.is_anonymous,
-      })),
-    );
-
+    users.push(...batch.map((user) => ({
+      id: user.id,
+      aud: user.aud,
+      role: user.role,
+      email: user.email,
+      phone: user.phone,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      email_confirmed_at: user.email_confirmed_at,
+      phone_confirmed_at: user.phone_confirmed_at,
+      last_sign_in_at: user.last_sign_in_at,
+      app_metadata: user.app_metadata,
+      user_metadata: user.user_metadata,
+      identities: user.identities,
+      is_anonymous: user.is_anonymous,
+    })));
     if (batch.length < 1000) break;
     page += 1;
   }
-
   return users;
 }
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return responseJson({ error: "POST required" }, 405);
-
   try {
     await authorizeGitHub(req);
     const db = await getVerifiedSessionPoolerUrl();
     const storage = await collectStorage();
     const authUsers = await collectAuthUsers();
-
     return responseJson({
       ok: true,
       project_ref: PROJECT_REF,
@@ -246,9 +228,6 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("backup broker failure", error);
-    return responseJson(
-      { error: error instanceof Error ? error.message : String(error) },
-      500,
-    );
+    return responseJson({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
