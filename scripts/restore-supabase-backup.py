@@ -53,8 +53,6 @@ def upload_file(base_url: str, key: str, bucket: str, object_path: str, local_pa
     url = f"{base_url}/object/{encoded_bucket}/{encoded_path}"
     content_type = mimetypes.guess_type(local_path.name)[0] or "application/octet-stream"
 
-    env = os.environ.copy()
-    env["SUPABASE_RESTORE_KEY"] = key
     try:
         result = subprocess.run(
             [
@@ -73,9 +71,9 @@ def upload_file(base_url: str, key: str, bucket: str, object_path: str, local_pa
                 "POST",
                 url,
                 "-H",
-                "Authorization: Bearer $SUPABASE_RESTORE_KEY",
+                f"Authorization: Bearer {key}",
                 "-H",
-                "apikey: $SUPABASE_RESTORE_KEY",
+                f"apikey: {key}",
                 "-H",
                 f"Content-Type: {content_type}",
                 "-H",
@@ -85,7 +83,6 @@ def upload_file(base_url: str, key: str, bucket: str, object_path: str, local_pa
                 "--data-binary",
                 f"@{local_path}",
             ],
-            env=env,
             check=False,
             capture_output=True,
             text=True,
@@ -98,14 +95,14 @@ def upload_file(base_url: str, key: str, bucket: str, object_path: str, local_pa
         raise RestoreError(f"upload failed for {bucket}/{object_path}: {detail}")
 
 
-def safe_object_path(root: Path, bucket: str, object_name: str) -> Path:
+def safe_object_path(storage_files_root: Path, bucket: str, object_name: str) -> Path:
     """Resolve a backup object and reject path traversal outside storage/files."""
     if not bucket or not object_name:
         raise RestoreError("Storage object bucket/name cannot be empty")
-    candidate = (root / bucket / object_name).resolve()
-    files_root = root.resolve()
+    candidate = (storage_files_root / bucket / object_name).resolve()
+    root = storage_files_root.resolve()
     try:
-        candidate.relative_to(files_root)
+        candidate.relative_to(root)
     except ValueError as exc:
         raise RestoreError(f"Unsafe Storage object path rejected: {bucket}/{object_name}") from exc
     return candidate
@@ -137,7 +134,7 @@ def main() -> int:
         raise RestoreError("Storage metadata must be JSON arrays")
 
     storage_api = f"{supabase_url}/storage/v1"
-    created_or_updated = 0
+    restored_buckets = 0
     uploaded = 0
 
     # Recreate bucket configuration using the supported bucket API.
@@ -153,7 +150,7 @@ def main() -> int:
         payload = {"id": bucket_id, "name": name, **options}
         try:
             request_json(f"{storage_api}/bucket", "POST", service_role_key, payload)
-            created_or_updated += 1
+            restored_buckets += 1
         except RestoreError as create_error:
             # The destination may already contain the bucket. In that case,
             # update its configuration rather than failing the whole restore.
@@ -164,7 +161,7 @@ def main() -> int:
                     service_role_key,
                     options,
                 )
-                created_or_updated += 1
+                restored_buckets += 1
             except RestoreError:
                 raise create_error
 
@@ -183,7 +180,7 @@ def main() -> int:
             print(f"storage-progress: uploaded {uploaded}/{len(objects)}")
 
     summary = {
-        "storage_buckets_restored": created_or_updated,
+        "storage_buckets_restored": restored_buckets,
         "storage_objects_expected": len(objects),
         "storage_objects_uploaded": uploaded,
         "ok": True,
