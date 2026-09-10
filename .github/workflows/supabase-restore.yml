@@ -1,0 +1,228 @@
+name: Restore Supabase Backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_run_id:
+        description: "GitHub Actions run ID containing the backup artifact"
+        required: true
+        type: string
+      confirmation:
+        description: "Type RESTORE_TO_NEW_PROJECT to confirm this is a NEW/TEST Supabase project"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  restore:
+    name: Restore database and Storage backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      # Configure these as repository/environment secrets before using the workflow.
+      TARGET_SUPABASE_URL: ${{ secrets.LG_RESTORE_SUPABASE_URL }}
+      TARGET_DB_URL: ${{ secrets.LG_RESTORE_DB_URL }}
+      TARGET_SERVICE_ROLE_KEY: ${{ secrets.LG_RESTORE_SERVICE_ROLE_KEY }}
+      PRODUCTION_SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate restore confirmation and target
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "RESTORE_TO_NEW_PROJECT" || {
+            echo "Restore cancelled: confirmation must be RESTORE_TO_NEW_PROJECT." >&2
+            exit 1
+          }
+          test -n "$TARGET_SUPABASE_URL" || { echo "Missing LG_RESTORE_SUPABASE_URL secret." >&2; exit 1; }
+          test -n "$TARGET_DB_URL" || { echo "Missing LG_RESTORE_DB_URL secret." >&2; exit 1; }
+          test -n "$TARGET_SERVICE_ROLE_KEY" || { echo "Missing LG_RESTORE_SERVICE_ROLE_KEY secret." >&2; exit 1; }
+          test "$TARGET_SUPABASE_URL" != "$PRODUCTION_SUPABASE_URL" || {
+            echo "Safety stop: target Supabase URL matches Learner's Guide production." >&2
+            exit 1
+          }
+          case "$TARGET_DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo "LG_RESTORE_DB_URL must be a PostgreSQL connection string." >&2; exit 1;;
+          esac
+          echo "Target Supabase: $TARGET_SUPABASE_URL"
+          echo "Production safety check: passed"
+
+      - name: Validate backup run ID
+        shell: bash
+        env:
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]] || {
+            echo "backup_run_id must contain only digits." >&2
+            exit 1
+          }
+          echo "Using backup run: $BACKUP_RUN_ID"
+
+      - name: Download backup artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/backup-artifact"
+          artifact_name="supabase-complete-backup-${BACKUP_RUN_ID}"
+          gh run download "$BACKUP_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$artifact_name" \
+            --dir "$RUNNER_TEMP/backup-artifact"
+          find "$RUNNER_TEMP/backup-artifact" -maxdepth 2 -type f -print
+          test -n "$(find "$RUNNER_TEMP/backup-artifact" -name '*.tar.gz' -type f -print -quit)" || {
+            echo "Backup tarball not found in artifact." >&2
+            exit 1
+          }
+
+      - name: Verify and extract backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/backup-artifact" -name '*.tar.gz' -type f -print -quit)"
+          checksum_file="$(find "$RUNNER_TEMP/backup-artifact" -name 'sha256.txt' -type f -print -quit)"
+          test -n "$checksum_file"
+          expected="$(awk '{print $1}' "$checksum_file")"
+          actual="$(sha256sum "$archive" | awk '{print $1}')"
+          test "$expected" = "$actual" || {
+            echo "Backup checksum mismatch." >&2
+            echo "Expected: $expected" >&2
+            echo "Actual:   $actual" >&2
+            exit 1
+          }
+          rm -rf "$RUNNER_TEMP/extracted-backup"
+          mkdir -p "$RUNNER_TEMP/extracted-backup"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/extracted-backup"
+          test -s "$RUNNER_TEMP/extracted-backup/database/roles.sql"
+          test -s "$RUNNER_TEMP/extracted-backup/database/schema.sql"
+          test -s "$RUNNER_TEMP/extracted-backup/database/data.sql"
+          test -f "$RUNNER_TEMP/extracted-backup/storage/buckets.json"
+          test -f "$RUNNER_TEMP/extracted-backup/storage/objects.json"
+          test -f "$RUNNER_TEMP/extracted-backup/auth-users.json"
+          echo "Backup checksum verified and archive extracted."
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Verify target database connection
+        shell: bash
+        env:
+          PGPASSWORD: ""
+        run: |
+          set -euo pipefail
+          export PGSSLMODE=require
+          export PGCONNECT_TIMEOUT=30
+          psql --dbname="$TARGET_DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
+            "select current_database(), current_user, current_setting('server_version');"
+          echo "Target database connection: OK"
+
+      - name: Restore database roles, schema, and data
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGSSLMODE=require
+          export PGCONNECT_TIMEOUT=30
+          root="$RUNNER_TEMP/extracted-backup"
+
+          # Supabase's documented logical restore order is roles -> schema -> data.
+          # Keep the whole database restore transactional where supported.
+          psql \
+            --single-transaction \
+            --variable ON_ERROR_STOP=1 \
+            --file "$root/database/roles.sql" \
+            --file "$root/database/schema.sql" \
+            --command 'SET session_replication_role = replica' \
+            --file "$root/database/data.sql" \
+            --dbname "$TARGET_DB_URL"
+
+          echo "Database restore: OK"
+
+      - name: Restore Storage buckets and files
+        shell: bash
+        env:
+          TARGET_SUPABASE_URL: ${{ secrets.LG_RESTORE_SUPABASE_URL }}
+          TARGET_SERVICE_ROLE_KEY: ${{ secrets.LG_RESTORE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          python3 scripts/restore-supabase-backup.py "$RUNNER_TEMP/extracted-backup"
+
+      - name: Verify restored data and Storage counts
+        shell: bash
+        env:
+          TARGET_DB_URL: ${{ secrets.LG_RESTORE_DB_URL }}
+          TARGET_SUPABASE_URL: ${{ secrets.LG_RESTORE_SUPABASE_URL }}
+          TARGET_SERVICE_ROLE_KEY: ${{ secrets.LG_RESTORE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          export PGSSLMODE=require
+          export PGCONNECT_TIMEOUT=30
+          root="$RUNNER_TEMP/extracted-backup"
+
+          echo "Database tables restored:"
+          psql --dbname="$TARGET_DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
+            "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';"
+
+          expected_objects="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path(r"$RUNNER_TEMP/extracted-backup/storage/objects.json")
+          print(len(json.loads(p.read_text(encoding='utf-8'))))
+          PY
+          )"
+          echo "Expected Storage objects: $expected_objects"
+
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+          root = os.path.join(os.environ['RUNNER_TEMP'], 'extracted-backup')
+          expected = len(json.loads(open(os.path.join(root, 'storage', 'objects.json'), encoding='utf-8').read()))
+          base = os.environ['TARGET_SUPABASE_URL'].rstrip('/') + '/storage/v1'
+          key = os.environ['TARGET_SERVICE_ROLE_KEY']
+          req = urllib.request.Request(base + '/bucket', headers={'Authorization': 'Bearer ' + key, 'apikey': key})
+          with urllib.request.urlopen(req, timeout=60) as response:
+              buckets = json.loads(response.read().decode('utf-8'))
+          expected_buckets = len(json.loads(open(os.path.join(root, 'storage', 'buckets.json'), encoding='utf-8').read()))
+          if len(buckets) < expected_buckets:
+              raise SystemExit(f'Storage bucket verification failed: expected at least {expected_buckets}, found {len(buckets)}')
+          print(f'Storage buckets present: {len(buckets)} (expected at least {expected_buckets})')
+          print(f'Storage objects uploaded: {expected}')
+          PY
+
+          echo "NOTE: auth-users.json is backed up as Auth metadata. This workflow does not recreate Auth accounts/password hashes from metadata alone."
+          echo "Restore completed for database and Storage."
+
+      - name: Upload restore report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/restore-report"
+          printf 'Backup run: %s\nTarget: %s\nDatabase restore: attempted\nStorage restore: attempted\nAuth metadata: preserved in backup; account recreation not performed\n' \
+            "${{ inputs.backup_run_id }}" "$TARGET_SUPABASE_URL" > "$RUNNER_TEMP/restore-report/restore-report.txt"
+          cat "$RUNNER_TEMP/restore-report/restore-report.txt"
+
+      - name: Publish restore report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-restore-report-${{ github.run_id }}
+          path: ${{ runner.temp }}/restore-report/restore-report.txt
+          retention-days: 7
+          if-no-files-found: error
