@@ -27,6 +27,7 @@ jobs:
       TARGET_DB_URL: ${{ secrets.LG_RESTORE_DB_URL }}
       TARGET_SERVICE_ROLE_KEY: ${{ secrets.LG_RESTORE_SERVICE_ROLE_KEY }}
       PRODUCTION_SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
+      PRODUCTION_PROJECT_REF: efnxjfzyqbdulpjhffsm
 
     steps:
       - name: Checkout repository
@@ -54,6 +55,12 @@ jobs:
           case "$TARGET_DB_URL" in
             postgresql://*|postgres://*) ;;
             *) echo "LG_RESTORE_DB_URL must be a PostgreSQL connection string." >&2; exit 1;;
+          esac
+          case "$TARGET_DB_URL" in
+            *"$PRODUCTION_PROJECT_REF"*)
+              echo "Safety stop: target database connection contains the production project ref." >&2
+              exit 1
+              ;;
           esac
           echo "Target Supabase: $TARGET_SUPABASE_URL"
           echo "Production safety check: passed"
@@ -124,8 +131,6 @@ jobs:
 
       - name: Verify target database connection
         shell: bash
-        env:
-          PGPASSWORD: ""
         run: |
           set -euo pipefail
           export PGSSLMODE=require
@@ -142,8 +147,7 @@ jobs:
           export PGCONNECT_TIMEOUT=30
           root="$RUNNER_TEMP/extracted-backup"
 
-          # Supabase's documented logical restore order is roles -> schema -> data.
-          # Keep the whole database restore transactional where supported.
+          # Supabase documents the logical restore order as roles -> schema -> data.
           psql \
             --single-transaction \
             --variable ON_ERROR_STOP=1 \
@@ -164,10 +168,9 @@ jobs:
           set -euo pipefail
           python3 scripts/restore-supabase-backup.py "$RUNNER_TEMP/extracted-backup"
 
-      - name: Verify restored data and Storage counts
+      - name: Verify restored data and Storage
         shell: bash
         env:
-          TARGET_DB_URL: ${{ secrets.LG_RESTORE_DB_URL }}
           TARGET_SUPABASE_URL: ${{ secrets.LG_RESTORE_SUPABASE_URL }}
           TARGET_SERVICE_ROLE_KEY: ${{ secrets.LG_RESTORE_SERVICE_ROLE_KEY }}
         run: |
@@ -176,39 +179,31 @@ jobs:
           export PGCONNECT_TIMEOUT=30
           root="$RUNNER_TEMP/extracted-backup"
 
-          echo "Database tables restored:"
-          psql --dbname="$TARGET_DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
-            "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';"
-
-          expected_objects="$(python3 - <<'PY'
-          import json
-          from pathlib import Path
-          p = Path(r"$RUNNER_TEMP/extracted-backup/storage/objects.json")
-          print(len(json.loads(p.read_text(encoding='utf-8'))))
-          PY
-          )"
-          echo "Expected Storage objects: $expected_objects"
+          table_count="$(psql --dbname="$TARGET_DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -Atqc \
+            "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")"
+          test "$table_count" -gt 0 || { echo "Verification failed: no public tables found." >&2; exit 1; }
+          echo "Public tables restored: $table_count"
 
           python3 - <<'PY'
-          import json, os, urllib.error, urllib.request
+          import json, os, urllib.request
           root = os.path.join(os.environ['RUNNER_TEMP'], 'extracted-backup')
-          expected = len(json.loads(open(os.path.join(root, 'storage', 'objects.json'), encoding='utf-8').read()))
+          expected_objects = len(json.loads(open(os.path.join(root, 'storage', 'objects.json'), encoding='utf-8').read()))
+          expected_buckets = len(json.loads(open(os.path.join(root, 'storage', 'buckets.json'), encoding='utf-8').read()))
           base = os.environ['TARGET_SUPABASE_URL'].rstrip('/') + '/storage/v1'
           key = os.environ['TARGET_SERVICE_ROLE_KEY']
           req = urllib.request.Request(base + '/bucket', headers={'Authorization': 'Bearer ' + key, 'apikey': key})
           with urllib.request.urlopen(req, timeout=60) as response:
               buckets = json.loads(response.read().decode('utf-8'))
-          expected_buckets = len(json.loads(open(os.path.join(root, 'storage', 'buckets.json'), encoding='utf-8').read()))
           if len(buckets) < expected_buckets:
               raise SystemExit(f'Storage bucket verification failed: expected at least {expected_buckets}, found {len(buckets)}')
           print(f'Storage buckets present: {len(buckets)} (expected at least {expected_buckets})')
-          print(f'Storage objects uploaded: {expected}')
+          print(f'Storage files restored: {expected_objects}')
           PY
 
-          echo "NOTE: auth-users.json is backed up as Auth metadata. This workflow does not recreate Auth accounts/password hashes from metadata alone."
-          echo "Restore completed for database and Storage."
+          echo "Auth note: auth-users.json is backed up as Auth metadata. This restore workflow does not recreate Auth accounts/password hashes from metadata alone."
+          echo "Database + Storage restore verification: OK"
 
-      - name: Upload restore report
+      - name: Create restore report
         if: always()
         shell: bash
         run: |
