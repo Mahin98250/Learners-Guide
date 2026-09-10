@@ -24,7 +24,9 @@ function getSupabaseAdminKey() {
       const keys = JSON.parse(encoded);
       const defaultKey = keys?.default;
       if (typeof defaultKey === "string" && defaultKey.length > 0) return defaultKey;
-    } catch {}
+    } catch {
+      // Ignore malformed optional secret payload and report a single clear error below.
+    }
   }
   throw new Error("Supabase privileged key is unavailable to backup broker");
 }
@@ -255,7 +257,9 @@ async function requestMode(req: Request) {
   try {
     const body = await req.json();
     if (body?.mode === "database" || body?.mode === "storage") return body.mode;
-  } catch {}
+  } catch {
+    // Default to the complete backup mode when the optional JSON body is absent or malformed.
+  }
   return "complete" as const;
 }
 
