@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -51,29 +52,63 @@ def upload_file(base_url: str, key: str, bucket: str, object_path: str, local_pa
     encoded_path = "/".join(urllib.parse.quote(part, safe="") for part in object_path.split("/"))
     url = f"{base_url}/object/{encoded_bucket}/{encoded_path}"
     content_type = mimetypes.guess_type(local_path.name)[0] or "application/octet-stream"
-    req = urllib.request.Request(
-        url,
-        data=local_path.read_bytes(),
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {key}",
-            "apikey": key,
-            "Content-Type": content_type,
-            "x-upsert": "true",
-            "Cache-Control": "3600",
-        },
-    )
+
+    env = os.environ.copy()
+    env["SUPABASE_RESTORE_KEY"] = key
     try:
-        with urllib.request.urlopen(req, timeout=180) as response:
-            if response.status < 200 or response.status >= 300:
-                raise RestoreError(f"upload failed for {bucket}/{object_path}: HTTP {response.status}")
-    except urllib.error.HTTPError as exc:
-        raw = exc.read().decode("utf-8", errors="replace")
-        raise RestoreError(
-            f"upload failed for {bucket}/{object_path}: HTTP {exc.code}: {raw[:500]}"
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise RestoreError(f"upload failed for {bucket}/{object_path}: {exc}") from exc
+        result = subprocess.run(
+            [
+                "curl",
+                "--silent",
+                "--show-error",
+                "--fail",
+                "--retry",
+                "3",
+                "--retry-all-errors",
+                "--connect-timeout",
+                "30",
+                "--max-time",
+                "900",
+                "-X",
+                "POST",
+                url,
+                "-H",
+                "Authorization: Bearer $SUPABASE_RESTORE_KEY",
+                "-H",
+                "apikey: $SUPABASE_RESTORE_KEY",
+                "-H",
+                f"Content-Type: {content_type}",
+                "-H",
+                "x-upsert: true",
+                "-H",
+                "Cache-Control: 3600",
+                "--data-binary",
+                f"@{local_path}",
+            ],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise RestoreError(f"curl could not be started for {bucket}/{object_path}: {exc}") from exc
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "unknown curl error").strip()[:500]
+        raise RestoreError(f"upload failed for {bucket}/{object_path}: {detail}")
+
+
+def safe_object_path(root: Path, bucket: str, object_name: str) -> Path:
+    """Resolve a backup object and reject path traversal outside storage/files."""
+    if not bucket or not object_name:
+        raise RestoreError("Storage object bucket/name cannot be empty")
+    candidate = (root / bucket / object_name).resolve()
+    files_root = root.resolve()
+    try:
+        candidate.relative_to(files_root)
+    except ValueError as exc:
+        raise RestoreError(f"Unsafe Storage object path rejected: {bucket}/{object_name}") from exc
+    return candidate
 
 
 def main() -> int:
@@ -89,9 +124,10 @@ def main() -> int:
     if not supabase_url.startswith("https://"):
         raise RestoreError("TARGET_SUPABASE_URL must be an https Supabase project URL")
 
-    buckets_path = root / "storage" / "buckets.json"
-    objects_path = root / "storage" / "objects.json"
-    files_root = root / "storage" / "files"
+    storage_root = root / "storage"
+    buckets_path = storage_root / "buckets.json"
+    objects_path = storage_root / "objects.json"
+    files_root = storage_root / "files"
     if not buckets_path.is_file() or not objects_path.is_file() or not files_root.is_dir():
         raise RestoreError("Backup is missing storage/buckets.json, storage/objects.json, or storage/files")
 
@@ -138,7 +174,7 @@ def main() -> int:
         object_name = item.get("name")
         if not isinstance(bucket, str) or not isinstance(object_name, str):
             raise RestoreError("A storage object is missing bucket/name")
-        local_path = files_root / bucket / object_name
+        local_path = safe_object_path(files_root, bucket, object_name)
         if not local_path.is_file():
             raise RestoreError(f"Missing backed-up Storage file: {bucket}/{object_name}")
         upload_file(storage_api, service_role_key, bucket, object_name, local_path)
