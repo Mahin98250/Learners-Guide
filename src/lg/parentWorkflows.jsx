@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import { Badge, Card, Shell, AppBar, Sec } from "@/lg/ui";
+import { relativeDate } from "@/lg/dateUtils";
 
 const ParentNotifications = lazy(() => import("@/lg/ParentNotifications").then(m => ({ default: m.ParentNotifications })));
 const ParentHomework = lazy(() => import("@/lg/ParentHomework").then(m => ({ default: m.ParentHomework })));
@@ -101,7 +102,7 @@ export function ParentApp({ user, onLogout }) {
     <Card style={{ padding: 20 }}><div style={{ color: "#b42318", marginBottom: 12 }}>{error}</div><button type="button" onClick={() => void load()} style={{ minHeight: 42, padding: "0 16px", border: 0, borderRadius: 10, background: "#5146d9", color: "#fff", fontWeight: 800 }}>Try again</button></Card> : !selected ?
     <Card style={{ padding: 24, textAlign: "center", color: "#747c94" }}>No student is linked to this parent account.</Card> :
     <main className="parent-portal" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}>
-      <section className="pp-hero"><div className="pp-eyebrow">Parent dashboard</div><h1>Welcome back, {String(user?.name || "Parent").split(" ")[0]} 👋</h1><p>Everything important about your child's learning, in one place.</p><div className="pp-child"><div className="pp-avatar">{String(selected.name || "S").slice(0,1).toUpperCase()}</div><div className="pp-child-copy"><b>{selected.name}</b><small>Class {selected.cls}-{selected.sec} · SID {selected.sid}</small></div></div>{children.length > 1 && <select className="pp-select" value={selected.id} onChange={e => setSelectedId(e.target.value)} aria-label="Select child">{children.map(c => <option key={c.id} value={c.id}>{c.name} · {c.sid}</option>)}</select>}</section>
+      <section className="pp-hero"><div className="pp-eyebrow">Parent dashboard</div><h1>Welcome back, {String(user?.name || "Parent").split(" ")[0]} 👋</h1><p>Everything important about your child's learning, in one place.</p><div className="pp-child"><div className="pp-avatar">{String(selected.name || "S").slice(0,1).toUpperCase()}</div><div className="pp-child-copy"><b>{selected.name}</b><small>Class {selected.cls}-{selected.sec} · SID {selected.sid}</small></div></div>{children.length > 1 && <label style={{display:"block",marginTop:12}}><span style={{display:"block",fontSize:11,fontWeight:800,color:"rgba(255,255,255,.72)",marginBottom:5}}>VIEWING CHILD {children.length > 1 ? `· ${children.length} CHILDREN` : ""}</span><select className="pp-select" value={selected.id} onChange={e => setSelectedId(e.target.value)} aria-label="Select child">{children.map(c => <option key={c.id} value={c.id}>{c.name} · Class {c.cls}-{c.sec} · {c.sid}</option>)}</select></label>}</section>
       <div className="pp-grid">
         <div style={statCard}><div>✅</div><b className="pp-stat-value">{attendanceRate == null ? "—" : `${attendanceRate}%`}</b><span>Attendance</span></div>
         <div style={statCard}><div>📝</div><b className="pp-stat-value">{childHomework.length}</b><span>Homework</span></div>
