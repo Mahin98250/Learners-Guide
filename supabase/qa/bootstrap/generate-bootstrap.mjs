@@ -167,7 +167,11 @@ for (const col of sortBy(publicColumns, "table", "ordinal", "column")) {
 
 for (const idx of sortBy(baseline.indexes, "schema", "table", "name")) {
   if (idx.schema !== "public") continue;
-  push(idx.definition + ";");
+  if (!idx.definition) fail(`Index public.${idx.name} lacks definition`);
+  const ddl = String(idx.definition)
+    .replace(/\\bcreate\\s+unique\\s+index\\b/i, "create unique index if not exists")
+    .replace(/\\bcreate\\s+index\\b/i, "create index if not exists");
+  push(ddl + ";");
 }
 
 for (const table of tables.filter((t) => t.schema === "public" && t.rls)) {
