@@ -1,0 +1,117 @@
+name: QA Local Supabase Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - "supabase/schema-baseline/**"
+      - "supabase/qa/bootstrap/**"
+      - "supabase/config.toml"
+      - ".github/workflows/qa-local-supabase-bootstrap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Reconstruct local Supabase from production baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Verify local tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          docker --version
+          docker compose version
+          supabase --version
+          psql --version
+
+      - name: Generate executable bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          node supabase/qa/bootstrap/generate-bootstrap.mjs
+          test -s supabase/qa/bootstrap/production-derived-bootstrap.sql
+          ! grep -Eiq '(^|[[:space:]])(insert[[:space:]]+into[[:space:]]+public\.|copy[[:space:]]+public\.)' supabase/qa/bootstrap/production-derived-bootstrap.sql
+          ! grep -Eiq '(encrypted_password|refresh_token|service_role_key|access_token)' supabase/qa/bootstrap/production-derived-bootstrap.sql
+
+      - name: Quarantine historical migrations for this CI workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv supabase/migrations supabase/migrations.historical
+          mkdir -p supabase/migrations
+
+      - name: Start fresh Local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
+          supabase start
+
+      - name: Verify local target
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_file="$RUNNER_TEMP/supabase.env"
+          supabase status -o env > "$env_file"
+          chmod 600 "$env_file"
+          . "$env_file"
+          SUPABASE_URL="${API_URL:-}"
+          export SUPABASE_URL
+          node supabase/qa/bootstrap/assert-local-target.mjs
+          case "$DB_URL" in
+            postgresql://*127.0.0.1:54322/*|postgresql://*localhost:54322/*) ;;
+            *) echo "Refusing non-local DB URL target"; exit 1 ;;
+          esac
+          printf 'LOCAL_DB_URL=%s\n' "$DB_URL" >> "$GITHUB_ENV"
+          printf 'SUPABASE_LOCAL_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          rm -f "$env_file"
+
+      - name: Apply production-derived structural baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$LOCAL_DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -f supabase/qa/bootstrap/production-derived-bootstrap.sql
+
+      - name: Verify reconstructed structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          node supabase/qa/bootstrap/verify-bootstrap.mjs
+
+      - name: Upload generated bootstrap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-local-bootstrap-evidence
+          path: |
+            supabase/qa/bootstrap/production-derived-bootstrap.sql
+            supabase/schema-baseline/production-derived-schema-baseline.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Stop Local Supabase
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase stop --no-backup || true
