@@ -1,14 +1,13 @@
 name: Local Supabase Capability Check
 
+# This was a one-time infrastructure capability check.
+# Keep it manual so normal QA commits do not consume Actions minutes.
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/local-supabase-capability.yml"
-      - "supabase/**"
-      - "package.json"
-      - "playwright.config.ts"
-      - "tests/e2e/**"
   workflow_dispatch:
+
+concurrency:
+  group: local-supabase-capability
+  cancel-in-progress: true
 
 permissions:
   contents: read
