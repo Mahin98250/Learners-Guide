@@ -36,6 +36,19 @@ if(canonical(expectedTables)!==canonical(actualTables)) fail("Table set/RLS stat
 const expectedCols=names(baseline.columns.filter(x=>x.schema==="public"),x=>`${x.schema}.${x.table}.${x.column}|${x.type}|${x.udt}|${x.nullable}|${x.default??""}`);
 const actualCols=names(actualData.columns,x=>`${x.schema}.${x.table}.${x.column}|${x.type}|${x.udt}|${x.nullable}|${x.default??""}`);
 if(canonical(expectedCols)!==canonical(actualCols)) fail("Column/type/default/nullability mismatch.");
+const expConstraints=names(baseline.constraints.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.type}|${x.definition}`);
+const actConstraints=names(actualData.constraints.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.type}|${x.definition}`);
+if(canonical(expConstraints)!==canonical(actConstraints)) fail("Constraint mismatch.");
+const expIndexes=names(baseline.indexes.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.definition}`);
+const actIndexes=names(actualData.indexes.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.definition}`);
+if(canonical(expIndexes)!==canonical(actIndexes)) fail("Index mismatch.");
+const expTableGrants=names(baseline.table_grants.filter(x=>x.schema==="public"),x=>`${x.table}|${x.grantee}|${x.privilege}`);
+const actTableGrants=names(actualData.table_grants.filter(x=>x.schema==="public"),x=>`${x.table}|${x.grantee}|${x.privilege}`);
+for(const g of expTableGrants){if(!actTableGrants.includes(g)) fail("Missing table grant: "+g);}
+const expRoutineGrants=names(baseline.routine_grants.filter(x=>x.schema==="public"),x=>`${x.routine}|${x.grantee}|${x.privilege}`);
+const actRoutineGrants=names(actualData.routine_grants.filter(x=>x.schema==="public"),x=>`${x.routine}|${x.grantee}|${x.privilege}`);
+for(const g of expRoutineGrants){if(!actRoutineGrants.includes(g)) fail("Missing routine grant: "+g);}
+
 const expFns=names(baseline.functions,x=>`${x.schema}.${x.name}(${x.args??""})|${x.language}|${x.security_definer}|${x.definition}`);
 const actFns=names(actualData.functions,x=>`${x.schema}.${x.name}(${x.args??""})|${x.language}|${x.security_definer}|${x.definition}`);
 if(canonical(expFns)!==canonical(actFns)) fail("Function definitions/security mismatch.");
@@ -54,14 +67,21 @@ if(canonical(expBuckets)!==canonical(actBuckets)) fail("Storage bucket configura
 const expSP=names(baseline.storage_policies,x=>`${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using_expression??""}|${x.with_check??""}`);
 const actSP=names(actualData.storage_policies,x=>`${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using??""}|${x.check??""}`);
 if(canonical(expSP)!==canonical(actSP)) fail("Storage policy mismatch.");
+const views=(actualData.views||[]).filter(x=>x.schema==="public" && x.name!=="storage.objects");
+const expectedViews=(baseline.views||[]).filter(x=>x.schema==="public" && x.name!=="storage.objects" && !/\\bstorage\\.objects\\b/i.test(String(x.definition??"")));
+if(JSON.stringify(names(expectedViews,x=>`${x.schema}.${x.name}|${x.definition}`))!==JSON.stringify(names(views,x=>`${x.schema}.${x.name}|${x.definition}`))) fail("View mismatch.");
 console.log(JSON.stringify({
   PASS:true,
   tables:expectedTables.length,
   columns:expectedCols.length,
+  constraints:expConstraints.length,
+  indexes:expIndexes.length,
   functions:expFns.length,
   triggers:expTrig.length,
   rlsPolicies:expPolicies.length,
   extensions:expExt.length,
   storageBuckets:expBuckets.length,
-  storagePolicies:expSP.length
+  storagePolicies:expSP.length,
+  minimumTableGrants:expTableGrants.length,
+  minimumRoutineGrants:expRoutineGrants.length
 },null,2));
