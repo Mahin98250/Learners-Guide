@@ -1,0 +1,79 @@
+name: Local Supabase Capability Check
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/local-supabase-capability.yml"
+      - "supabase/**"
+      - "package.json"
+      - "playwright.config.ts"
+      - "tests/e2e/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-supabase-capability:
+    name: Verify Docker + Local Supabase Runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Runtime versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          docker --version
+          docker compose version
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+
+      - name: Verify Playwright package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts
+          npx playwright --version
+
+      - name: Install Chromium for browser capability check
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+
+      - name: Verify Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --list
+
+      - name: Start isolated Local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
+          supabase start
+          supabase status
+
+      - name: Stop isolated Local Supabase
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase stop --no-backup || true
