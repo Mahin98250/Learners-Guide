@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import { C } from "@/lg/data";
 import { Card, Sec } from "@/lg/ui";
+import { relativeDate } from "@/lg/dateUtils";
 
 export function StudentAnnouncements({ student }) {
   const [rows, setRows] = useState([]);
