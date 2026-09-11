@@ -39,13 +39,19 @@ export function StudentAnnouncements({ student }) {
       {loading ? (
         <Card style={{ padding: 28, textAlign: "center", color: C.sub }}>Loading announcements…</Card>
       ) : rows.length ? (
-        rows.map((row) => (
-          <Card key={row.id} style={{ marginBottom: 10 }}>
-            <div style={{ fontWeight: 900 }}>{row.title || "Announcement"}</div>
-            <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{row.date || row.created_at || "—"}</div>
-            {row.desc && <div style={{ marginTop: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{row.desc}</div>}
-          </Card>
-        ))
+        rows.map((row) => {
+          const d = relativeDate(row.date || row.created_at);
+          return (
+            <Card key={row.id} style={{ marginBottom: 10, borderLeft: d.primary === "Today" ? "4px solid #EF4444" : "1px solid #EEF2FF" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ fontWeight: 900, minWidth: 0 }}>{row.title || "Announcement"}</div>
+                <span style={{ flexShrink: 0, padding: "4px 9px", borderRadius: 999, background: d.primary === "Today" ? "#FEE2E2" : "#EEF2FF", color: d.primary === "Today" ? "#B91C1C" : C.accent, fontSize: 10, fontWeight: 900 }}>{d.primary}</span>
+              </div>
+              <div style={{ fontSize: 11, color: C.sub, marginTop: 5 }}>{d.secondary || "Announcement date"}</div>
+              {row.desc && <div style={{ marginTop: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{row.desc}</div>}
+            </Card>
+          );
+        })
       ) : (
         <Card style={{ padding: 24, textAlign: "center", color: C.sub }}>No announcements are available for you right now.</Card>
       )}
