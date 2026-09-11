@@ -51,15 +51,23 @@ for (const key of [
   "extensions","table_grants","routine_grants","storage_buckets","storage_policies","types","views"
 ]) assertArray(baseline, key);
 
-const MANAGED_RELATIONS = new Set([
+// The production export flattens managed Supabase qualified relations under
+// schema="public", storing the full qualified relation name in the table field.
+// Example: { schema: "public", table: "storage.objects" }.
+const MANAGED_EXTERNAL_RELATIONS = new Set([
   "auth.users",
   "storage.objects",
 ]);
 
-const relationKey = (schema, name) => `${schema}.${name}`;
+const normalizeRelation = (schema, name) => {
+  const qualifiedName = `${schema}.${name}`;
+  if (schema === "public" && MANAGED_EXTERNAL_RELATIONS.has(name)) return name;
+  if (MANAGED_EXTERNAL_RELATIONS.has(qualifiedName)) return qualifiedName;
+  return qualifiedName;
+};
 
-const isManagedRelationReference = (schema, name) =>
-  MANAGED_RELATIONS.has(relationKey(schema, name));
+const isManagedExternalRelation = (schema, name) =>
+  MANAGED_EXTERNAL_RELATIONS.has(normalizeRelation(schema, name));
 
 const tables = sortBy(
   baseline.catalog_tables.filter((t) => !isManagedRelationReference(t.schema, t.name)),
@@ -75,7 +83,7 @@ for (const c of sortBy(publicColumns, "table", "ordinal", "column")) {
   columnsByTable.get(c.table).push(c);
 }
 const tableNames = new Set(tables.filter((t) => t.schema === "public").map((t) => t.name));
-const managedRelationNames = new Set(MANAGED_RELATIONS);
+const managedRelationNames = new Set(MANAGED_EXTERNAL_RELATIONS);
 
 const publicTypes = sortBy(
   baseline.types.filter((t) => t.schema === "public" && (t.kind === "e" || t.kind === "d")),
