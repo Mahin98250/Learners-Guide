@@ -3,7 +3,6 @@ import { Card, Sec, Badge } from "@/lg/ui";
 import { C } from "@/lg/data";
 import { supabase, SB_KEY, SB_URL } from "@/lg/supabase";
 import { dueState } from "@/lg/dateUtils";
-import { dueState } from "@/lg/dateUtils";
 
 const DB_NAME = "learners-guide-offline-pdfs";
 const STORE = "files";
@@ -142,7 +141,7 @@ function PdfViewer({ file, onClose }) {
 
 export function ParentHomework({ homework = [] }) {
   const [selected, setSelected] = useState(null);
-  const [filter, setFilter] = useState("all");\n  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [viewer, setViewer] = useState(null);
