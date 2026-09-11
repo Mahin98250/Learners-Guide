@@ -209,7 +209,10 @@ const functionList = sortBy(baseline.functions, "schema", "name", "args");
 for (const fn of functionList) {
   if (fn.schema !== "public") continue;
   if (!fn.definition) fail(`Function public.${fn.name}(${fn.args ?? ""}) has no definition`);
-  push(fn.definition + "\n");
+  const functionDdl = fn.definition.trimEnd().endsWith(";")
+    ? fn.definition.trimEnd()
+    : fn.definition.trimEnd() + ";";
+  push(functionDdl + "\n");
 }
 
 for (const trigger of sortBy(baseline.triggers, "schema", "table", "name", "event")) {
