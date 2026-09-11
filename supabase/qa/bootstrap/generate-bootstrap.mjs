@@ -51,14 +51,31 @@ for (const key of [
   "extensions","table_grants","routine_grants","storage_buckets","storage_policies","types","views"
 ]) assertArray(baseline, key);
 
-const tables = sortBy(baseline.catalog_tables, "schema", "name");
-const publicColumns = baseline.columns.filter((c) => c.schema === "public");
+const MANAGED_RELATIONS = new Set([
+  "auth.users",
+  "storage.objects",
+]);
+
+const relationKey = (schema, name) => `${schema}.${name}`;
+
+const isManagedRelationReference = (schema, name) =>
+  MANAGED_RELATIONS.has(relationKey(schema, name));
+
+const tables = sortBy(
+  baseline.catalog_tables.filter((t) => !isManagedRelationReference(t.schema, t.name)),
+  "schema", "name"
+);
+
+const publicColumns = baseline.columns.filter(
+  (c) => c.schema === "public" && !isManagedRelationReference(c.schema, c.table)
+);
 const columnsByTable = new Map();
 for (const c of sortBy(publicColumns, "table", "ordinal", "column")) {
   if (!columnsByTable.has(c.table)) columnsByTable.set(c.table, []);
   columnsByTable.get(c.table).push(c);
 }
 const tableNames = new Set(tables.filter((t) => t.schema === "public").map((t) => t.name));
+const managedRelationNames = new Set(MANAGED_RELATIONS);
 
 const publicTypes = sortBy(
   baseline.types.filter((t) => t.schema === "public" && (t.kind === "e" || t.kind === "d")),
@@ -67,13 +84,17 @@ const publicTypes = sortBy(
 const generatedRowTypes = baseline.types.filter((t) => t.schema === "public" && t.kind === "c");
 
 for (const c of publicColumns) {
-  if (!tableNames.has(c.table)) fail(`Column references missing table public.${c.table}`);
+  if (!tableNames.has(c.table) && !isManagedRelationReference(c.schema, c.table)) {
+    fail(`Column references missing application table ${c.schema}.${c.table}`);
+  }
   if (!c.type) fail(`Missing type for public.${c.table}.${c.column}`);
 }
 
 for (const constraint of baseline.constraints) {
   if (constraint.schema !== "public") continue;
-  if (!tableNames.has(constraint.table)) fail(`Constraint references missing table public.${constraint.table}`);
+  if (!tableNames.has(constraint.table) && !isManagedRelationReference("public", constraint.table)) {
+    fail(`Constraint references missing application table public.${constraint.table}`);
+  }
 }
 
 const statements = [];
@@ -208,6 +229,8 @@ for (const grant of sortBy(baseline.routine_grants, "schema", "routine", "grante
   }
 }
 
+push("-- Managed Supabase relations are externally supplied and are never recreated.");
+push(`-- Explicit managed relations allowlisted: ${[...managedRelationNames].sort().join(", ")}.`);
 push("-- Storage configuration is intentionally limited to buckets/policies; storage.objects itself is Supabase-managed.");
 for (const bucket of sortBy(baseline.storage_buckets, "id")) {
   const mime = Array.isArray(bucket.allowed_mime_types)
