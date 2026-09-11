@@ -260,9 +260,12 @@ export function ParentHomework({ homework = [] }) {
     );
   }
 
+  const filteredHomework = homework.filter(item => { const state = item.due ? dueState(item.due).key : "none"; return filter === "all" || state === filter; }).sort((a,b) => String(a.due || "9999-12-31").localeCompare(String(b.due || "9999-12-31")));
+  const filterCounts = { all: homework.length, today: homework.filter(i => dueState(i.due).key === "today").length, tomorrow: homework.filter(i => dueState(i.due).key === "tomorrow").length, overdue: homework.filter(i => dueState(i.due).key === "overdue").length };
   return (
     <>
       <Sec title="Homework" />
+      {homework.length > 0 && <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:9,marginBottom:4}}>{[["all","All"],["today","Today"],["tomorrow","Tomorrow"],["overdue","Overdue"]].map(([key,label])=><button key={key} type="button" onClick={()=>setFilter(key)} style={{whiteSpace:"nowrap",border:0,borderRadius:999,padding:"7px 11px",background:filter===key?C.accent:"#EEF2FF",color:filter===key?"#fff":C.accent,fontSize:11,fontWeight:800}}>{label} · {filterCounts[key]}</button>)}</div>}
       {!homework.length ? (
         <Card>No homework assigned 🎉</Card>
       ) : (
