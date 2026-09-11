@@ -43,8 +43,8 @@ if (baseline.artifact_type !== "PRODUCTION-DERIVED SCHEMA BASELINE") {
 if (baseline.data_policy && /production application rows|auth\.users rows.*included/i.test(baseline.data_policy)) {
   fail("Baseline data policy is unsafe.");
 }
-if (baseline.source_project_ref === "efnxjfzyqbdulpjhffsm" && process.env.E2E_ENV === "E2E_LOCAL_ONLY") {
-  // The source reference documents where the snapshot came from. It is never used as a connection target.
+if (baseline.source_project_ref === "efnxjfzyqbdulpjhffsm") {
+  // The source ref documents where the snapshot came from. It is never used as a connection target.
 }
 for (const key of [
   "catalog_tables","columns","constraints","indexes","functions","triggers","policies",
@@ -125,19 +125,6 @@ for (const table of tables.filter((t) => t.schema === "public")) {
 }
 
 const generatedPkUniqueNames = new Set();
-for (const constraint of sortBy(baseline.constraints, "schema", "table", "name")) {
-  if (constraint.schema !== "public") continue;
-  push(`alter table ${qualified(constraint.schema, constraint.table)} add constraint ${escIdent(constraint.name)} ${constraint.definition};`);
-  if (constraint.type === "PRIMARY KEY" || constraint.type === "UNIQUE") generatedPkUniqueNames.add(constraint.name);
-}
-
-// Defaults are applied after tables/constraints so function dependencies can exist first.
-for (const col of sortBy(publicColumns, "table", "ordinal", "column")) {
-  if (col.default) {
-    push(`alter table ${qualified("public", col.table)} alter column ${escIdent(col.column)} set default ${col.default};`);
-  }
-}
-
 const normalViews = baseline.views.filter((v) =>
   v.schema === "public" &&
   v.name !== "storage.objects" &&
@@ -166,6 +153,18 @@ for (const trigger of sortBy(baseline.triggers, "schema", "table", "name", "even
   push(`create trigger ${escIdent(trigger.name)} ${timingSql} ${eventSql} on ${qualified(trigger.schema, trigger.table)} for each ${orientation.toLowerCase()} ${trigger.definition};`);
 }
 
+for (const constraint of sortBy(baseline.constraints, "schema", "table", "name")) {
+  if (constraint.schema !== "public") continue;
+  push(`alter table ${qualified(constraint.schema, constraint.table)} add constraint ${escIdent(constraint.name)} ${constraint.definition};`);
+}
+
+// Defaults are emitted after functions exist so defaults that call helper functions are safe.
+for (const col of sortBy(publicColumns, "table", "ordinal", "column")) {
+  if (col.default) {
+    push(`alter table ${qualified("public", col.table)} alter column ${escIdent(col.column)} set default ${col.default};`);
+  }
+}
+
 for (const idx of sortBy(baseline.indexes, "schema", "table", "name")) {
   if (idx.schema !== "public") continue;
   push(idx.definition + ";");
@@ -190,9 +189,19 @@ for (const grant of sortBy(baseline.table_grants, "schema", "table", "grantee", 
   push(`grant ${grant.privilege} on table ${qualified(grant.schema, grant.table)} to ${escIdent(grant.grantee)};`);
 }
 
+const functionsByName = new Map();
+for (const fn of functionList) {
+  const key = `${fn.schema}.${fn.name}`;
+  if (!functionsByName.has(key)) functionsByName.set(key, []);
+  functionsByName.get(key).push(fn);
+}
 for (const grant of sortBy(baseline.routine_grants, "schema", "routine", "grantee", "privilege")) {
   if (grant.schema !== "public") continue;
-  push(`grant ${grant.privilege} on function ${qualified(grant.schema, grant.routine)} to ${escIdent(grant.grantee)};`);
+  const matches = functionsByName.get(`${grant.schema}.${grant.routine}`) ?? [];
+  if (!matches.length) fail(`Routine grant references missing function ${grant.schema}.${grant.routine}`);
+  for (const fn of matches) {
+    push(`grant ${grant.privilege} on function ${qualified(fn.schema, fn.name)}(${fn.args ?? ""}) to ${escIdent(grant.grantee)};`);
+  }
 }
 
 push("-- Storage configuration is intentionally limited to buckets/policies; storage.objects itself is Supabase-managed.");
