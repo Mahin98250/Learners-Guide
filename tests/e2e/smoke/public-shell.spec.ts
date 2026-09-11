@@ -15,8 +15,10 @@ test("public shell renders and exposes role entry points", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle(/Learner's Guide/i);
 
-  await expect(page.getByRole("button", { name: /student/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /teacher/i })).toBeVisible();
+  // Match the role-entry labels by their distinctive leading text. A broad
+  // /student/i locator also matches the Teacher card's "students" hint.
+  await expect(page.getByRole("button", { name: /^🎓 Student View/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^👨‍🏫 Teacher Manage/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /parent/i })).toBeVisible();
 
   expect(httpFailures, `Unexpected HTTP 5xx responses:\n${httpFailures.join("\n")}`).toEqual([]);
