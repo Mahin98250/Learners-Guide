@@ -70,12 +70,12 @@ const isManagedExternalRelation = (schema, name) =>
   MANAGED_EXTERNAL_RELATIONS.has(normalizeRelation(schema, name));
 
 const tables = sortBy(
-  baseline.catalog_tables.filter((t) => !isManagedRelationReference(t.schema, t.name)),
+  baseline.catalog_tables.filter((t) => !isManagedExternalRelation(t.schema, t.name)),
   "schema", "name"
 );
 
 const publicColumns = baseline.columns.filter(
-  (c) => c.schema === "public" && !isManagedRelationReference(c.schema, c.table)
+  (c) => c.schema === "public" && !isManagedExternalRelation(c.schema, c.table)
 );
 const columnsByTable = new Map();
 for (const c of sortBy(publicColumns, "table", "ordinal", "column")) {
@@ -92,7 +92,7 @@ const publicTypes = sortBy(
 const generatedRowTypes = baseline.types.filter((t) => t.schema === "public" && t.kind === "c");
 
 for (const c of publicColumns) {
-  if (!tableNames.has(c.table) && !isManagedRelationReference(c.schema, c.table)) {
+  if (!tableNames.has(c.table) && !isManagedExternalRelation(c.schema, c.table)) {
     fail(`Column references missing application table ${c.schema}.${c.table}`);
   }
   if (!c.type) fail(`Missing type for public.${c.table}.${c.column}`);
@@ -100,7 +100,7 @@ for (const c of publicColumns) {
 
 for (const constraint of baseline.constraints) {
   if (constraint.schema !== "public") continue;
-  if (!tableNames.has(constraint.table) && !isManagedRelationReference("public", constraint.table)) {
+  if (!tableNames.has(constraint.table) && !isManagedExternalRelation("public", constraint.table)) {
     fail(`Constraint references missing application table public.${constraint.table}`);
   }
 }
