@@ -97,7 +97,15 @@ jobs:
         run: npm run preview -- --host 127.0.0.1 > /tmp/learner-guide-vite.log 2>&1 &
 
       - name: Wait for local application
-        run: npx playwright wait-for-server http://127.0.0.1:4173
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/learner-guide-vite.log
+          exit 1
 
       - name: Run Playwright public shell smoke
         env:
