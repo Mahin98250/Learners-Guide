@@ -56,7 +56,7 @@ jobs:
           cmp -s supabase/qa/bootstrap/production-derived-bootstrap.sql supabase/qa/bootstrap/production-derived-bootstrap.second.sql
           ! grep -Eiq 'create[[:space:]]+table[[:space:]]+.*storage[.]objects|create[[:space:]]+table[[:space:]]+.*auth[.]users' supabase/qa/bootstrap/production-derived-bootstrap.sql
           grep -Fq 'Managed Supabase relations are externally supplied' supabase/qa/bootstrap/production-derived-bootstrap.sql
-          test "$(grep -Eic 'create[[:space:]]+table[[:space:]]+" supabase/qa/bootstrap/production-derived-bootstrap.sql)" -eq 27
+          test "$(grep -Eic 'create[[:space:]]+table[[:space:]]+' supabase/qa/bootstrap/production-derived-bootstrap.sql)" -eq 27
           ! grep -Eiq '(^|[[:space:]])(insert[[:space:]]+into[[:space:]]+public\.|copy[[:space:]]+public\.)' supabase/qa/bootstrap/production-derived-bootstrap.sql
           ! grep -Eiq '(encrypted_password|refresh_token|service_role_key|access_token)' supabase/qa/bootstrap/production-derived-bootstrap.sql
 
