@@ -13,7 +13,7 @@ const statCard = { padding: 14, borderRadius: 16, background: "#fff", border: "1
 const row = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: "1px solid #f0f1f6", minWidth: 0 };
 const percentage = (marks, total) => Number.isFinite(Number(marks)) && Number(total) > 0 ? Math.round(Number(marks) / Number(total) * 100) : null;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const dayName = value => { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 6 ? DAY_NAMES[n] : "Scheduled"; };
+const dayName = value => { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 6 ? DAY_NAMES[n] : "Scheduled"; }; const todayDayNumber = () => { const d = new Date().getDay(); return d === 0 ? 7 : d; };
 
 export function ParentApp({ user, onLogout }) {
   const [children, setChildren] = useState([]), [selectedId, setSelectedId] = useState(null);
@@ -83,7 +83,7 @@ export function ParentApp({ user, onLogout }) {
   const childTests = tests.filter(t => childBatchIds.has(String(t.batch_id)));
   const childResults = results.filter(r => String(r.student_id) === String(selected?.id));
   const childHomework = homework.filter(h => childBatchIds.has(String(h.batch_id)));
-  const childTimetable = timetable.filter(t => childBatchIds.has(String(t.batch_id)));
+  const childTimetable = timetable.filter(t => childBatchIds.has(String(t.batch_id))).sort((a,b) => { const ad=Number(a.day_of_week), bd=Number(b.day_of_week), today=todayDayNumber(); const ar=ad===today?0:1, br=bd===today?0:1; return ar-br || ad-bd || String(a.start_time||"").localeCompare(String(b.start_time||"")); });
   const attendanceRate = childAttendance.length ? Math.round(childAttendance.filter(a => String(a.status).toLowerCase() === "present").length / childAttendance.length * 100) : null;
   const upcomingTests = childTests.filter(t => !t.test_date || new Date(t.test_date) >= new Date());
   const resultPercentages = childResults.map(r => percentage(r.marks, r.test?.total_marks)).filter(x => x != null);
