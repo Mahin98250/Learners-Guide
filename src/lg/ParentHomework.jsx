@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Card, Sec, Badge } from "@/lg/ui";
 import { C } from "@/lg/data";
 import { supabase, SB_KEY, SB_URL } from "@/lg/supabase";
+import { dueState } from "@/lg/dateUtils";
 
 const DB_NAME = "learners-guide-offline-pdfs";
 const STORE = "files";
@@ -140,6 +141,7 @@ function PdfViewer({ file, onClose }) {
 
 export function ParentHomework({ homework = [] }) {
   const [selected, setSelected] = useState(null);
+  const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [viewer, setViewer] = useState(null);
@@ -258,20 +260,23 @@ export function ParentHomework({ homework = [] }) {
     );
   }
 
+  const filteredHomework = homework.filter(item => { const state = item.due ? dueState(item.due).key : "none"; return filter === "all" || state === filter; }).sort((a,b) => String(a.due || "9999-12-31").localeCompare(String(b.due || "9999-12-31")));
+  const filterCounts = { all: homework.length, today: homework.filter(i => dueState(i.due).key === "today").length, tomorrow: homework.filter(i => dueState(i.due).key === "tomorrow").length, overdue: homework.filter(i => dueState(i.due).key === "overdue").length };
   return (
     <>
       <Sec title="Homework" />
+      {homework.length > 0 && <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:9,marginBottom:4}}>{[["all","All"],["today","Today"],["tomorrow","Tomorrow"],["overdue","Overdue"]].map(([key,label])=><button key={key} type="button" onClick={()=>setFilter(key)} style={{whiteSpace:"nowrap",border:0,borderRadius:999,padding:"7px 11px",background:filter===key?C.accent:"#EEF2FF",color:filter===key?"#fff":C.accent,fontSize:11,fontWeight:800}}>{label} · {filterCounts[key]}</button>)}</div>}
       {!homework.length ? (
         <Card>No homework assigned 🎉</Card>
       ) : (
-        homework.map((item) => (
+        filteredHomework.map((item) => (
           <Card key={item.id} style={{ marginBottom: 9, cursor: "pointer" }} onClick={() => setSelected(item)}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
               <div>
                 <Badge label={item.subject || "Subject"} />
                 <div style={{ fontWeight: 800, marginTop: 7 }}>{item.title || item.desc || "Homework"}</div>
                 <div style={{ fontSize: 11, color: C.sub }}>Due: {item.due || "—"}</div>
-                {item.due && <div style={{ fontSize: 11, fontWeight: 800, color: item.due < new Date().toISOString().slice(0, 10) ? C.red : C.accent, marginTop: 3 }}>{dueLabel(item.due)}</div>}
+                {item.due && (() => { const state = dueState(item.due); const color = state.key === "overdue" ? C.red : state.key === "today" ? "#D97706" : C.accent; return <div style={{display:"inline-block",marginTop:4,padding:"4px 8px",borderRadius:999,background:color+"18",color,fontSize:10,fontWeight:900}}>{state.label}</div>; })()}
               </div>
               {item.pdfname && <span style={{ fontSize: 18 }} title="PDF attached">📄</span>}
             </div>

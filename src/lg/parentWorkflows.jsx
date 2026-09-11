@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import { Badge, Card, Shell, AppBar, Sec } from "@/lg/ui";
+import { relativeDate } from "@/lg/dateUtils";
 
 const ParentNotifications = lazy(() => import("@/lg/ParentNotifications").then(m => ({ default: m.ParentNotifications })));
 const ParentHomework = lazy(() => import("@/lg/ParentHomework").then(m => ({ default: m.ParentHomework })));
@@ -12,7 +13,7 @@ const statCard = { padding: 14, borderRadius: 16, background: "#fff", border: "1
 const row = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: "1px solid #f0f1f6", minWidth: 0 };
 const percentage = (marks, total) => Number.isFinite(Number(marks)) && Number(total) > 0 ? Math.round(Number(marks) / Number(total) * 100) : null;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const dayName = value => { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 6 ? DAY_NAMES[n] : "Scheduled"; };
+const dayName = value => { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 6 ? DAY_NAMES[n] : "Scheduled"; }; const todayDayNumber = () => { const d = new Date().getDay(); return d === 0 ? 7 : d; };
 
 export function ParentApp({ user, onLogout }) {
   const [children, setChildren] = useState([]), [selectedId, setSelectedId] = useState(null);
@@ -82,7 +83,7 @@ export function ParentApp({ user, onLogout }) {
   const childTests = tests.filter(t => childBatchIds.has(String(t.batch_id)));
   const childResults = results.filter(r => String(r.student_id) === String(selected?.id));
   const childHomework = homework.filter(h => childBatchIds.has(String(h.batch_id)));
-  const childTimetable = timetable.filter(t => childBatchIds.has(String(t.batch_id)));
+  const childTimetable = timetable.filter(t => childBatchIds.has(String(t.batch_id))).sort((a,b) => { const ad=Number(a.day_of_week), bd=Number(b.day_of_week), today=todayDayNumber(); const ar=ad===today?0:1, br=bd===today?0:1; return ar-br || ad-bd || String(a.start_time||"").localeCompare(String(b.start_time||"")); });
   const attendanceRate = childAttendance.length ? Math.round(childAttendance.filter(a => String(a.status).toLowerCase() === "present").length / childAttendance.length * 100) : null;
   const upcomingTests = childTests.filter(t => !t.test_date || new Date(t.test_date) >= new Date());
   const resultPercentages = childResults.map(r => percentage(r.marks, r.test?.total_marks)).filter(x => x != null);
@@ -101,7 +102,7 @@ export function ParentApp({ user, onLogout }) {
     <Card style={{ padding: 20 }}><div style={{ color: "#b42318", marginBottom: 12 }}>{error}</div><button type="button" onClick={() => void load()} style={{ minHeight: 42, padding: "0 16px", border: 0, borderRadius: 10, background: "#5146d9", color: "#fff", fontWeight: 800 }}>Try again</button></Card> : !selected ?
     <Card style={{ padding: 24, textAlign: "center", color: "#747c94" }}>No student is linked to this parent account.</Card> :
     <main className="parent-portal" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}>
-      <section className="pp-hero"><div className="pp-eyebrow">Parent dashboard</div><h1>Welcome back, {String(user?.name || "Parent").split(" ")[0]} 👋</h1><p>Everything important about your child's learning, in one place.</p><div className="pp-child"><div className="pp-avatar">{String(selected.name || "S").slice(0,1).toUpperCase()}</div><div className="pp-child-copy"><b>{selected.name}</b><small>Class {selected.cls}-{selected.sec} · SID {selected.sid}</small></div></div>{children.length > 1 && <select className="pp-select" value={selected.id} onChange={e => setSelectedId(e.target.value)} aria-label="Select child">{children.map(c => <option key={c.id} value={c.id}>{c.name} · {c.sid}</option>)}</select>}</section>
+      <section className="pp-hero"><div className="pp-eyebrow">Parent dashboard</div><h1>Welcome back, {String(user?.name || "Parent").split(" ")[0]} 👋</h1><p>Everything important about your child's learning, in one place.</p><div className="pp-child"><div className="pp-avatar">{String(selected.name || "S").slice(0,1).toUpperCase()}</div><div className="pp-child-copy"><b>{selected.name}</b><small>Class {selected.cls}-{selected.sec} · SID {selected.sid}</small></div></div>{children.length > 1 && <label style={{display:"block",marginTop:12}}><span style={{display:"block",fontSize:11,fontWeight:800,color:"rgba(255,255,255,.72)",marginBottom:5}}>VIEWING CHILD {children.length > 1 ? `· ${children.length} CHILDREN` : ""}</span><select className="pp-select" value={selected.id} onChange={e => setSelectedId(e.target.value)} aria-label="Select child">{children.map(c => <option key={c.id} value={c.id}>{c.name} · Class {c.cls}-{c.sec} · {c.sid}</option>)}</select></label>}</section>
       <div className="pp-grid">
         <div style={statCard}><div>✅</div><b className="pp-stat-value">{attendanceRate == null ? "—" : `${attendanceRate}%`}</b><span>Attendance</span></div>
         <div style={statCard}><div>📝</div><b className="pp-stat-value">{childHomework.length}</b><span>Homework</span></div>
