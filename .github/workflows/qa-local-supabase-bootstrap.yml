@@ -1,13 +1,14 @@
 name: QA Local Supabase Bootstrap
 
+# This is an expensive infrastructure-reconstruction workflow.
+# Keep it manual while the bootstrap is being developed so normal commits
+# do not repeatedly consume GitHub Actions minutes.
 on:
-  pull_request:
-    paths:
-      - "supabase/schema-baseline/**"
-      - "supabase/qa/bootstrap/**"
-      - "supabase/config.toml"
-      - ".github/workflows/qa-local-supabase-bootstrap.yml"
   workflow_dispatch:
+
+concurrency:
+  group: qa-local-supabase-bootstrap
+  cancel-in-progress: true
 
 permissions:
   contents: read
