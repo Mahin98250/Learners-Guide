@@ -58,7 +58,6 @@ try {
   if (existsSync(quarantine)) throw new Error("[E2E] Existing migration quarantine found; refusing to continue.");
   if (!existsSync(migrations)) throw new Error("[E2E] supabase/migrations is missing.");
 
-  // Never inherit hosted Supabase targets into the local browser build.
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_ANON_KEY;
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -91,7 +90,7 @@ try {
   );
 
   requireLocalUrl(serverEnv.API_URL, "Supabase API URL");
-  requireLocalUrl(`http://${new URL(serverEnv.API_URL).hostname}:54322`, "Supabase DB host");
+  if (!serverEnv.DB_URL) throw new Error("[E2E] Supabase status did not provide DB_URL.");
 
   const localEnv = {
     ...process.env,
@@ -102,6 +101,7 @@ try {
     VITE_SUPABASE_ANON_KEY: serverEnv.ANON_KEY,
     SUPABASE_URL: serverEnv.API_URL,
     SUPABASE_SERVICE_ROLE_KEY: serverEnv.SERVICE_ROLE_KEY,
+    LOCAL_DB_URL: serverEnv.DB_URL,
     E2E_TEST_PASSWORD: process.env.E2E_TEST_PASSWORD || randomBytes(24).toString("base64url"),
     PLAYWRIGHT_HTML_OPEN: "never",
   };
