@@ -59,8 +59,6 @@ for (const key of [
   "extensions", "table_grants", "routine_grants", "storage_buckets", "storage_policies", "types", "views",
 ]) assertArray(baseline, key);
 
-// These relations are supplied by the local Supabase stack. They must never be
-// recreated from the production-derived application snapshot.
 const MANAGED_EXTERNAL_RELATIONS = new Set(["auth.users", "storage.objects"]);
 const normalizeRelation = (schema, name) => {
   const qualifiedName = `${schema}.${name}`;
@@ -155,13 +153,17 @@ for (const view of sortBy(normalViews, "schema", "name")) {
   push(`create or replace view ${qualified(view.schema, view.name)} as\n${view.definition};`);
 }
 
-// Function creation is dependency-aware across ALL public languages. PostgreSQL
-// validates SQL-language bodies during CREATE FUNCTION, while other languages may
-// still contain defaults/expressions that reference application helpers.
+// Function creation is dependency-aware, but the security identity resolver is a
+// bootstrap root: RLS policies depend on app_role(), and app_role() only depends
+// on Supabase-managed auth primitives. Emit it first so policy creation can never
+// race the helper that every role-aware policy relies upon.
 const functionCandidates = sortBy(baseline.functions, "schema", "name", "args");
 const functionsByKey = new Map(
   functionCandidates.map((fn) => [`${fn.schema}.${fn.name}(${fn.args ?? ""})`, fn]),
 );
+const appRoleKey = [...functionsByKey.keys()].find((key) => key === "public.app_role()" || /^public\.app_role\(\s*\)$/.test(key));
+if (!appRoleKey) fail("Production baseline is missing required public.app_role(); refusing to generate an RLS bootstrap without the role resolver.");
+
 const functionKeysByName = new Map();
 for (const fn of functionCandidates) {
   const nameKey = `${fn.schema}.${fn.name}`;
@@ -218,12 +220,20 @@ if (functionCreationOrder.length !== functionsByKey.size) {
   fail(`Function dependency cycle detected: ${cycle.join(", ")}`);
 }
 
-for (const key of functionCreationOrder) {
-  const fn = functionsByKey.get(key);
-  if (fn.schema !== "public") continue;
-  if (!fn.definition) fail(`Function public.${fn.name}(${fn.args ?? ""}) has no definition`);
+const emitFunction = (fn) => {
+  if (!fn?.definition) fail(`Function public.${fn?.name ?? "?"}(${fn?.args ?? ""}) has no definition`);
   const functionDdl = fn.definition.trimEnd().endsWith(";") ? fn.definition.trimEnd() : `${fn.definition.trimEnd()};`;
   push(functionDdl);
+};
+
+// Force the security root before the topological order. Remove it from the normal
+// sequence to avoid duplicate CREATE FUNCTION output.
+emitFunction(functionsByKey.get(appRoleKey));
+for (const key of functionCreationOrder) {
+  if (key === appRoleKey) continue;
+  const fn = functionsByKey.get(key);
+  if (fn.schema !== "public") continue;
+  emitFunction(fn);
 }
 
 for (const trigger of sortBy(baseline.triggers, "schema", "table", "name", "event")) {
