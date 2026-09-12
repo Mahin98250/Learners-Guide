@@ -33,6 +33,14 @@ export default defineConfig({
     navigationTimeout: 15_000,
     actionTimeout: 10_000,
   },
+  webServer: process.env.E2E_MODE === "local"
+    ? {
+        command: "npm run preview -- --host 127.0.0.1 --port 4173",
+        url: baseURL,
+        reuseExistingServer: false,
+        timeout: 30_000,
+      }
+    : undefined,
   projects: [
     { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile-chromium", use: { ...devices["Pixel 7"] } },
