@@ -1,6 +1,7 @@
+import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 
 const root = resolve(process.cwd());
 const migrations = resolve(root, "supabase/migrations");
@@ -83,15 +84,11 @@ try {
     VITE_SUPABASE_ANON_KEY: serverEnv.ANON_KEY,
     SUPABASE_URL: serverEnv.API_URL,
     SUPABASE_SERVICE_ROLE_KEY: serverEnv.SERVICE_ROLE_KEY,
+    E2E_TEST_PASSWORD: process.env.E2E_TEST_PASSWORD || randomBytes(24).toString("base64url"),
   };
 
   await run("psql", [serverEnv.DB_URL, "--no-psqlrc", "-v", "ON_ERROR_STOP=1", "-f", bootstrapSql], { env: localEnv });
   await run("node", ["supabase/qa/bootstrap/verify-bootstrap.mjs"], { env: localEnv });
-
-  if (!process.env.E2E_TEST_PASSWORD) {
-    throw new Error("[E2E] Set E2E_TEST_PASSWORD to a synthetic local-only password before running authenticated E2E tests.");
-  }
-
   await run("node", ["tests/e2e/bootstrap/seed-local.mjs"], { env: localEnv });
   await run("npm", ["run", "build"], { env: localEnv });
   await run("npm", ["run", "test:e2e:full"], { env: localEnv });
