@@ -102,8 +102,6 @@ jobs:
           printf 'VITE_SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
           printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$ANON_KEY" >> "$GITHUB_ENV"
           printf 'SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
-          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
-          rm -f "$env_file"
 
       - name: Apply production-derived structural baseline
         shell: bash
@@ -128,6 +126,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          env_file="$RUNNER_TEMP/supabase.env"
+          . "$env_file"
+          export SUPABASE_URL="$API_URL"
+          export E2E_SUPABASE_URL="$API_URL"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
           node tests/e2e/bootstrap/seed-local.mjs
           node tests/e2e/bootstrap/seed-domain-data.mjs
 
@@ -135,19 +138,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run build
+          env -u SUPABASE_SERVICE_ROLE_KEY npm run build
 
       - name: Security verification - direct RLS authorization
         shell: bash
         run: |
           set -euo pipefail
-          E2E_MODE=local npx playwright test tests/e2e/security --project=desktop-chromium
+          env -u SUPABASE_SERVICE_ROLE_KEY E2E_MODE=local npx playwright test tests/e2e/security --project=desktop-chromium
 
       - name: Full browser E2E - desktop and mobile
         shell: bash
         run: |
           set -euo pipefail
-          E2E_MODE=local npx playwright test --grep-invert '@security'
+          env -u SUPABASE_SERVICE_ROLE_KEY E2E_MODE=local npx playwright test --grep-invert '@security'
 
       - name: Upload E2E evidence
         if: always()
@@ -168,6 +171,13 @@ jobs:
         run: |
           set -euo pipefail
           supabase stop --no-backup || true
+
+      - name: Remove temporary Supabase credentials
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$RUNNER_TEMP/supabase.env"
 
       - name: Restore historical migrations
         if: always()
