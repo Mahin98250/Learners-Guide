@@ -94,7 +94,9 @@ jobs:
             fi
           fi
 
-          mapfile -t FILES < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" --             '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.css' '*.md' '*.yml' '*.yaml'             ':!package-lock.json' ':!.github/workflows/*')
+          mapfile -t FILES < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- \
+            '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.css' '*.md' '*.yml' '*.yaml' \
+            ':!package-lock.json' ':!.github/workflows/*')
 
           if (( ${#FILES[@]} == 0 )); then
             echo "No changed files require Prettier formatting."
