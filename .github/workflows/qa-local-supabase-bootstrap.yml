@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   bootstrap:
-    name: Reconstruct local Supabase from production baseline
+    name: Reconstruct local Supabase and run isolated E2E
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          unset SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
+          unset SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY
           supabase start
 
       - name: Verify local target
@@ -91,7 +91,11 @@ jobs:
             *) echo "Refusing non-local DB URL target"; exit 1 ;;
           esac
           printf 'LOCAL_DB_URL=%s\n' "$DB_URL" >> "$GITHUB_ENV"
-          printf 'SUPABASE_LOCAL_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'E2E_SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'VITE_SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$ANON_KEY" >> "$GITHUB_ENV"
+          printf 'SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
           rm -f "$env_file"
 
       - name: Apply production-derived structural baseline
@@ -106,16 +110,49 @@ jobs:
           set -euo pipefail
           node supabase/qa/bootstrap/verify-bootstrap.mjs
 
-      - name: Upload generated bootstrap evidence
+      - name: Create synthetic E2E password
+        shell: bash
+        run: |
+          set -euo pipefail
+          password="$(node -e 'console.log(require("node:crypto").randomBytes(24).toString("base64url"))')"
+          printf 'E2E_TEST_PASSWORD=%s\n' "$password" >> "$GITHUB_ENV"
+
+      - name: Seed deterministic synthetic E2E identities and data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/e2e/bootstrap/seed-local.mjs
+
+      - name: Build application against Local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+
+      - name: Security verification - direct RLS authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          E2E_MODE=local npx playwright test tests/e2e/security --project=desktop-chromium
+
+      - name: Full browser E2E - desktop and mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          E2E_MODE=local npx playwright test --grep-invert '@security'
+
+      - name: Upload E2E evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qa-local-bootstrap-evidence
+          name: qa-local-e2e-evidence
           path: |
+            playwright-report
+            test-results
             supabase/qa/bootstrap/production-derived-bootstrap.sql
             supabase/schema-baseline/production-derived-schema-baseline.json
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Stop Local Supabase
         if: always()
@@ -123,3 +160,11 @@ jobs:
         run: |
           set -euo pipefail
           supabase stop --no-backup || true
+
+      - name: Restore historical migrations
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf supabase/migrations
+          if [ -d supabase/migrations.historical ]; then mv supabase/migrations.historical supabase/migrations; fi
