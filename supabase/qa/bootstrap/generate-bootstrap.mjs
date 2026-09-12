@@ -205,7 +205,85 @@ for (const view of sortBy(normalViews, "schema", "name")) {
   push(`create or replace view ${qualified(view.schema, view.name)} as\n${view.definition};`);
 }
 
-const functionList = sortBy(baseline.functions, "schema", "name", "args");
+const functionCandidates = sortBy(baseline.functions, "schema", "name", "args");
+
+const normalizeFunctionName = (name) => String(name ?? "").replace(/^public\./i, "");
+const sqlFunctionNames = new Set(
+  functionCandidates
+    .filter((fn) => fn.schema === "public" && fn.language === "sql")
+    .map((fn) => fn.name)
+);
+
+// SQL-language functions can require referenced functions to exist while PostgreSQL
+// parses their body at CREATE FUNCTION time. PL/pgSQL bodies are not forced into
+// this dependency graph because PostgreSQL can defer their body compilation.
+// Only references to captured public functions are considered; auth/storage and
+// other managed/external functions remain outside this graph.
+const functionDependencies = new Map();
+for (const fn of functionCandidates) {
+  const key = `${fn.schema}.${fn.name}(${fn.args ?? ""})`;
+  const deps = new Set();
+
+  if (fn.schema === "public" && fn.language === "sql") {
+    const body = fn.definition ?? "";
+    const callPattern = /\\b(?:public\\.)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/g;
+    for (const match of body.matchAll(callPattern)) {
+      const dependencyName = normalizeFunctionName(match[1]);
+      if (dependencyName === fn.name) continue;
+      if (sqlFunctionNames.has(dependencyName) || functionCandidates.some((candidate) => candidate.schema === "public" && candidate.name === dependencyName)) {
+        const dependency = functionCandidates.find(
+          (candidate) => candidate.schema === "public" && candidate.name === dependencyName
+        );
+        if (dependency) deps.add(`${dependency.schema}.${dependency.name}(${dependency.args ?? ""})`);
+      }
+    }
+  }
+
+  functionDependencies.set(key, deps);
+}
+
+const functionsByKey = new Map(
+  functionCandidates.map((fn) => [`${fn.schema}.${fn.name}(${fn.args ?? ""})`, fn])
+);
+
+const indegree = new Map([...functionsByKey.keys()].map((key) => [key, 0]));
+const dependents = new Map([...functionsByKey.keys()].map((key) => [key, new Set()]));
+for (const [fnKey, deps] of functionDependencies) {
+  for (const depKey of deps) {
+    if (!functionsByKey.has(depKey)) continue;
+    indegree.set(fnKey, indegree.get(fnKey) + 1);
+    dependents.get(depKey).add(fnKey);
+  }
+}
+
+const ready = [...indegree.entries()]
+  .filter(([, degree]) => degree === 0)
+  .map(([key]) => key)
+  .sort();
+
+const functionCreationOrder = [];
+while (ready.length) {
+  const key = ready.shift();
+  functionCreationOrder.push(key);
+  for (const dependent of [...dependents.get(key)].sort()) {
+    const nextDegree = indegree.get(dependent) - 1;
+    indegree.set(dependent, nextDegree);
+    if (nextDegree === 0) {
+      ready.push(dependent);
+      ready.sort();
+    }
+  }
+}
+
+if (functionCreationOrder.length !== functionsByKey.size) {
+  const cycle = [...indegree.entries()]
+    .filter(([, degree]) => degree > 0)
+    .map(([key]) => key)
+    .sort();
+  fail(`Function dependency cycle detected: ${cycle.join(", ")}`);
+}
+
+const functionList = functionCreationOrder.map((key) => functionsByKey.get(key));
 for (const fn of functionList) {
   if (fn.schema !== "public") continue;
   if (!fn.definition) fail(`Function public.${fn.name}(${fn.args ?? ""}) has no definition`);
