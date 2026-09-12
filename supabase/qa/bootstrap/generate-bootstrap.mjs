@@ -207,38 +207,31 @@ for (const view of sortBy(normalViews, "schema", "name")) {
 
 const functionCandidates = sortBy(baseline.functions, "schema", "name", "args");
 
-const normalizeFunctionName = (name) => String(name ?? "").replace(/^public\./i, "");
-const sqlFunctionNames = new Set(
-  functionCandidates
-    .filter((fn) => fn.schema === "public" && fn.language === "sql")
-    .map((fn) => fn.name)
-);
-
-// SQL-language functions can require referenced functions to exist while PostgreSQL
-// parses their body at CREATE FUNCTION time. PL/pgSQL bodies are not forced into
-// this dependency graph because PostgreSQL can defer their body compilation.
-// Only references to captured public functions are considered; auth/storage and
-// other managed/external functions remain outside this graph.
+// SQL-language functions may be parsed against their referenced functions at CREATE
+// FUNCTION time. Build a dependency graph from exact known public function names.
+// The previous implementation used /\\b/ in a RegExp literal, which searched for a
+// literal backslash+b and therefore missed references such as public.app_role().
 const functionDependencies = new Map();
+const functionKeysByName = new Map();
+for (const fn of functionCandidates) {
+  const key = `${fn.schema}.${fn.name}(${fn.args ?? ""})`;
+  if (!functionKeysByName.has(`${fn.schema}.${fn.name}`)) functionKeysByName.set(`${fn.schema}.${fn.name}`, []);
+  functionKeysByName.get(`${fn.schema}.${fn.name}`).push(key);
+}
+
 for (const fn of functionCandidates) {
   const key = `${fn.schema}.${fn.name}(${fn.args ?? ""})`;
   const deps = new Set();
-
   if (fn.schema === "public" && fn.language === "sql") {
-    const body = fn.definition ?? "";
-    const callPattern = /\\b(?:public\\.)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/g;
+    const body = String(fn.definition ?? "");
+    const callPattern = /\b(?:public\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
     for (const match of body.matchAll(callPattern)) {
-      const dependencyName = normalizeFunctionName(match[1]);
+      const dependencyName = match[1];
       if (dependencyName === fn.name) continue;
-      if (sqlFunctionNames.has(dependencyName) || functionCandidates.some((candidate) => candidate.schema === "public" && candidate.name === dependencyName)) {
-        const dependency = functionCandidates.find(
-          (candidate) => candidate.schema === "public" && candidate.name === dependencyName
-        );
-        if (dependency) deps.add(`${dependency.schema}.${dependency.name}(${dependency.args ?? ""})`);
-      }
+      const dependencyKeys = functionKeysByName.get(`public.${dependencyName}`) ?? [];
+      for (const dependencyKey of dependencyKeys) deps.add(dependencyKey);
     }
   }
-
   functionDependencies.set(key, deps);
 }
 
@@ -297,7 +290,6 @@ for (const trigger of sortBy(baseline.triggers, "schema", "table", "name", "even
   if (trigger.schema !== "public") continue;
   if (!trigger.definition) fail(`Trigger public.${trigger.table}.${trigger.name} lacks definition`);
   push(`drop trigger if exists ${escIdent(trigger.name)} on ${qualified(trigger.schema, trigger.table)};`);
-  // information_schema.triggers action_statement is the executable trigger clause.
   const eventSql = trigger.event;
   const timingSql = trigger.timing;
   const orientation = trigger.orientation || "ROW";
@@ -309,7 +301,6 @@ for (const constraint of sortBy(baseline.constraints, "schema", "table", "name")
   push(`alter table ${qualified(constraint.schema, constraint.table)} add constraint ${escIdent(constraint.name)} ${constraint.definition};`);
 }
 
-// Defaults are emitted after functions exist so defaults that call helper functions are safe.
 for (const col of sortBy(publicColumns, "table", "ordinal", "column")) {
   if (col.default) {
     push(`alter table ${qualified("public", col.table)} alter column ${escIdent(col.column)} set default ${col.default};`);
@@ -320,8 +311,8 @@ for (const idx of sortBy(baseline.indexes, "schema", "table", "name")) {
   if (idx.schema !== "public") continue;
   if (!idx.definition) fail(`Index public.${idx.name} lacks definition`);
   const ddl = String(idx.definition)
-    .replace(/\\bcreate\\s+unique\\s+index\\b/i, "create unique index if not exists")
-    .replace(/\\bcreate\\s+index\\b/i, "create index if not exists");
+    .replace(/\bcreate\s+unique\s+index\b/i, "create unique index if not exists")
+    .replace(/\bcreate\s+index\b/i, "create index if not exists");
   push(ddl + ";");
 }
 
