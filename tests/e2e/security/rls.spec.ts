@@ -74,10 +74,14 @@ test.describe("RLS authorization @security", () => {
     expect((await batchIdsFor(c, "materials")).every((id) => id === ids.BA)).toBe(true);
     expect((await batchIdsFor(c, "timetable_entries")).every((id) => id === ids.BA)).toBe(true);
     expect((await batchIdsFor(c, "tests")).every((id) => id === ids.BA)).toBe(true);
+    const { data: results, error } = await c.from("test_results").select("student_id");
+    if (error) throw error;
+    expect((results || []).every((r) => r.student_id === ids.A)).toBe(true);
   });
 
   test("admin can see the synthetic QA dataset", async () => {
     const c = await clientFor(users.admin);
     expect(await idsFor(c, "students", "id", [ids.A, ids.B, ids.C])).toEqual(expect.arrayContaining([ids.A, ids.B, ids.C]));
+    expect((await batchIdsFor(c, "tests")).sort()).toEqual([ids.BA, ids.BB].sort());
   });
 });
