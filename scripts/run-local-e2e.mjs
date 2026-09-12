@@ -10,7 +10,11 @@ const bootstrapSql = resolve(root, "supabase/qa/bootstrap/production-derived-boo
 
 function run(command, args, options = {}) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd: root, stdio: "inherit", env: { ...process.env, ...options.env } });
+    const child = spawn(command, args, {
+      cwd: root,
+      stdio: "inherit",
+      env: { ...process.env, ...options.env },
+    });
     child.on("error", reject);
     child.on("exit", (code, signal) => {
       if (code === 0) resolvePromise();
@@ -21,7 +25,11 @@ function run(command, args, options = {}) {
 
 function runCapture(command, args) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"], env: process.env });
+    const child = spawn(command, args, {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk; });
@@ -43,9 +51,10 @@ function requireLocalUrl(value, label) {
 
 let migrationsQuarantined = false;
 let supabaseStarted = false;
-let serverEnv = null;
 
 try {
+  await run("node", ["scripts/check-local-e2e-prereqs.mjs"]);
+
   if (existsSync(quarantine)) throw new Error("[E2E] Existing migration quarantine found; refusing to continue.");
   if (!existsSync(migrations)) throw new Error("[E2E] supabase/migrations is missing.");
 
@@ -56,17 +65,21 @@ try {
   delete process.env.VITE_SUPABASE_URL;
   delete process.env.VITE_SUPABASE_ANON_KEY;
 
+  await run("node", ["tests/e2e/bootstrap/validate-fixture-contract.mjs"]);
+  await run("npm", ["test"]);
+  await run("npm", ["run", "lint:eslint"]);
+  await run("npm", ["run", "typecheck"]);
+
   renameSync(migrations, quarantine);
   mkdirSync(migrations, { recursive: true });
   migrationsQuarantined = true;
 
-  await run("node", ["tests/e2e/bootstrap/validate-fixture-contract.mjs"]);
   await run("node", ["supabase/qa/bootstrap/generate-bootstrap.mjs"]);
   await run("npx", ["supabase@2.117.0", "start"]);
   supabaseStarted = true;
 
   const status = await runCapture("npx", ["supabase@2.117.0", "status", "-o", "env"]);
-  serverEnv = Object.fromEntries(
+  const serverEnv = Object.fromEntries(
     status.stdout.split(/\r?\n/).filter(Boolean).map((line) => {
       const index = line.indexOf("=");
       return [line.slice(0, index), line.slice(index + 1)];
@@ -86,14 +99,17 @@ try {
     SUPABASE_URL: serverEnv.API_URL,
     SUPABASE_SERVICE_ROLE_KEY: serverEnv.SERVICE_ROLE_KEY,
     E2E_TEST_PASSWORD: process.env.E2E_TEST_PASSWORD || randomBytes(24).toString("base64url"),
+    PLAYWRIGHT_HTML_OPEN: "never",
   };
 
   await run("psql", [serverEnv.DB_URL, "--no-psqlrc", "-v", "ON_ERROR_STOP=1", "-f", bootstrapSql], { env: localEnv });
   await run("node", ["supabase/qa/bootstrap/verify-bootstrap.mjs"], { env: localEnv });
   await run("node", ["tests/e2e/bootstrap/seed-local.mjs"], { env: localEnv });
   await run("node", ["tests/e2e/bootstrap/seed-domain-data.mjs"], { env: localEnv });
+
   await run("npm", ["run", "build"], { env: localEnv });
-  await run("npm", ["run", "test:e2e:full"], { env: localEnv });
+  await run("npm", ["run", "test:e2e:security", "--", "--project=desktop-chromium"], { env: localEnv });
+  await run("npx", ["playwright", "test", "--project=desktop-chromium", "--project=mobile-chromium", "--grep-invert", "@security"], { env: localEnv });
 } finally {
   if (supabaseStarted) {
     await run("npx", ["supabase@2.117.0", "stop", "--no-backup"]).catch((error) => console.error(error.message));
