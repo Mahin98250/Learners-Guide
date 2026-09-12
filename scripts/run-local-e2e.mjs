@@ -75,6 +75,7 @@ try {
   migrationsQuarantined = true;
 
   await run("node", ["supabase/qa/bootstrap/generate-bootstrap.mjs"]);
+  await run("node", ["supabase/qa/bootstrap/validate-bootstrap-sql.mjs"]);
   await run("npx", ["supabase@2.117.0", "start"]);
   supabaseStarted = true;
 
