@@ -111,9 +111,13 @@ try {
   await run("node", ["tests/e2e/bootstrap/seed-local.mjs"], { env: localEnv });
   await run("node", ["tests/e2e/bootstrap/seed-domain-data.mjs"], { env: localEnv });
 
-  await run("npm", ["run", "build"], { env: localEnv });
-  await run("npm", ["run", "test:e2e:security", "--", "--project=desktop-chromium"], { env: localEnv });
-  await run("npx", ["playwright", "test", "--project=desktop-chromium", "--project=mobile-chromium", "--grep-invert", "@security"], { env: localEnv });
+  // Never expose the privileged setup credential to the application build or browser tests.
+  const browserEnv = { ...localEnv };
+  delete browserEnv.SUPABASE_SERVICE_ROLE_KEY;
+
+  await run("npm", ["run", "build"], { env: browserEnv });
+  await run("npm", ["run", "test:e2e:security", "--", "--project=desktop-chromium"], { env: browserEnv });
+  await run("npx", ["playwright", "test", "--project=desktop-chromium", "--project=mobile-chromium", "--grep-invert", "@security"], { env: browserEnv });
 } finally {
   if (supabaseStarted) {
     await run("npx", ["supabase@2.117.0", "stop", "--no-backup"]).catch((error) => console.error(error.message));
