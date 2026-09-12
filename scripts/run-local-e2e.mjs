@@ -76,8 +76,11 @@ try {
 
   await run("node", ["supabase/qa/bootstrap/generate-bootstrap.mjs"]);
   await run("node", ["supabase/qa/bootstrap/validate-bootstrap-sql.mjs"]);
-  await run("npx", ["supabase@2.117.0", "start"]);
+
+  // Mark the stack for cleanup before invoking start. Docker/Supabase startup can
+  // partially initialize containers and then fail; cleanup must still attempt stop.
   supabaseStarted = true;
+  await run("npx", ["supabase@2.117.0", "start"]);
 
   const status = await runCapture("npx", ["supabase@2.117.0", "status", "-o", "env"]);
   const serverEnv = Object.fromEntries(
