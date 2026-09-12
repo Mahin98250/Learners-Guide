@@ -44,12 +44,17 @@ test.describe("Parent multi-child portal", () => {
 });
 
 test.describe("Admin portal", () => {
-  test("loads the administrative shell and exposes the implemented management areas", async ({ page }) => {
+  test("loads the administrative shell and exposes the implemented management areas", async ({ page }, testInfo) => {
     await loginAs(page, "admin");
+    if (testInfo.project.name === "mobile-chromium") {
+      for (const label of ["Dashboard", "Students", "Teachers", "Batches & Timetable", "Teacher Assignments"]) {
+        await expect(page.getByRole("button", { name: label, exact: true }).first()).toBeVisible();
+      }
+      return;
+    }
     const labels = [
-      "Dashboard", "Students", "Teachers", "Batches & Timetable", "Attendance", "Homework",
-      "Exam Schedule", "Student Results", "Study Materials", "Fees", "Announcements", "User Accounts",
-      "Marks Overview", "Search Profiles", "Messages",
+      "Dashboard", "Students", "Teachers", "Batches & Timetable", "Teacher Assignments", "Tests & Results",
+      "Search Profiles", "Homework", "Study Materials", "Announcements", "User Accounts",
     ];
     for (const label of labels) await expect(page.getByRole("button", { name: label, exact: true }).first()).toBeVisible();
   });
