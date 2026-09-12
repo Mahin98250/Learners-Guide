@@ -21,8 +21,11 @@ const q = String.raw`select jsonb_build_object(
 'functions',(select jsonb_agg(jsonb_build_object('schema',n.nspname,'name',p.proname,'args',pg_get_function_identity_arguments(p.oid),'language',l.lanname,'security_definer',p.prosecdef,'definition',pg_get_functiondef(p.oid)) order by p.proname,pg_get_function_identity_arguments(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang where n.nspname='public'),
 'triggers',(select jsonb_agg(jsonb_build_object('schema',event_object_schema,'table',event_object_table,'name',trigger_name,'timing',action_timing,'event',event_manipulation,'orientation',action_orientation,'definition',action_statement) order by event_object_table,trigger_name,event_manipulation) from information_schema.triggers where event_object_schema='public'),
 'extensions',(select jsonb_agg(jsonb_build_object('name',extname,'version',extversion,'schema',(select nspname from pg_namespace n where n.oid=e.extnamespace)) order by extname) from pg_extension e),
+'table_grants',(select jsonb_agg(jsonb_build_object('schema',table_schema,'table',table_name,'grantee',grantee,'privilege',privilege_type) order by table_name,grantee,privilege_type) from information_schema.role_table_grants where table_schema='public'),
+'routine_grants',(select jsonb_agg(jsonb_build_object('schema',routine_schema,'routine',routine_name,'grantee',grantee,'privilege',privilege_type) order by routine_name,grantee,privilege_type) from information_schema.routine_privileges where routine_schema='public'),
 'storage_buckets',(select jsonb_agg(jsonb_build_object('id',id,'name',name,'public',public,'file_size_limit',file_size_limit,'allowed_mime_types',allowed_mime_types) order by id) from storage.buckets),
-'storage_policies',(select jsonb_agg(jsonb_build_object('schema',schemaname,'table',tablename,'name',policyname,'permissive',permissive,'roles',roles,'cmd',cmd,'using',qual,'check',with_check) order by policyname) from pg_policies where schemaname='storage' and tablename='objects')
+'storage_policies',(select jsonb_agg(jsonb_build_object('schema',schemaname,'table',tablename,'name',policyname,'permissive',permissive,'roles',roles,'cmd',cmd,'using',qual,'check',with_check) order by policyname) from pg_policies where schemaname='storage' and tablename='objects'),
+'views',(select jsonb_agg(jsonb_build_object('schema',table_schema,'name',table_name,'definition',view_definition) order by table_schema,table_name) from information_schema.views where table_schema='public')
 );`;
 const p=spawnSync("psql",["--dbname",dbUrl,"--no-psqlrc","-Atqc",q],{encoding:"utf8"});
 if(p.status!==0) fail((p.stderr||"psql failed").trim());
@@ -48,14 +51,13 @@ for(const g of expTableGrants){if(!actTableGrants.includes(g)) fail("Missing tab
 const expRoutineGrants=names(baseline.routine_grants.filter(x=>x.schema==="public"),x=>`${x.routine}|${x.grantee}|${x.privilege}`);
 const actRoutineGrants=names(actualData.routine_grants.filter(x=>x.schema==="public"),x=>`${x.routine}|${x.grantee}|${x.privilege}`);
 for(const g of expRoutineGrants){if(!actRoutineGrants.includes(g)) fail("Missing routine grant: "+g);}
-
 const expFns=names(baseline.functions,x=>`${x.schema}.${x.name}(${x.args??""})|${x.language}|${x.security_definer}|${x.definition}`);
 const actFns=names(actualData.functions,x=>`${x.schema}.${x.name}(${x.args??""})|${x.language}|${x.security_definer}|${x.definition}`);
 if(canonical(expFns)!==canonical(actFns)) fail("Function definitions/security mismatch.");
 const expTrig=names(baseline.triggers.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.timing}|${x.event}|${x.orientation}|${x.definition}`);
 const actTrig=names(actualData.triggers.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.timing}|${x.event}|${x.orientation}|${x.definition}`);
 if(canonical(expTrig)!==canonical(actTrig)) fail("Trigger mismatch.");
-const expPolicies=names(baseline.policies.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using_expression??""}|${x.with_check??""}`);
+const expPolicies=names(baseline.policies.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using_expression??x.using??""}|${x.with_check??x.check??""}`);
 const actPolicies=names(actualData.policies.filter(x=>x.schema==="public"),x=>`${x.table}|${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using??""}|${x.check??""}`);
 if(canonical(expPolicies)!==canonical(actPolicies)) fail("RLS policy mismatch.");
 const expExt=names(baseline.extensions,x=>`${x.name}|${x.version}|${x.schema}`);
@@ -64,11 +66,11 @@ for(const e of expExt){if(!actExt.includes(e)) fail("Missing required extension:
 const expBuckets=names(baseline.storage_buckets,x=>`${x.id}|${x.name}|${x.public}|${x.file_size_limit}|${JSON.stringify(x.allowed_mime_types)}`);
 const actBuckets=names(actualData.storage_buckets,x=>`${x.id}|${x.name}|${x.public}|${x.file_size_limit}|${JSON.stringify(x.allowed_mime_types)}`);
 if(canonical(expBuckets)!==canonical(actBuckets)) fail("Storage bucket configuration mismatch.");
-const expSP=names(baseline.storage_policies,x=>`${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using_expression??""}|${x.with_check??""}`);
+const expSP=names(baseline.storage_policies,x=>`${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using_expression??x.using??""}|${x.with_check??x.check??""}`);
 const actSP=names(actualData.storage_policies,x=>`${x.name}|${x.cmd}|${JSON.stringify(x.roles)}|${x.using??""}|${x.check??""}`);
 if(canonical(expSP)!==canonical(actSP)) fail("Storage policy mismatch.");
 const views=(actualData.views||[]).filter(x=>x.schema==="public" && x.name!=="storage.objects");
-const expectedViews=(baseline.views||[]).filter(x=>x.schema==="public" && x.name!=="storage.objects" && !/\\bstorage\\.objects\\b/i.test(String(x.definition??"")));
+const expectedViews=(baseline.views||[]).filter(x=>x.schema==="public" && x.name!=="storage.objects" && !/\bstorage\.objects\b/i.test(String(x.definition??"")));
 if(JSON.stringify(names(expectedViews,x=>`${x.schema}.${x.name}|${x.definition}`))!==JSON.stringify(names(views,x=>`${x.schema}.${x.name}|${x.definition}`))) fail("View mismatch.");
 console.log(JSON.stringify({
   PASS:true,
@@ -80,6 +82,7 @@ console.log(JSON.stringify({
   triggers:expTrig.length,
   rlsPolicies:expPolicies.length,
   extensions:expExt.length,
+  views:expectedViews.length,
   storageBuckets:expBuckets.length,
   storagePolicies:expSP.length,
   minimumTableGrants:expTableGrants.length,
