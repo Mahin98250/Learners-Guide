@@ -45,6 +45,12 @@ jobs:
           supabase --version
           psql --version
 
+      - name: Validate deterministic fixture contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/e2e/bootstrap/validate-fixture-contract.mjs
+
       - name: Generate executable bootstrap
         shell: bash
         run: |
