@@ -60,6 +60,7 @@ try {
   mkdirSync(migrations, { recursive: true });
   migrationsQuarantined = true;
 
+  await run("node", ["tests/e2e/bootstrap/validate-fixture-contract.mjs"]);
   await run("node", ["supabase/qa/bootstrap/generate-bootstrap.mjs"]);
   await run("npx", ["supabase@2.117.0", "start"]);
   supabaseStarted = true;
