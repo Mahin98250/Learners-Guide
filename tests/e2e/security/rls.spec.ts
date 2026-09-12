@@ -34,7 +34,7 @@ async function batchIdsFor(client: SupabaseClient, table: string) {
   return (data || []).map((row) => String(row.batch_id));
 }
 
-test.describe("RLS authorization", () => {
+test.describe("RLS authorization @security", () => {
   test("student A can see only student A data across sensitive entities", async () => {
     const c = await clientFor(users.student);
     expect(await idsFor(c, "students", "id", [ids.A, ids.B, ids.C])).toEqual([ids.A]);
