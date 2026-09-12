@@ -90,6 +90,7 @@ try {
   await run("psql", [serverEnv.DB_URL, "--no-psqlrc", "-v", "ON_ERROR_STOP=1", "-f", bootstrapSql], { env: localEnv });
   await run("node", ["supabase/qa/bootstrap/verify-bootstrap.mjs"], { env: localEnv });
   await run("node", ["tests/e2e/bootstrap/seed-local.mjs"], { env: localEnv });
+  await run("node", ["tests/e2e/bootstrap/seed-domain-data.mjs"], { env: localEnv });
   await run("npm", ["run", "build"], { env: localEnv });
   await run("npm", ["run", "test:e2e:full"], { env: localEnv });
 } finally {
