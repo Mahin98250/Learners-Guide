@@ -122,6 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           node tests/e2e/bootstrap/seed-local.mjs
+          node tests/e2e/bootstrap/seed-domain-data.mjs
 
       - name: Build application against Local Supabase
         shell: bash
