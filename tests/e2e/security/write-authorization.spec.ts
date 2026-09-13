@@ -9,16 +9,6 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(URL)) {
   throw new Error(`[E2E security] Refusing non-local Supabase target: ${URL}`);
 }
 
-const ids = {
-  A: "e2e-student-a",
-  B: "e2e-student-b",
-  C: "e2e-student-c",
-  BA: "e2e-batch-a",
-  BB: "e2e-batch-b",
-  BC: "e2e-batch-c",
-  teacher: "e2e-teacher-a",
-};
-
 const users = {
   student: "e2e.student.a@example.invalid",
   teacher: "e2e.teacher.a@example.invalid",
@@ -33,39 +23,80 @@ async function clientFor(email: string) {
   return client;
 }
 
-async function expectNoWrite(client: SupabaseClient, operation: Promise<{ data: unknown; error: unknown }>, label: string) {
+async function expectNoWrite(
+  operation: Promise<{ data: unknown; error: unknown }>,
+  label: string,
+) {
   const result = await operation;
-  if (result.error) return;
-  expect(result.data, `${label} should not return a written row`).toEqual([]);
+  expect(result.error || result.data === null || (Array.isArray(result.data) && result.data.length === 0), `${label} must be blocked`).toBeTruthy();
 }
 
 test.describe("RLS unauthorized writes @security", () => {
   test("student cannot modify another student's attendance, fees, marks, or homework", async () => {
     const c = await clientFor(users.student);
 
-    await expectNoWrite(c, c.from("attendance").update({ status: "present" }).eq("id", "e2e-attendance-b"), "student attendance update");
-    await expectNoWrite(c, c.from("fees").update({ status: "paid" }).eq("id", "e2e-fee-b"), "student fee update");
-    await expectNoWrite(c, c.from("marks").update({ marks: 100 }).eq("id", "e2e-mark-b"), "student marks update");
-    await expectNoWrite(c, c.from("homework").update({ desc: "unauthorized" }).eq("id", "e2e-homework-b"), "student homework update");
-    await expectNoWrite(c, c.from("attendance").delete().eq("id", "e2e-attendance-b"), "student attendance delete");
+    await expectNoWrite(
+      c.from("attendance").update({ status: "present" }).eq("id", "e2e-attendance-b").select("id"),
+      "student attendance update",
+    );
+    await expectNoWrite(
+      c.from("fees").update({ status: "paid" }).eq("id", "e2e-fee-b").select("id"),
+      "student fee update",
+    );
+    await expectNoWrite(
+      c.from("marks").update({ marks: 100 }).eq("id", "e2e-mark-b").select("id"),
+      "student marks update",
+    );
+    await expectNoWrite(
+      c.from("homework").update({ desc: "unauthorized" }).eq("id", "e2e-homework-b").select("id"),
+      "student homework update",
+    );
+    await expectNoWrite(
+      c.from("attendance").delete().eq("id", "e2e-attendance-b").select("id"),
+      "student attendance delete",
+    );
   });
 
   test("parent cannot mutate either linked child's academic records", async () => {
     const c = await clientFor(users.parent);
 
-    await expectNoWrite(c, c.from("attendance").update({ status: "present" }).eq("id", "e2e-attendance-a"), "parent attendance update");
-    await expectNoWrite(c, c.from("fees").update({ status: "paid" }).eq("id", "e2e-fee-a"), "parent fee update");
-    await expectNoWrite(c, c.from("marks").update({ marks: 100 }).eq("id", "e2e-mark-a"), "parent marks update");
-    await expectNoWrite(c, c.from("homework").delete().eq("id", "e2e-homework-a"), "parent homework delete");
+    await expectNoWrite(
+      c.from("attendance").update({ status: "present" }).eq("id", "e2e-attendance-a").select("id"),
+      "parent attendance update",
+    );
+    await expectNoWrite(
+      c.from("fees").update({ status: "paid" }).eq("id", "e2e-fee-a").select("id"),
+      "parent fee update",
+    );
+    await expectNoWrite(
+      c.from("marks").update({ marks: 100 }).eq("id", "e2e-mark-a").select("id"),
+      "parent marks update",
+    );
+    await expectNoWrite(
+      c.from("homework").delete().eq("id", "e2e-homework-a").select("id"),
+      "parent homework delete",
+    );
   });
 
   test("teacher cannot mutate records outside assigned batch", async () => {
     const c = await clientFor(users.teacher);
 
-    await expectNoWrite(c, c.from("homework").update({ desc: "unauthorized" }).eq("id", "e2e-homework-b"), "teacher homework update outside batch");
-    await expectNoWrite(c, c.from("materials").delete().eq("id", "e2e-material-b"), "teacher material delete outside batch");
-    await expectNoWrite(c, c.from("attendance").update({ status: "present" }).eq("id", "e2e-attendance-b"), "teacher attendance update outside batch");
-    await expectNoWrite(c, c.from("tests").update({ title: "unauthorized" }).eq("id", "e2e-test-b"), "teacher test update outside batch");
+    await expectNoWrite(
+      c.from("homework").update({ desc: "unauthorized" }).eq("id", "e2e-homework-b").select("id"),
+      "teacher homework update outside batch",
+    );
+    await expectNoWrite(
+      c.from("materials").delete().eq("id", "e2e-material-b").select("id"),
+      "teacher material delete outside batch",
+    );
+    await expectNoWrite(
+      c.from("attendance").update({ status: "present" }).eq("id", "e2e-attendance-b").select("id"),
+      "teacher attendance update outside batch",
+    );
+    await expectNoWrite(
+      c.from("tests").update({ title: "unauthorized" }).eq("id", "e2e-test-b").select("id"),
+      "teacher test update outside batch",
+    );
   });
 
   test("non-admin roles cannot insert privileged student records", async () => {
@@ -83,6 +114,10 @@ test.describe("RLS unauthorized writes @security", () => {
         status: "active",
       });
       expect(result.error || result.data?.length === 0, `${role} must not insert students`).toBeTruthy();
+
+      if (!result.error && Array.isArray(result.data) && result.data.length > 0) {
+        throw new Error(`[E2E security] ${role} unexpectedly inserted a student; fixture cleanup is required.`);
+      }
     }
   });
 
