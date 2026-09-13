@@ -168,7 +168,7 @@ jobs:
             playwright-report
             test-results
             supabase/qa/bootstrap/production-derived-bootstrap.sql
-            supabase/qa/bootstrap/production-derived-schema-baseline.json
+            supabase/schema-baseline/production-derived-schema-baseline.json
             supabase/qa/bootstrap/production-trigger-definitions.json
           retention-days: 7
           if-no-files-found: warn
