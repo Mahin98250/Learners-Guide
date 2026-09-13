@@ -68,6 +68,13 @@ jobs:
           ! grep -Eiq '(^|[[:space:]])(insert[[:space:]]+into[[:space:]]+public\.|copy[[:space:]]+public\.)' supabase/qa/bootstrap/production-derived-bootstrap.sql
           ! grep -Eiq '(encrypted_password|refresh_token|service_role_key|access_token)' supabase/qa/bootstrap/production-derived-bootstrap.sql
 
+      - name: Restore exact production trigger semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node supabase/qa/bootstrap/repair-trigger-semantics.mjs
+          node supabase/qa/bootstrap/validate-trigger-semantics.mjs
+
       - name: Quarantine historical migrations for this CI workspace
         shell: bash
         run: |
@@ -161,7 +168,8 @@ jobs:
             playwright-report
             test-results
             supabase/qa/bootstrap/production-derived-bootstrap.sql
-            supabase/schema-baseline/production-derived-schema-baseline.json
+            supabase/qa/bootstrap/production-derived-schema-baseline.json
+            supabase/qa/bootstrap/production-trigger-definitions.json
           retention-days: 7
           if-no-files-found: warn
 
