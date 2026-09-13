@@ -236,11 +236,54 @@ for (const key of functionCreationOrder) {
   emitFunction(fn);
 }
 
-for (const trigger of sortBy(baseline.triggers, "schema", "table", "name", "event")) {
+// information_schema.triggers has one row per event for a multi-event trigger.
+// PostgreSQL, however, permits only one trigger object of a given name per table.
+// Reconstruct those rows into one CREATE TRIGGER statement instead of attempting
+// to create the same trigger repeatedly.
+const triggerGroups = new Map();
+for (const trigger of baseline.triggers) {
   if (trigger.schema !== "public") continue;
   if (!trigger.definition) fail(`Trigger public.${trigger.table}.${trigger.name} lacks definition`);
+  const key = `${trigger.schema}.${trigger.table}.${trigger.name}`;
+  const existing = triggerGroups.get(key);
+  if (!existing) {
+    triggerGroups.set(key, {
+      ...trigger,
+      events: new Set([String(trigger.event).toUpperCase()]),
+    });
+    continue;
+  }
+  if (String(existing.timing).toUpperCase() !== String(trigger.timing).toUpperCase()) {
+    fail(`Trigger ${key} has inconsistent timing across baseline event rows.`);
+  }
+  if (String(existing.orientation || "ROW").toUpperCase() !== String(trigger.orientation || "ROW").toUpperCase()) {
+    fail(`Trigger ${key} has inconsistent orientation across baseline event rows.`);
+  }
+  if (String(existing.definition).trim() !== String(trigger.definition).trim()) {
+    fail(`Trigger ${key} has inconsistent action definition across baseline event rows.`);
+  }
+  existing.events.add(String(trigger.event).toUpperCase());
+}
+
+const triggerEventOrder = ["INSERT", "UPDATE", "DELETE", "TRUNCATE"];
+for (const trigger of [...triggerGroups.values()].sort((a, b) => {
+  for (const key of ["schema", "table", "name"]) {
+    const cmp = String(a?.[key] ?? "").localeCompare(String(b?.[key] ?? ""));
+    if (cmp) return cmp;
+  }
+  return 0;
+})) {
+  const events = [...trigger.events].sort((a, b) => {
+    const ai = triggerEventOrder.indexOf(a);
+    const bi = triggerEventOrder.indexOf(b);
+    if (ai < 0 && bi < 0) return a.localeCompare(b);
+    if (ai < 0) return 1;
+    if (bi < 0) return -1;
+    return ai - bi;
+  });
+  const eventClause = events.join(" OR ");
   push(`drop trigger if exists ${escIdent(trigger.name)} on ${qualified(trigger.schema, trigger.table)};`);
-  push(`create trigger ${escIdent(trigger.name)} ${trigger.timing} ${trigger.event} on ${qualified(trigger.schema, trigger.table)} for each ${(trigger.orientation || "ROW").toLowerCase()} ${trigger.definition};`);
+  push(`create trigger ${escIdent(trigger.name)} ${trigger.timing} ${eventClause} on ${qualified(trigger.schema, trigger.table)} for each ${(trigger.orientation || "ROW").toLowerCase()} ${trigger.definition};`);
 }
 for (const constraint of sortBy(baseline.constraints, "schema", "table", "name")) {
   if (constraint.schema !== "public") continue;
