@@ -4,9 +4,11 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const SQL_PATH = path.join(ROOT, "supabase", "qa", "bootstrap", "production-derived-bootstrap.sql");
+const BASELINE_PATH = path.join(ROOT, "supabase", "schema-baseline", "production-derived-schema-baseline.json");
 const fail = (message) => { throw new Error(`[QA bootstrap SQL] ${message}`); };
 
 const sql = fs.readFileSync(SQL_PATH, "utf8");
+const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"));
 const normalized = sql.toLowerCase();
 
 if (!sql.trim()) fail("Generated bootstrap SQL is empty.");
@@ -38,4 +40,26 @@ for (let index = 0; index < functionMatches.length; index += 1) {
   }
 }
 
-console.log(`[QA bootstrap SQL] PASS — ${tableCount} tables, ${functionMatches.length} functions, app_role-first ordering, and safety boundaries verified.`);
+// information_schema.triggers can contain one row per event for a single
+// multi-event trigger. The bootstrap generator must reconstruct those rows into
+// one PostgreSQL trigger object, otherwise the second CREATE TRIGGER fails because
+// trigger names are unique per table.
+const expectedTriggerKeys = new Set(
+  (baseline.triggers ?? [])
+    .filter((trigger) => trigger.schema === "public")
+    .map((trigger) => `${trigger.schema}.${trigger.table}.${trigger.name}`),
+);
+const triggerMatches = [...sql.matchAll(/\bcreate\s+trigger\s+"([^"]+)"\s+[^\n]*?\s+on\s+"public"\."([^"]+)"\s+/gi)];
+const generatedTriggerKeys = triggerMatches.map((match) => `public.${match[2]}.${match[1]}`);
+const generatedTriggerSet = new Set(generatedTriggerKeys);
+if (generatedTriggerKeys.length !== generatedTriggerSet.size) {
+  fail("Generated bootstrap contains duplicate CREATE TRIGGER objects for the same table/name.");
+}
+if (generatedTriggerSet.size !== expectedTriggerKeys.size) {
+  fail(`Expected ${expectedTriggerKeys.size} reconstructed public trigger objects, found ${generatedTriggerSet.size}.`);
+}
+for (const key of expectedTriggerKeys) {
+  if (!generatedTriggerSet.has(key)) fail(`Missing reconstructed trigger ${key}.`);
+}
+
+console.log(`[QA bootstrap SQL] PASS — ${tableCount} tables, ${functionMatches.length} functions, ${generatedTriggerSet.size} reconstructed triggers, app_role-first ordering, and safety boundaries verified.`);
