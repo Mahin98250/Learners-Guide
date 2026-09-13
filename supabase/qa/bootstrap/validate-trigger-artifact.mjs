@@ -22,10 +22,8 @@ for (const trigger of artifact.triggers) {
   if (!baselineKeys.has(key)) fail(`Trigger artifact is not present in production schema baseline: ${key}`);
 }
 
-const missing = [...baselineKeys].filter((key) => !artifactKeys.has(key));
-// information_schema.triggers has one row per event, so only multi-event rows
-// may appear as "missing" here. The actual PostgreSQL trigger object count must
-// still be represented exactly once in the companion artifact.
-if (missing.length === 0 || baselineKeys.size !== 31) fail(`Unexpected baseline trigger object shape: baseline unique keys=${baselineKeys.size}, artifact=${artifactKeys.size}`);
+if (baselineKeys.size !== artifactKeys.size || [...baselineKeys].some((key) => !artifactKeys.has(key))) {
+  fail(`Trigger key mismatch: baseline unique keys=${baselineKeys.size}, artifact keys=${artifactKeys.size}`);
+}
 
 console.log(`[QA trigger artifact] PASS — ${artifactKeys.size} actual triggers represented; baseline contains ${baseline.triggers.length} event rows`);
