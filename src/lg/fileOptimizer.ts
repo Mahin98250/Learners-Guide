@@ -124,7 +124,7 @@ async function qpdfOptimize(input: File, onProgress?: OptimizationProgress): Pro
     onProgress?.("Safe PDF optimization completed.");
     return new Blob([result], { type: PDF_MIME });
   } finally {
-    qpdf.destroy();
+    await qpdf.destroy();
   }
 }
 
