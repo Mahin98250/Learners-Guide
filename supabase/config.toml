@@ -1,2 +1,5 @@
 [functions.auth-login]
 verify_jwt = false
+
+[functions.file-optimizer]
+verify_jwt = true
