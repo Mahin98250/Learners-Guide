@@ -27,6 +27,7 @@ test("PDF validation keeps structural safety without false metadata/page-box rej
   assert.match(optimizer, /page count changed/);
   assert.match(optimizer, /invalid page size/);
   assert.doesNotMatch(optimizer, /sameMetadata/);
+  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
   assert.doesNotMatch(optimizer, /DIMENSION_TOLERANCE_PT/);
   assert.match(optimizer, /validationReason/);
 });
