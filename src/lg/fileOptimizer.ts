@@ -1,4 +1,3 @@
-import { compressPDF } from "@fileslim/compress";
 import { PDFDocument } from "pdf-lib";
 
 export type OptimizationProgress = (message: string) => void;
@@ -12,11 +11,12 @@ export type OptimizationResult = {
   savingsPercent: number;
   optimized: boolean;
   status: OptimizationStatus;
-  engine: "fileslim-pdf" | "original";
+  engine: "safe-pdf" | "original";
 };
 
 const PDF_MIME = "application/pdf";
 const MIN_INPUT_BYTES = 512 * 1024;
+const MAX_IMAGE_DIMENSION = 2000;
 
 const percent = (saved: number, original: number) =>
   original > 0 ? Math.max(0, Math.round((saved / original) * 1000) / 10) : 0;
@@ -27,18 +27,20 @@ const emit = (detail: Record<string, unknown>) => {
   }
 };
 
-type PdfValidation = {
-  valid: boolean;
-  reason?: string;
+type PdfValidation = { valid: boolean; reason?: string };
+
+type ImageCandidate = {
+  ref: unknown;
+  stream: any;
+  width: number;
+  height: number;
+  data: Uint8Array;
 };
 
 /**
- * Validate the optimized PDF without rejecting legitimate PDF rewrites.
- * FileSlim rebuilds/saves PDF objects, so byte-level metadata, rotation and
- * page-box equality are not reliable content checks. The important safety
- * invariants here are: valid PDF, same page count, and valid positive page
- * geometry on every page. FileSlim only replaces embedded image streams and
- * preserves the existing page tree/content structure.
+ * Re-open the candidate and verify the invariants that matter to users.
+ * We intentionally do not compare PDF metadata, object numbering, rotation,
+ * page boxes, or byte layout because a valid PDF optimizer may rewrite them.
  */
 async function validatePdfCandidate(input: File, candidate: Blob): Promise<PdfValidation> {
   const [inputBytes, candidateBytes] = await Promise.all([
@@ -55,35 +57,26 @@ async function validatePdfCandidate(input: File, candidate: Blob): Promise<PdfVa
   let optimized: PDFDocument;
   try {
     [source, optimized] = await Promise.all([
-      PDFDocument.load(inputBytes, {
-        updateMetadata: false,
-        ignoreEncryption: true,
-      }),
-      PDFDocument.load(candidateBytes, {
-        updateMetadata: false,
-        ignoreEncryption: true,
-      }),
+      PDFDocument.load(inputBytes, { updateMetadata: false, ignoreEncryption: true }),
+      PDFDocument.load(candidateBytes, { updateMetadata: false, ignoreEncryption: true }),
     ]);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "PDF could not be reopened";
-    return { valid: false, reason: `optimized PDF could not be reopened: ${reason}` };
-  }
-
-  const sourcePages = source.getPages();
-  const optimizedPages = optimized.getPages();
-  if (sourcePages.length !== optimizedPages.length) {
     return {
       valid: false,
-      reason: `page count changed (${sourcePages.length} → ${optimizedPages.length})`,
+      reason: `optimized PDF could not be reopened: ${error instanceof Error ? error.message : "unknown error"}`,
     };
   }
 
-  for (let i = 0; i < optimizedPages.length; i += 1) {
-    const page = optimizedPages[i];
-    const width = page.getWidth();
-    const height = page.getHeight();
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-      return { valid: false, reason: `optimized page ${i + 1} has invalid dimensions` };
+  if (source.getPageCount() !== optimized.getPageCount()) {
+    return {
+      valid: false,
+      reason: `page count changed (${source.getPageCount()} → ${optimized.getPageCount()})`,
+    };
+  }
+
+  for (const page of optimized.getPages()) {
+    if (!Number.isFinite(page.getWidth()) || !Number.isFinite(page.getHeight()) || page.getWidth() <= 0 || page.getHeight() <= 0) {
+      return { valid: false, reason: "optimized PDF contains an invalid page size" };
     }
   }
 
@@ -103,6 +96,138 @@ const originalResult = (
   status,
   engine: "original",
 });
+
+function isSimpleColorSpace(value: any) {
+  const text = value?.toString?.() ?? "";
+  return text === "/DeviceRGB" || text === "/DeviceGray" || text === "/DeviceCMYK";
+}
+
+/**
+ * Safely recompress JPEG image XObjects.
+ *
+ * The previous third-party engine could replace an image stream while keeping
+ * the old Width/Height/ColorSpace/Filter dictionary. That can create a PDF
+ * that cannot be reopened. This implementation updates the complete image
+ * dictionary whenever an image is replaced, and skips images whose masks or
+ * uncommon encodings need special handling.
+ */
+async function collectSafeJpegCandidates(
+  pdfDoc: PDFDocument,
+  PDFName: any,
+): Promise<ImageCandidate[]> {
+  const candidates: ImageCandidate[] = [];
+  const objects = pdfDoc.context.enumerateIndirectObjects();
+
+  for (const [ref, obj] of objects) {
+    try {
+      if (!obj || typeof obj !== "object" || !("dict" in obj) || !("getContents" in obj)) continue;
+      const dict = (obj as any).dict;
+      if (!dict?.has?.(PDFName.of("Type")) || dict.get(PDFName.of("Type"))?.toString() !== "/XObject") continue;
+      if (!dict.has(PDFName.of("Subtype")) || dict.get(PDFName.of("Subtype"))?.toString() !== "/Image") continue;
+
+      // Images with transparency/masks or uncommon color spaces are left alone.
+      if (dict.has(PDFName.of("SMask")) || dict.has(PDFName.of("Mask")) || dict.has(PDFName.of("Decode"))) continue;
+      const colorSpace = dict.get(PDFName.of("ColorSpace"));
+      if (!isSimpleColorSpace(colorSpace)) continue;
+
+      const filter = dict.has(PDFName.of("Filter")) ? dict.get(PDFName.of("Filter"))?.toString() ?? "" : "";
+      if (filter !== "/DCTDecode") continue;
+
+      const width = Number(dict.get(PDFName.of("Width"))?.asNumber?.() ?? 0);
+      const height = Number(dict.get(PDFName.of("Height"))?.asNumber?.() ?? 0);
+      const data = (obj as any).getContents?.();
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) continue;
+      if (!(data instanceof Uint8Array) || data.length === 0) continue;
+
+      candidates.push({ ref, stream: obj, width, height, data });
+    } catch {
+      // An unusual object should never abort the complete upload.
+    }
+  }
+
+  return candidates;
+}
+
+async function buildOptimizedPdf(
+  input: File,
+  onProgress?: OptimizationProgress,
+): Promise<Blob> {
+  const { PDFName, PDFRawStream } = await import("pdf-lib");
+  const bytes = await input.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(bytes, { updateMetadata: false, ignoreEncryption: true });
+  const images = await collectSafeJpegCandidates(pdfDoc, PDFName);
+
+  let processed = 0;
+  let replaced = 0;
+
+  for (const image of images) {
+    try {
+      onProgress?.(`Optimizing image ${processed + 1} of ${images.length}…`);
+
+      const bitmap = await createImageBitmap(new Blob([image.data], { type: "image/jpeg" }));
+      const sourceWidth = bitmap.width;
+      const sourceHeight = bitmap.height;
+      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(sourceWidth, sourceHeight));
+      const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+      const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) {
+        bitmap.close();
+        processed += 1;
+        continue;
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+      bitmap.close();
+
+      const jpeg = await new Promise<Uint8Array | null>((resolve) => {
+        canvas.toBlob(async (blob) => {
+          resolve(blob ? new Uint8Array(await blob.arrayBuffer()) : null);
+        }, "image/jpeg", 0.85);
+      });
+      canvas.width = 1;
+      canvas.height = 1;
+
+      if (!jpeg || jpeg.length >= image.data.length) {
+        processed += 1;
+        continue;
+      }
+
+      const originalDict = (image.stream as any).dict;
+      const nextDict = originalDict.clone();
+      nextDict.set(PDFName.of("Filter"), PDFName.of("DCTDecode"));
+      nextDict.set(PDFName.of("Width"), pdfDoc.context.obj(targetWidth));
+      nextDict.set(PDFName.of("Height"), pdfDoc.context.obj(targetHeight));
+      nextDict.set(PDFName.of("BitsPerComponent"), pdfDoc.context.obj(8));
+      nextDict.set(PDFName.of("ColorSpace"), PDFName.of("DeviceRGB"));
+      nextDict.delete(PDFName.of("DecodeParms"));
+
+      const replacement = PDFRawStream.of(nextDict, jpeg);
+      pdfDoc.context.assign(image.ref as any, replacement);
+      replaced += 1;
+    } catch (error) {
+      console.warn("Skipping one PDF image during safe optimization", error);
+    }
+
+    processed += 1;
+    const pct = images.length > 0 ? Math.round((processed / images.length) * 85) : 70;
+    onProgress?.(`Optimizing images ${pct}%`);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  onProgress?.(`Saving optimized PDF (${replaced} images updated)…`);
+  const output = await pdfDoc.save({
+    useObjectStreams: true,
+    addDefaultPage: false,
+    updateFieldAppearances: false,
+  });
+  return new Blob([new Uint8Array(output)], { type: PDF_MIME });
+}
 
 /** Safely optimizes a PDF before it reaches Storage. */
 export async function optimizePdfFile(
@@ -138,33 +263,8 @@ export async function optimizePdfFile(
       message: "Analyzing PDF…",
     });
 
-    const result = await compressPDF(input, {
-      mode: "low",
-      imageQuality: 0.85,
-      maxImageDimension: 2000,
-      stripMetadata: false,
-      onProgress: (phase: string, pct: number) => {
-        const safePct = Number.isFinite(pct)
-          ? Math.max(0, Math.min(100, Math.round(pct)))
-          : 0;
-        const message = `${phase} ${safePct}%`;
-        onProgress?.(message);
-        emit({
-          status: "processing",
-          fileName: input.name,
-          originalSize: input.size,
-          optimizedSize: null,
-          savingsBytes: null,
-          savingsPercent: null,
-          progress: safePct,
-          message,
-        });
-      },
-    });
-
-    const candidate = result.blob;
-    const candidateSize = candidate.size;
-    if (candidateSize <= 0 || candidateSize >= input.size) {
+    const candidate = await buildOptimizedPdf(input, onProgress);
+    if (candidate.size <= 0 || candidate.size >= input.size) {
       const fallback = originalResult(input, "original-kept");
       emit({
         ...fallback,
@@ -174,17 +274,17 @@ export async function optimizePdfFile(
       return fallback;
     }
 
-    const savingsBytes = input.size - candidateSize;
+    const savingsBytes = input.size - candidate.size;
     const savingsPercent = percent(savingsBytes, input.size);
-    onProgress?.("Validating pages and document structure…");
+    onProgress?.("Validating optimized PDF…");
     emit({
       status: "processing",
       fileName: input.name,
       originalSize: input.size,
-      optimizedSize: candidateSize,
+      optimizedSize: candidate.size,
       savingsBytes,
       savingsPercent,
-      message: "Validating pages and document structure…",
+      message: "Validating optimized PDF…",
     });
 
     const validation = await validatePdfCandidate(input, candidate);
@@ -213,7 +313,7 @@ export async function optimizePdfFile(
       savingsPercent: percent(input.size - optimizedFile.size, input.size),
       optimized: true,
       status: "optimized",
-      engine: "fileslim-pdf",
+      engine: "safe-pdf",
     };
 
     onProgress?.("Optimization verified. Preparing upload…");
@@ -227,12 +327,13 @@ export async function optimizePdfFile(
   } catch (error) {
     console.warn("PDF optimization skipped; uploading original file.", error);
     const fallback = originalResult(input, "failed");
+    const reason = error instanceof Error ? error.message : "unknown optimization error";
     onProgress?.("Optimization failed; uploading the original PDF.");
     emit({
       ...fallback,
       file: undefined,
       fileName: input.name,
-      validationReason: error instanceof Error ? error.message : "unknown optimization error",
+      validationReason: reason,
       message: "Optimization failed — original PDF uploaded instead.",
     });
     return fallback;
