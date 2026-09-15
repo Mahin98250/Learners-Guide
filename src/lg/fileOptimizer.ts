@@ -2,6 +2,7 @@ import { compressPDF } from "@fileslim/compress";
 import { PDFDocument } from "pdf-lib";
 
 export type OptimizationProgress = (message: string) => void;
+export type OptimizationStatus = "optimized" | "original-kept" | "failed";
 
 export type OptimizationResult = {
   file: File;
@@ -10,6 +11,7 @@ export type OptimizationResult = {
   savingsBytes: number;
   savingsPercent: number;
   optimized: boolean;
+  status: OptimizationStatus;
   engine: "fileslim-pdf" | "original";
 };
 
@@ -18,6 +20,12 @@ const MIN_INPUT_BYTES = 512 * 1024;
 
 const percent = (saved: number, original: number) =>
   original > 0 ? Math.max(0, Math.round((saved / original) * 1000) / 10) : 0;
+
+const emit = (detail: Record<string, unknown>) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("lg:pdf-optimization", { detail }));
+  }
+};
 
 const sameMetadata = (a: PDFDocument, b: PDFDocument) =>
   JSON.stringify([
@@ -54,6 +62,17 @@ async function validatePdfCandidate(input: File, candidate: Blob) {
   return true;
 }
 
+const originalResult = (input: File, status: "original-kept" | "failed"): OptimizationResult => ({
+  file: input,
+  originalSize: input.size,
+  optimizedSize: input.size,
+  savingsBytes: 0,
+  savingsPercent: 0,
+  optimized: false,
+  status,
+  engine: "original",
+});
+
 /**
  * Safely optimizes a PDF before it reaches Storage.
  *
@@ -66,15 +85,18 @@ export async function optimizePdfFile(
   onProgress?: OptimizationProgress,
 ): Promise<OptimizationResult> {
   if (input.type !== PDF_MIME && !input.name.toLowerCase().endsWith(".pdf")) {
-    return { file: input, originalSize: input.size, optimizedSize: input.size, savingsBytes: 0, savingsPercent: 0, optimized: false, engine: "original" };
+    return originalResult(input, "original-kept");
   }
 
   if (input.size < MIN_INPUT_BYTES) {
-    return { file: input, originalSize: input.size, optimizedSize: input.size, savingsBytes: 0, savingsPercent: 0, optimized: false, engine: "original" };
+    emit({ status: "original-kept", fileName: input.name, originalSize: input.size, optimizedSize: input.size, savingsBytes: 0, savingsPercent: 0, message: "Original kept — PDF is already small." });
+    return originalResult(input, "original-kept");
   }
 
   try {
     onProgress?.("Analyzing PDF…");
+    emit({ status: "processing", fileName: input.name, originalSize: input.size, optimizedSize: null, savingsBytes: null, savingsPercent: null, message: "Analyzing PDF…" });
+
     const result = await compressPDF(input, {
       mode: "low",
       imageQuality: 0.85,
@@ -82,37 +104,49 @@ export async function optimizePdfFile(
       stripMetadata: false,
       onProgress: (phase: string, pct: number) => {
         const safePct = Number.isFinite(pct) ? Math.max(0, Math.min(100, Math.round(pct))) : 0;
-        onProgress?.(`${phase} ${safePct}%`);
+        const message = `${phase} ${safePct}%`;
+        onProgress?.(message);
+        emit({ status: "processing", fileName: input.name, originalSize: input.size, optimizedSize: null, savingsBytes: null, savingsPercent: null, progress: safePct, message });
       },
     });
 
     const candidate = result.blob;
     const candidateSize = candidate.size;
     if (candidateSize <= 0 || candidateSize >= input.size) {
-      return { file: input, originalSize: input.size, optimizedSize: input.size, savingsBytes: 0, savingsPercent: 0, optimized: false, engine: "original" };
+      const fallback = originalResult(input, "original-kept");
+      emit({ ...fallback, status: fallback.status, fileName: input.name, message: "No safe size reduction found — original PDF kept." });
+      return fallback;
     }
 
     onProgress?.("Validating pages and document structure…");
+    emit({ status: "processing", fileName: input.name, originalSize: input.size, optimizedSize: candidateSize, savingsBytes: input.size - candidateSize, savingsPercent: percent(input.size - candidateSize, input.size), message: "Validating pages and document structure…" });
     if (!(await validatePdfCandidate(input, candidate))) {
+      const fallback = originalResult(input, "failed");
+      emit({ ...fallback, status: fallback.status, fileName: input.name, message: "Validation failed — original PDF uploaded instead." });
       onProgress?.("Validation failed; uploading the original PDF.");
-      return { file: input, originalSize: input.size, optimizedSize: input.size, savingsBytes: 0, savingsPercent: 0, optimized: false, engine: "original" };
+      return fallback;
     }
 
     const optimizedFile = new File([candidate], input.name, { type: PDF_MIME, lastModified: input.lastModified });
     const savingsBytes = input.size - optimizedFile.size;
-    onProgress?.("Optimization verified. Preparing upload…");
-    return {
+    const optimizedResult: OptimizationResult = {
       file: optimizedFile,
       originalSize: input.size,
       optimizedSize: optimizedFile.size,
       savingsBytes,
       savingsPercent: percent(savingsBytes, input.size),
       optimized: true,
+      status: "optimized",
       engine: "fileslim-pdf",
     };
+    onProgress?.("Optimization verified. Preparing upload…");
+    emit({ ...optimizedResult, file: undefined, fileName: input.name, message: "Optimization successful and verified." });
+    return optimizedResult;
   } catch (error) {
     console.warn("PDF optimization skipped; uploading original file.", error);
-    onProgress?.("Optimization skipped; uploading the original PDF.");
-    return { file: input, originalSize: input.size, optimizedSize: input.size, savingsBytes: 0, savingsPercent: 0, optimized: false, engine: "original" };
+    const fallback = originalResult(input, "failed");
+    onProgress?.("Optimization failed; uploading the original PDF.");
+    emit({ ...fallback, status: fallback.status, file: undefined, fileName: input.name, message: "Optimization failed — original PDF uploaded instead." });
+    return fallback;
   }
 }
