@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
+import { optimizePdfFile } from "@/lg/fileOptimizer";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
 import { NotifPanel } from "@/lg/panels";
 import { THHome, THSchedule, THAttendance } from "@/lg/teacher";
@@ -44,6 +45,7 @@ export function T5HomeworkWithFiles({ teacher }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processing, setProcessing] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({ batchId: "", subject: "", desc: "", due: "", file: null });
 
@@ -117,6 +119,7 @@ export function T5HomeworkWithFiles({ teacher }) {
     }
 
     setSaving(true);
+    setProcessing("");
     setError("");
     let path = "";
     const homeworkId = uid();
@@ -135,22 +138,29 @@ export function T5HomeworkWithFiles({ teacher }) {
         tid: teacher.id,
       };
 
-      if (form.file) {
-        const safe = form.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      let uploadFile = form.file;
+      if (uploadFile?.type === "application/pdf" || uploadFile?.name.toLowerCase().endsWith(".pdf")) {
+        const optimized = await optimizePdfFile(uploadFile, setProcessing);
+        uploadFile = optimized.file;
+        if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
+      }
+
+      if (uploadFile) {
+        const safe = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         path = `teacher/${teacher.id}/${selected.id}/${crypto.randomUUID()}-${safe}`;
         const { error: insertError } = await supabase.from("homework").insert({
           ...base,
           storage_path: path,
-          pdfname: form.file.name,
-          file_size: form.file.size,
-          mime_type: form.file.type || "application/octet-stream",
+          pdfname: uploadFile.name,
+          file_size: uploadFile.size,
+          mime_type: uploadFile.type || "application/octet-stream",
         });
         if (insertError) throw insertError;
         inserted = true;
 
         const { error: uploadError } = await supabase.storage
           .from("homework")
-          .upload(path, form.file, { upsert: false, contentType: form.file.type || "application/octet-stream" });
+          .upload(path, uploadFile, { upsert: false, contentType: uploadFile.type || "application/octet-stream" });
         if (uploadError) {
           await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id);
           throw uploadError;
@@ -168,20 +178,24 @@ export function T5HomeworkWithFiles({ teacher }) {
       setError(errText(e));
     } finally {
       setSaving(false);
+      setProcessing("");
     }
   };
 
   const remove = async (row) => {
     if (!window.confirm("Delete this homework?")) return;
     setError("");
+    if (row.storage_path) {
+      const { error: storageError } = await supabase.storage.from("homework").remove([row.storage_path]);
+      if (storageError) {
+        setError(errText(storageError));
+        return;
+      }
+    }
     const { error: deleteError } = await supabase.from("homework").delete().eq("id", row.id).eq("tid", teacher.id);
     if (deleteError) {
       setError(errText(deleteError));
       return;
-    }
-    if (row.storage_path) {
-      const { error: storageError } = await supabase.storage.from("homework").remove([row.storage_path]);
-      if (storageError) setError(errText(storageError));
     }
     await refresh();
   };
@@ -192,6 +206,7 @@ export function T5HomeworkWithFiles({ teacher }) {
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 800, color: C.text, marginBottom: 10 }}>Assign to my class</div>
         {error && <div style={{ color: C.red, background: "#FFF1F2", padding: 10, borderRadius: 10, fontSize: 12, marginBottom: 10 }}>{error}</div>}
+        {processing && <div style={{ color: C.accent, background: "#EEF2FF", padding: 10, borderRadius: 10, fontSize: 12, marginBottom: 10, fontWeight: 700 }}>{processing}</div>}
         {loading ? (
           <div style={{ color: C.sub, fontSize: 13 }}>Loading your classes…</div>
         ) : batches.length === 0 ? (
@@ -210,8 +225,8 @@ export function T5HomeworkWithFiles({ teacher }) {
             <textarea value={form.desc} onChange={(event) => setForm({ ...form, desc: event.target.value })} placeholder="Homework description" rows={3} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9, resize: "vertical" }} />
             <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9 }} />
             <input type="file" accept={ACCEPT} disabled={saving} onChange={chooseFile} style={{ width: "100%", padding: 8, borderRadius: 10, border: `1px dashed ${C.border}`, marginBottom: 6 }} />
-            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{form.file ? `📎 ${fileLabel(form.file)}` : "Optional attachment · PDF, PPT/PPTX, DOC/DOCX, PNG/JPG · max 50 MB"}</div>
-            <GBtn ch={saving ? "Saving…" : "Assign Homework ✓"} onClick={save} />
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{form.file ? `📎 ${fileLabel(form.file)}` : "Optional attachment · PDF, PPT/PPTX, DOC/DOCX, PNG/JPG · max 50 MB"}{form.file?.type === "application/pdf" ? " · PDF optimized automatically" : ""}</div>
+            <GBtn ch={saving ? (processing || "Saving…") : "Assign Homework ✓"} onClick={save} />
           </>
         )}
       </Card>
@@ -265,17 +280,17 @@ export function TeacherAppWithHomeworkFiles({ user, onLogout }) {
         : tab === "homework"
           ? <T5HomeworkWithFiles teacher={teacher} />
           : tab === "tests"
-            ? <><TTests teacher={teacher} /><TTestResults teacher={teacher} /></>
-            : tab === "announcements"
-              ? <TeacherAnnouncements teacher={teacher} />
-              : <T6Materials teacher={teacher} />;
+            ? <TTests teacher={teacher} />
+            : tab === "materials"
+              ? <T6Materials teacher={teacher} />
+              : <TeacherAnnouncements teacher={teacher} />;
 
-  return (
-    <>
-      <Shell header={<AppBar name={user.name} role="teacher" userId={user.id} onLogout={onLogout} onNotif={() => setShowNotif(true)} />} tabs={tabs} activeTab={tab} setTab={setTab}>
-        {content}
-      </Shell>
-      {showNotif && <NotifPanel userId={user.id} onClose={() => setShowNotif(false)} />}
-    </>
-  );
+  return <Shell>
+    <AppBar title={teacher.name || "Teacher"} onLogout={onLogout} onBell={() => setShowNotif((v) => !v)} />
+    {showNotif && <NotifPanel user={user} onClose={() => setShowNotif(false)} />}
+    <div style={{ padding: "16px 16px 88px", maxWidth: 900, margin: "0 auto" }}>{content}</div>
+    <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 1000, background: "#fff", borderTop: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {tabs.map((item) => <button key={item.key} onClick={() => setTab(item.key)} style={{ border: 0, background: "transparent", padding: "9px 3px", color: tab === item.key ? C.accent : C.sub, fontSize: 10, fontWeight: 800, cursor: "pointer" }}><div style={{ fontSize: 18 }}>{item.icon}</div>{item.label}</button>)}
+    </nav>
+  </Shell>;
 }
