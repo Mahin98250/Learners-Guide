@@ -12,20 +12,31 @@ const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8")
 const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
-test("PDF optimizer dependency and safe fallback are present", () => {
-  assert.match(pkg.dependencies["@fileslim/compress"], /^\^2\.3\.0$/);
-  assert.match(optimizer, /compressPDF/);
-  assert.match(optimizer, /candidateSize >= input\.size/);
-  assert.match(optimizer, /stripMetadata: false/);
-  assert.doesNotMatch(optimizer, /sameMetadata/);
+test("PDF optimizer uses the safe in-app engine and keeps a safe fallback", () => {
+  assert.match(pkg.dependencies["pdf-lib"], /^\^1\.17\.1$/);
+  assert.match(optimizer, /buildOptimizedPdf/);
+  assert.match(optimizer, /candidate\.size >= input\.size/);
+  assert.match(optimizer, /engine: "safe-pdf"/);
+  assert.doesNotMatch(optimizer, /compressPDF/);
+  assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF validation keeps structural safety without false page-box rejection", () => {
+test("PDF validation keeps structural safety without false metadata/page-box rejection", () => {
   assert.match(optimizer, /header !== "%PDF-"/);
   assert.match(optimizer, /page count changed/);
-  assert.match(optimizer, /invalid dimensions/);
+  assert.match(optimizer, /invalid page size/);
+  assert.doesNotMatch(optimizer, /sameMetadata/);
   assert.doesNotMatch(optimizer, /DIMENSION_TOLERANCE_PT/);
   assert.match(optimizer, /validationReason/);
+});
+
+test("PDF image replacement updates the complete image dictionary", () => {
+  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("Filter"\)/);
+  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("Width"\)/);
+  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("Height"\)/);
+  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("ColorSpace"\)/);
+  assert.match(optimizer, /nextDict\.delete\(PDFName\.of\("DecodeParms"\)/);
+  assert.match(optimizer, /PDFRawStream\.of\(nextDict, jpeg\)/);
 });
 
 test("PDF optimization reports processing, success, safe fallback and failure states", () => {
