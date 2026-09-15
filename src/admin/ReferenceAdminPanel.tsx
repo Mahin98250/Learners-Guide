@@ -1526,9 +1526,16 @@ function Materials({ data, reload }: { data: Row[]; reload: () => void }) {
     }
   };
   const remove = async (r: Row) => {
-    if (r.storage_path) await supabase.storage.from("materials").remove([r.storage_path]);
-    await delR("materials", r.id);
-    reload();
+    try {
+      if (r.storage_path) {
+        const { error: storageError } = await supabase.storage.from("materials").remove([r.storage_path]);
+        if (storageError) throw storageError;
+      }
+      await delR("materials", r.id);
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Unable to delete material.");
+    }
   };
   return (
     <div className="content" style={{ padding: 28 }}>
