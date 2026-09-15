@@ -14,9 +14,10 @@ const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8")
 
 test("PDF optimizer uses the safe in-app engine and keeps a safe fallback", () => {
   assert.match(pkg.dependencies["pdf-lib"], /^\^1\.17\.1$/);
-  assert.match(optimizer, /buildOptimizedPdf/);
+  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
+  assert.match(optimizer, /qpdfOptimize/);
   assert.match(optimizer, /candidate\.size >= input\.size/);
-  assert.match(optimizer, /engine: "safe-pdf"/);
+  assert.match(optimizer, /engine: "qpdf-wasm"/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
@@ -31,12 +32,12 @@ test("PDF validation keeps structural safety without false metadata/page-box rej
 });
 
 test("PDF image replacement updates the complete image dictionary", () => {
-  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("Filter"\)/);
-  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("Width"\)/);
-  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("Height"\)/);
-  assert.match(optimizer, /nextDict\.set\(PDFName\.of\("ColorSpace"\)/);
-  assert.match(optimizer, /nextDict\.delete\(PDFName\.of\("DecodeParms"\)/);
-  assert.match(optimizer, /PDFRawStream\.of\(nextDict, jpeg\)/);
+  assert.match(optimizer, /--optimize-images/);
+  assert.match(optimizer, /--recompress-flate/);
+  assert.match(optimizer, /qpdf\.destroy\(\)/);
+  assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
+  assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
+  assert.match(optimizer, /createQpdfRunner/);
 });
 
 test("PDF optimization reports processing, success, safe fallback and failure states", () => {
