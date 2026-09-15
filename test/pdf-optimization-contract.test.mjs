@@ -20,6 +20,14 @@ test("PDF optimizer dependency and safe fallback are present", () => {
   assert.doesNotMatch(optimizer, /sameMetadata/);
 });
 
+test("PDF validation keeps structural safety without false page-box rejection", () => {
+  assert.match(optimizer, /header !== "%PDF-"/);
+  assert.match(optimizer, /page count changed/);
+  assert.match(optimizer, /invalid dimensions/);
+  assert.doesNotMatch(optimizer, /DIMENSION_TOLERANCE_PT/);
+  assert.match(optimizer, /validationReason/);
+});
+
 test("PDF optimization reports processing, success, safe fallback and failure states", () => {
   assert.match(optimizer, /lg:pdf-optimization/);
   assert.match(optimizer, /status: "processing"/);
