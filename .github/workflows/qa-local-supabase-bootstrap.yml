@@ -1,0 +1,202 @@
+name: QA Local Supabase Bootstrap
+
+# This is an expensive infrastructure-reconstruction workflow.
+# Keep it manual while the bootstrap is being developed so normal commits
+# do not repeatedly consume GitHub Actions minutes.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: qa-local-supabase-bootstrap
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Reconstruct local Supabase and run isolated E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Verify local tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          docker --version
+          docker compose version
+          supabase --version
+          psql --version
+
+      - name: Validate deterministic fixture contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/e2e/bootstrap/validate-fixture-contract.mjs
+
+      - name: Validate production trigger artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          node supabase/qa/bootstrap/validate-trigger-artifact.mjs
+
+      - name: Generate executable bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f supabase/qa/bootstrap/production-derived-bootstrap.sql supabase/qa/bootstrap/production-derived-bootstrap.second.sql
+          node supabase/qa/bootstrap/generate-bootstrap.mjs
+          test -s supabase/qa/bootstrap/production-derived-bootstrap.sql
+          cp supabase/qa/bootstrap/production-derived-bootstrap.sql supabase/qa/bootstrap/production-derived-bootstrap.second.sql
+          node supabase/qa/bootstrap/generate-bootstrap.mjs
+          cmp -s supabase/qa/bootstrap/production-derived-bootstrap.sql supabase/qa/bootstrap/production-derived-bootstrap.second.sql
+          node supabase/qa/bootstrap/validate-bootstrap-sql.mjs
+          ! grep -Eiq 'create[[:space:]]+table[[:space:]]+.*storage[.]objects|create[[:space:]]+table[[:space:]]+.*auth[.]users' supabase/qa/bootstrap/production-derived-bootstrap.sql
+          grep -Fq 'Managed Supabase relations are externally supplied' supabase/qa/bootstrap/production-derived-bootstrap.sql
+          test "$(grep -Eic 'create[[:space:]]+table[[:space:]]+' supabase/qa/bootstrap/production-derived-bootstrap.sql)" -eq 27
+          ! grep -Eiq '(^|[[:space:]])(insert[[:space:]]+into[[:space:]]+public\.|copy[[:space:]]+public\.)' supabase/qa/bootstrap/production-derived-bootstrap.sql
+          ! grep -Eiq '(encrypted_password|refresh_token|service_role_key|access_token)' supabase/qa/bootstrap/production-derived-bootstrap.sql
+
+      - name: Restore exact production trigger semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node supabase/qa/bootstrap/repair-trigger-semantics.mjs
+          node supabase/qa/bootstrap/validate-trigger-semantics.mjs
+
+      - name: Quarantine historical migrations for this CI workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv supabase/migrations supabase/migrations.historical
+          mkdir -p supabase/migrations
+
+      - name: Start fresh Local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY
+          supabase start
+
+      - name: Verify local target
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_file="$RUNNER_TEMP/supabase.env"
+          supabase status -o env > "$env_file"
+          chmod 600 "$env_file"
+          . "$env_file"
+          SUPABASE_URL="${API_URL:-}"
+          export SUPABASE_URL
+          node supabase/qa/bootstrap/assert-local-target.mjs
+          case "$DB_URL" in
+            postgresql://*127.0.0.1:54322/*|postgresql://*localhost:54322/*) ;;
+            *) echo "Refusing non-local DB URL target"; exit 1 ;;
+          esac
+          printf 'LOCAL_DB_URL=%s\n' "$DB_URL" >> "$GITHUB_ENV"
+          printf 'E2E_SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'VITE_SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$ANON_KEY" >> "$GITHUB_ENV"
+          printf 'SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+
+      - name: Apply production-derived structural baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$LOCAL_DB_URL" --no-psqlrc -v ON_ERROR_STOP=1 -f supabase/qa/bootstrap/production-derived-bootstrap.sql
+
+      - name: Verify reconstructed structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          node supabase/qa/bootstrap/verify-bootstrap.mjs
+
+      - name: Create synthetic E2E password
+        shell: bash
+        run: |
+          set -euo pipefail
+          password="$(node -e 'console.log(require("node:crypto").randomBytes(24).toString("base64url"))')"
+          printf 'E2E_TEST_PASSWORD=%s\n' "$password" >> "$GITHUB_ENV"
+
+      - name: Seed deterministic synthetic E2E identities and data
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_file="$RUNNER_TEMP/supabase.env"
+          . "$env_file"
+          export SUPABASE_URL="$API_URL"
+          export E2E_SUPABASE_URL="$API_URL"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node tests/e2e/bootstrap/seed-local.mjs
+          node tests/e2e/bootstrap/seed-domain-data.mjs
+
+      - name: Build application against Local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u SUPABASE_SERVICE_ROLE_KEY npm run build
+
+      - name: Security verification - direct RLS authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u SUPABASE_SERVICE_ROLE_KEY E2E_MODE=local npx playwright test tests/e2e/security --project=desktop-chromium
+
+      - name: Full browser E2E - desktop and mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u SUPABASE_SERVICE_ROLE_KEY E2E_MODE=local npx playwright test --grep-invert '@security'
+
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-local-e2e-evidence
+          path: |
+            playwright-report
+            test-results
+            supabase/qa/bootstrap/production-derived-bootstrap.sql
+            supabase/schema-baseline/production-derived-schema-baseline.json
+            supabase/qa/bootstrap/production-trigger-definitions.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Stop Local Supabase
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase stop --no-backup || true
+
+      - name: Remove temporary Supabase credentials
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$RUNNER_TEMP/supabase.env"
+
+      - name: Restore historical migrations
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf supabase/migrations
+          if [ -d supabase/migrations.historical ]; then mv supabase/migrations.historical supabase/migrations; fi

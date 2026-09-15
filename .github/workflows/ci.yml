@@ -6,11 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,8 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Validate the committed source before any working-tree formatting.
-      # This keeps production contracts aligned with what is actually reviewed.
       - name: Production contract checks
         run: node scripts/production-contract-check.mjs
 
@@ -44,8 +46,41 @@ jobs:
       - name: Production build
         run: npm run build
 
-      # Formatting is intentionally last so tests and build validate the
-      # committed source instead of a CI-mutated working tree.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Vite preview
+        run: npm run preview -- --host 127.0.0.1 > /tmp/learner-guide-vite.log 2>&1 &
+
+      - name: Wait for local application
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/learner-guide-vite.log
+          exit 1
+
+      - name: Run Playwright public shell smoke
+        env:
+          E2E_BASE_URL: http://127.0.0.1:4173
+        run: npm run test:e2e:smoke
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-public-shell-report
+          path: |
+            playwright-report/
+            test-results/
+            /tmp/learner-guide-vite.log
+          if-no-files-found: ignore
+
+      # Formatting is intentionally last so tests/build validate committed source.
       - name: Format changed source files
         shell: bash
         run: |
