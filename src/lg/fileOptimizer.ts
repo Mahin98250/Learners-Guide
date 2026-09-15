@@ -17,6 +17,7 @@ export type OptimizationResult = {
 
 const PDF_MIME = "application/pdf";
 const MIN_INPUT_BYTES = 512 * 1024;
+const DIMENSION_TOLERANCE_PT = 1;
 
 const percent = (saved: number, original: number) =>
   original > 0 ? Math.max(0, Math.round((saved / original) * 1000) / 10) : 0;
@@ -27,10 +28,34 @@ const emit = (detail: Record<string, unknown>) => {
   }
 };
 
+type PageSize = { width: number; height: number };
+
+const normalizedRotation = (page: { getRotation: () => { angle: number } }) => {
+  const angle = page.getRotation().angle % 360;
+  return angle < 0 ? angle + 360 : angle;
+};
+
+const effectivePageSize = (
+  page: {
+    getWidth: () => number;
+    getHeight: () => number;
+    getRotation: () => { angle: number };
+  },
+): PageSize => {
+  const width = page.getWidth();
+  const height = page.getHeight();
+  const rotation = normalizedRotation(page);
+  return rotation === 90 || rotation === 270
+    ? { width: height, height: width }
+    : { width, height };
+};
+
 /**
  * Validate only properties that represent document structure/content safety.
- * FileSlim may legitimately rewrite PDF metadata while keeping visible content
- * intact, so metadata equality must not be treated as a validation failure.
+ * FileSlim may legitimately rewrite PDF metadata and normalize page rotation,
+ * so metadata equality and raw rotation equality must not be treated as
+ * content failures. We still require the candidate to be a readable PDF with
+ * the same page count and effectively the same visible page dimensions.
  */
 async function validatePdfCandidate(input: File, candidate: Blob) {
   const [inputBytes, candidateBytes] = await Promise.all([
@@ -38,8 +63,14 @@ async function validatePdfCandidate(input: File, candidate: Blob) {
     candidate.arrayBuffer(),
   ]);
   const [source, optimized] = await Promise.all([
-    PDFDocument.load(inputBytes, { updateMetadata: false }),
-    PDFDocument.load(candidateBytes, { updateMetadata: false }),
+    PDFDocument.load(inputBytes, {
+      updateMetadata: false,
+      ignoreEncryption: true,
+    }),
+    PDFDocument.load(candidateBytes, {
+      updateMetadata: false,
+      ignoreEncryption: true,
+    }),
   ]);
 
   const sourcePages = source.getPages();
@@ -47,10 +78,10 @@ async function validatePdfCandidate(input: File, candidate: Blob) {
   if (sourcePages.length !== optimizedPages.length) return false;
 
   for (let i = 0; i < sourcePages.length; i += 1) {
-    const a = sourcePages[i];
-    const b = optimizedPages[i];
-    if (Math.abs(a.getWidth() - b.getWidth()) > 0.01) return false;
-    if (Math.abs(a.getHeight() - b.getHeight()) > 0.01) return false;
+    const a = effectivePageSize(sourcePages[i]);
+    const b = effectivePageSize(optimizedPages[i]);
+    if (Math.abs(a.width - b.width) > DIMENSION_TOLERANCE_PT) return false;
+    if (Math.abs(a.height - b.height) > DIMENSION_TOLERANCE_PT) return false;
   }
 
   return true;
