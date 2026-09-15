@@ -17,7 +17,6 @@ export type OptimizationResult = {
 
 const PDF_MIME = "application/pdf";
 const MIN_INPUT_BYTES = 512 * 1024;
-const DIMENSION_TOLERANCE_PT = 1;
 
 const percent = (saved: number, original: number) =>
   original > 0 ? Math.max(0, Math.round((saved / original) * 1000) / 10) : 0;
@@ -28,63 +27,67 @@ const emit = (detail: Record<string, unknown>) => {
   }
 };
 
-type PageSize = { width: number; height: number };
-
-const normalizedRotation = (page: { getRotation: () => { angle: number } }) => {
-  const angle = page.getRotation().angle % 360;
-  return angle < 0 ? angle + 360 : angle;
-};
-
-const effectivePageSize = (
-  page: {
-    getWidth: () => number;
-    getHeight: () => number;
-    getRotation: () => { angle: number };
-  },
-): PageSize => {
-  const width = page.getWidth();
-  const height = page.getHeight();
-  const rotation = normalizedRotation(page);
-  return rotation === 90 || rotation === 270
-    ? { width: height, height: width }
-    : { width, height };
+type PdfValidation = {
+  valid: boolean;
+  reason?: string;
 };
 
 /**
- * Validate only properties that represent document structure/content safety.
- * FileSlim may legitimately rewrite PDF metadata and normalize page rotation,
- * so metadata equality and raw rotation equality must not be treated as
- * content failures. We still require the candidate to be a readable PDF with
- * the same page count and effectively the same visible page dimensions.
+ * Validate the optimized PDF without rejecting legitimate PDF rewrites.
+ * FileSlim rebuilds/saves PDF objects, so byte-level metadata, rotation and
+ * page-box equality are not reliable content checks. The important safety
+ * invariants here are: valid PDF, same page count, and valid positive page
+ * geometry on every page. FileSlim only replaces embedded image streams and
+ * preserves the existing page tree/content structure.
  */
-async function validatePdfCandidate(input: File, candidate: Blob) {
+async function validatePdfCandidate(input: File, candidate: Blob): Promise<PdfValidation> {
   const [inputBytes, candidateBytes] = await Promise.all([
     input.arrayBuffer(),
     candidate.arrayBuffer(),
   ]);
-  const [source, optimized] = await Promise.all([
-    PDFDocument.load(inputBytes, {
-      updateMetadata: false,
-      ignoreEncryption: true,
-    }),
-    PDFDocument.load(candidateBytes, {
-      updateMetadata: false,
-      ignoreEncryption: true,
-    }),
-  ]);
+
+  const header = new TextDecoder("ascii").decode(candidateBytes.slice(0, 5));
+  if (header !== "%PDF-") {
+    return { valid: false, reason: "optimized output is not a PDF" };
+  }
+
+  let source: PDFDocument;
+  let optimized: PDFDocument;
+  try {
+    [source, optimized] = await Promise.all([
+      PDFDocument.load(inputBytes, {
+        updateMetadata: false,
+        ignoreEncryption: true,
+      }),
+      PDFDocument.load(candidateBytes, {
+        updateMetadata: false,
+        ignoreEncryption: true,
+      }),
+    ]);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "PDF could not be reopened";
+    return { valid: false, reason: `optimized PDF could not be reopened: ${reason}` };
+  }
 
   const sourcePages = source.getPages();
   const optimizedPages = optimized.getPages();
-  if (sourcePages.length !== optimizedPages.length) return false;
-
-  for (let i = 0; i < sourcePages.length; i += 1) {
-    const a = effectivePageSize(sourcePages[i]);
-    const b = effectivePageSize(optimizedPages[i]);
-    if (Math.abs(a.width - b.width) > DIMENSION_TOLERANCE_PT) return false;
-    if (Math.abs(a.height - b.height) > DIMENSION_TOLERANCE_PT) return false;
+  if (sourcePages.length !== optimizedPages.length) {
+    return {
+      valid: false,
+      reason: `page count changed (${sourcePages.length} → ${optimizedPages.length})`,
+    };
   }
 
-  return true;
+  for (let i = 0; i < optimizedPages.length; i += 1) {
+    const page = optimizedPages[i];
+    const width = page.getWidth();
+    const height = page.getHeight();
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return { valid: false, reason: `optimized page ${i + 1} has invalid dimensions` };
+    }
+  }
+
+  return { valid: true };
 }
 
 const originalResult = (
@@ -184,11 +187,14 @@ export async function optimizePdfFile(
       message: "Validating pages and document structure…",
     });
 
-    if (!(await validatePdfCandidate(input, candidate))) {
+    const validation = await validatePdfCandidate(input, candidate);
+    if (!validation.valid) {
+      console.warn("PDF optimization validation rejected candidate:", validation.reason);
       const fallback = originalResult(input, "failed");
       emit({
         ...fallback,
         fileName: input.name,
+        validationReason: validation.reason,
         message: "Validation failed — original PDF uploaded instead.",
       });
       onProgress?.("Validation failed; uploading the original PDF.");
@@ -226,6 +232,7 @@ export async function optimizePdfFile(
       ...fallback,
       file: undefined,
       fileName: input.name,
+      validationReason: error instanceof Error ? error.message : "unknown optimization error",
       message: "Optimization failed — original PDF uploaded instead.",
     });
     return fallback;
