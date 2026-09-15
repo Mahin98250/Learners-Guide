@@ -6,6 +6,8 @@ const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const optimizer = fs.readFileSync("src/lg/fileOptimizer.ts", "utf8");
 const adminHomework = fs.readFileSync("src/admin/HomeworkPage.tsx", "utf8");
 const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8");
+const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
+const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
 test("PDF optimizer dependency and safe fallback are present", () => {
   assert.match(pkg.dependencies["@fileslim/compress"], /^\^2\.3\.0$/);
@@ -22,4 +24,14 @@ test("admin homework runs PDFs through the optimizer before Storage", () => {
 test("teacher homework runs PDFs through the optimizer before Storage", () => {
   assert.match(teacherHomework, /optimizePdfFile\(uploadFile, setProcessing\)/);
   assert.match(teacherHomework, /file_size: uploadFile\.size/);
+});
+
+test("teacher material uploads PDFs through the optimizer before Storage", () => {
+  assert.match(teacherMaterials, /optimizePdfFile\(selectedFile, setProcessing\)/);
+  assert.match(teacherMaterials, /file_size: uploadFile\.size/);
+});
+
+test("active admin materials uploader runs PDFs through the optimizer before Storage", () => {
+  assert.match(adminMaterials, /optimizePdfFile\(file, setProcessing\)/);
+  assert.match(adminMaterials, /file_size:uploadFile\.size/);
 });
