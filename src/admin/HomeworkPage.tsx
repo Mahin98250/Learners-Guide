@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { delR, gdb, C, subjectsForClasses } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
+import { optimizePdfFile } from "@/lg/fileOptimizer";
 
 type Row = Record<string, any>;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
@@ -11,6 +12,7 @@ export default function HomeworkPage() {
   const [teachers, setTeachers] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processing, setProcessing] = useState("");
   const [error, setError] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState({ batchId: "", teacherId: "", subject: "", desc: "", given: new Date().toISOString().slice(0, 10), due: "", pdfName: "" });
@@ -42,21 +44,27 @@ export default function HomeworkPage() {
     setError("");
     if (!form.batchId || !form.subject || !form.desc.trim() || !form.due) { setError("Batch, subject, description and due date are required."); return; }
     if (!selectedBatch) { setError("Please select a valid batch."); return; }
-    setSaving(true); let storagePath = "";
+    setSaving(true); setProcessing(""); let storagePath = "";
     const id = `hw_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     try {
+      let uploadFile = file;
       if (file) {
-        storagePath = `admin/${selectedBatch.id}/${id}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-        const { error: uploadError } = await supabase.storage.from("homework").upload(storagePath, file, { upsert: false, contentType: "application/pdf" });
+        const optimized = await optimizePdfFile(file, setProcessing);
+        uploadFile = optimized.file;
+        if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
+      }
+      if (uploadFile) {
+        storagePath = `admin/${selectedBatch.id}/${id}-${uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error: uploadError } = await supabase.storage.from("homework").upload(storagePath, uploadFile, { upsert: false, contentType: "application/pdf" });
         if (uploadError) throw uploadError;
       }
-      const { error: insertError } = await supabase.from("homework").insert({ id, cls: String(selectedBatch.cls || ""), sec: String(selectedBatch.sec || ""), batch_id: selectedBatch.id, subject: form.subject, desc: form.desc.trim(), given: form.given, due: form.due, tid: form.teacherId || null, completedby: [], pdfname: form.pdfName || null, pdfdata: null, storage_path: storagePath || null, file_size: file?.size || null, mime_type: file ? "application/pdf" : null });
+      const { error: insertError } = await supabase.from("homework").insert({ id, cls: String(selectedBatch.cls || ""), sec: String(selectedBatch.sec || ""), batch_id: selectedBatch.id, subject: form.subject, desc: form.desc.trim(), given: form.given, due: form.due, tid: form.teacherId || null, completedby: [], pdfname: form.pdfName || null, pdfdata: null, storage_path: storagePath || null, file_size: uploadFile?.size || null, mime_type: uploadFile ? "application/pdf" : null });
       if (insertError) throw insertError;
       setFile(null); setForm({ batchId: "", teacherId: "", subject: "", desc: "", given: new Date().toISOString().slice(0, 10), due: "", pdfName: "" }); await load();
     } catch (e) {
       if (storagePath) await supabase.storage.from("homework").remove([storagePath]);
       setError(e instanceof Error ? e.message : "Unable to create homework.");
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setProcessing(""); }
   };
   const remove = async (row: Row) => {
     if (!window.confirm("Delete this homework?")) return;
@@ -74,8 +82,9 @@ export default function HomeworkPage() {
 
   return <div className="admin-homework-page" style={{ padding: "clamp(14px,3vw,28px)", maxWidth: 1100, margin: "0 auto", fontFamily: "Poppins,system-ui,sans-serif", color: C.text, boxSizing: "border-box", width: "100%", overflowX: "hidden" }}>
     <style>{`@media(max-width:640px){.homework-header{align-items:flex-start!important;flex-direction:column!important}.homework-header button{width:100%}.homework-form{padding:15px!important}.homework-form-grid{grid-template-columns:1fr!important}.homework-submit{width:100%;min-height:46px}.homework-list{padding:15px!important}.homework-row{flex-direction:column!important;align-items:stretch!important}.homework-row button{width:100%;min-height:42px}.homework-description{overflow-wrap:anywhere}.homework-file{width:100%;box-sizing:border-box}}`}</style>
-    <div className="homework-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, gap: 12 }}><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: 20 }}>Homework 📝</h2><div style={{ color: C.sub, fontSize: 13, marginTop: 3 }}>Admin can assign homework to any batch and securely attach a PDF.</div></div><button onClick={() => void load()} style={{ border: 0, borderRadius: 10, padding: "9px 13px", minHeight: 42, background: C.light, color: C.accent, fontWeight: 800, cursor: "pointer" }}>↻ Refresh</button></div>
+    <div className="homework-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, gap: 12 }}><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: 20 }}>Homework 📝</h2><div style={{ color: C.sub, fontSize: 13, marginTop: 3 }}>Admin can assign homework to any batch and securely attach a PDF. PDFs are optimized automatically before upload.</div></div><button onClick={() => void load()} style={{ border: 0, borderRadius: 10, padding: "9px 13px", minHeight: 42, background: C.light, color: C.accent, fontWeight: 800, cursor: "pointer" }}>↻ Refresh</button></div>
     {error && <div style={{ background: "#FFF5F5", border: `1px solid ${C.red}33`, borderLeft: `4px solid ${C.red}`, borderRadius: 12, padding: 12, marginBottom: 14, color: C.red, fontSize: 13, overflowWrap: "anywhere" }}>{error}</div>}
+    {processing && <div style={{ background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 12, padding: 10, marginBottom: 14, color: C.accent, fontSize: 12, fontWeight: 700 }}>{processing}</div>}
     <div className="homework-form" style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 18, padding: 20, marginBottom: 18, boxShadow: "0 4px 18px rgba(15,27,61,.06)" }}>
       <div style={{ fontWeight: 800, marginBottom: 14 }}>Create Homework</div>
       <div className="homework-form-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 12 }}>
@@ -86,7 +95,7 @@ export default function HomeworkPage() {
       </div>
       <label style={{ display: "block", marginTop: 12, fontSize: 12, fontWeight: 700, color: C.sub }}>Description<textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="Homework instructions…" style={{ display: "block", width: "100%", boxSizing: "border-box", minHeight: 90, marginTop: 6, padding: 10, borderRadius: 10, border: `1px solid ${C.border}`, background: C.light, resize: "vertical" }} /></label>
       <label className="homework-file" style={{ display: "block", marginTop: 12, fontSize: 12, fontWeight: 700, color: C.sub }}>Attach PDF (optional)<input type="file" accept="application/pdf,.pdf" onChange={(e) => handlePdf(e.target.files?.[0])} style={{ display: "block", maxWidth: "100%", marginTop: 7 }} />{form.pdfName && <span style={{ display: "block", marginTop: 5, color: C.green, overflowWrap: "anywhere" }}>✓ {form.pdfName}</span>}</label>
-      <button className="homework-submit" disabled={saving} onClick={() => void save()} style={{ marginTop: 16, border: 0, borderRadius: 11, padding: "11px 18px", background: C.accent, color: "#fff", fontWeight: 800, cursor: saving ? "wait" : "pointer", opacity: saving ? .65 : 1 }}>{saving ? "Saving…" : "Assign Homework"}</button>
+      <button className="homework-submit" disabled={saving} onClick={() => void save()} style={{ marginTop: 16, border: 0, borderRadius: 11, padding: "11px 18px", background: C.accent, color: "#fff", fontWeight: 800, cursor: saving ? "wait" : "pointer", opacity: saving ? .65 : 1 }}>{saving ? (processing || "Saving…") : "Assign Homework"}</button>
     </div>
     <div className="homework-list" style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 18, padding: 20 }}><div style={{ fontWeight: 800, marginBottom: 12 }}>Existing Homework ({homework.length})</div>{loading ? <div style={{ color: C.sub }}>Loading…</div> : homework.length === 0 ? <div style={{ color: C.sub }}>No homework assigned yet.</div> : homework.map((h) => <div className="homework-row" key={h.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 750, overflowWrap: "anywhere" }}>{h.subject} · Class {h.cls}-{h.sec}</div><div className="homework-description" style={{ fontSize: 12, color: C.sub }}>{h.desc}</div><div style={{ fontSize: 11, color: C.sub, marginTop: 4, overflowWrap: "anywhere" }}>Due: {h.due}{h.pdfname ? ` · 📄 ${h.pdfname}` : ""}</div></div><button onClick={() => void remove(h)} style={{ alignSelf: "center", border: 0, borderRadius: 9, padding: "7px 10px", minHeight: 42, background: "#FEE2E2", color: C.red, cursor: "pointer" }}>🗑 Delete</button></div>)}</div>
   </div>;
