@@ -18,34 +18,6 @@ export const supabase = createClient(SB_URL, SB_KEY, {
   },
 });
 
-const OPTIMIZABLE_BUCKETS = new Set(["homework", "materials"]);
-const originalStorageFrom = supabase.storage.from.bind(supabase.storage);
-
-// Keep the existing upload API intact and transparently run the safe optimizer
-// after successful staff uploads. If optimization fails, the original upload
-// remains valid and the caller still receives the original upload result.
-supabase.storage.from = ((bucket: string) => {
-  const bucketApi = originalStorageFrom(bucket);
-  if (!OPTIMIZABLE_BUCKETS.has(bucket)) return bucketApi;
-
-  const originalUpload = bucketApi.upload.bind(bucketApi);
-  bucketApi.upload = async (path, fileBody, fileOptions) => {
-    const result = await originalUpload(path, fileBody, fileOptions);
-    if (!result.error && /\.pdf$/i.test(String(path))) {
-      try {
-        const { error: optimizerError } = await supabase.functions.invoke("file-optimizer", {
-          body: { bucket, path },
-        });
-        if (optimizerError) console.warn("File optimization skipped:", optimizerError.message);
-      } catch (error) {
-        console.warn("File optimization skipped:", error);
-      }
-    }
-    return result;
-  };
-  return bucketApi;
-}) as typeof supabase.storage.from;
-
 function clearStoredAuth() {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -82,7 +54,9 @@ export function clearInvalidAuthSession() {
 
 export function isInvalidRefreshTokenError(error: unknown) {
   const candidate = error as { message?: unknown } | null;
-  const message = String(candidate && typeof candidate === "object" ? candidate.message || "" : error || "").toLowerCase();
+  const message = String(
+    candidate && typeof candidate === "object" ? candidate.message || "" : error || "",
+  ).toLowerCase();
   return message.includes("invalid refresh token") ||
     message.includes("refresh_token_not_found") ||
     message.includes("refresh token not found");
