@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data";
+import { optimizePdfFile } from "@/lg/fileOptimizer";
 import { supabase } from "@/lg/supabase";
 import { Card, Sec } from "@/lg/ui";
 
@@ -94,6 +95,7 @@ export function T6Materials({ teacher }) {
   const [currentId, setCurrentId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [processing, setProcessing] = useState("");
   const [error, setError] = useState("");
 
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -270,17 +272,24 @@ export function T6Materials({ teacher }) {
 
     setBusy(true);
     setError("");
+    setProcessing("");
     let storagePath = "";
     try {
+      let uploadFile = selectedFile;
+      if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
+        const optimized = await optimizePdfFile(selectedFile, setProcessing);
+        uploadFile = optimized.file;
+        if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
+      }
       const randomId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : uid();
-      const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       storagePath = `teacher/${teacher.id}/${targetBatch.id}/${randomId}-${safeName}`;
 
       const { error: storageError } = await supabase.storage
         .from("materials")
-        .upload(storagePath, selectedFile, {
+        .upload(storagePath, uploadFile, {
           upsert: false,
-          contentType: selectedFile.type || "application/octet-stream",
+          contentType: uploadFile.type || "application/octet-stream",
         });
       if (storageError) throw storageError;
 
@@ -292,13 +301,13 @@ export function T6Materials({ teacher }) {
         sec: targetBatch.sec || null,
         subject: clean(fileSubject),
         title: clean(fileTitle),
-        name: selectedFile.name,
+        name: uploadFile.name,
         desc: null,
         date: new Date().toISOString().slice(0, 10),
         tid: teacher.id,
         storage_path: storagePath,
-        file_size: selectedFile.size,
-        mime_type: selectedFile.type || "application/octet-stream",
+        file_size: uploadFile.size,
+        mime_type: uploadFile.type || "application/octet-stream",
       });
       if (insertError) throw insertError;
 
@@ -312,6 +321,7 @@ export function T6Materials({ teacher }) {
       setError(errorText(error));
     } finally {
       setBusy(false);
+      setProcessing("");
     }
   };
 
