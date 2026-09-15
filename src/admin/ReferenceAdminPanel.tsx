@@ -1500,13 +1500,12 @@ function Materials({ data, reload }: { data: Row[]; reload: () => void }) {
         .from("materials")
         .upload(path, f, { upsert: false, contentType: f.type });
       if (error) throw error;
-      const { data: urlData } = supabase.storage.from("materials").getPublicUrl(path);
       await addR("materials", {
         id: "m" + Date.now(),
         ...form,
         pdfname: f.name,
         storage_path: path,
-        pdfurl: urlData.publicUrl,
+        pdfurl: null,
         size: f.size,
       });
       setOpen(false);
@@ -1559,16 +1558,22 @@ function Materials({ data, reload }: { data: Row[]; reload: () => void }) {
               {m.pdfname} · {m.size ? Math.round((m.size / 1024 / 1024) * 10) / 10 : 0} MB
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              {m.pdfurl && (
-                <a
+              {m.storage_path && (
+                <button
                   className="btn"
-                  href={m.pdfurl}
-                  target="_blank"
-                  rel="noreferrer"
+                  type="button"
+                  onClick={async () => {
+                    const { data, error } = await supabase.storage.from("materials").createSignedUrl(m.storage_path, 300);
+                    if (error || !data?.signedUrl) {
+                      alert(error?.message || "Unable to open this material.");
+                      return;
+                    }
+                    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+                  }}
                   style={{ background: A.accent, color: "#fff", textDecoration: "none" }}
                 >
                   Open
-                </a>
+                </button>
               )}
               <Btn onClick={() => void remove(m)} color={A.red}>
                 🗑
