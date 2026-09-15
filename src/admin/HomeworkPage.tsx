@@ -60,8 +60,16 @@ export default function HomeworkPage() {
   };
   const remove = async (row: Row) => {
     if (!window.confirm("Delete this homework?")) return;
-    try { await delR("homework", row.id); if (row.storage_path) await supabase.storage.from("homework").remove([row.storage_path]); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Unable to delete homework."); }
+    try {
+      if (row.storage_path) {
+        const { error: storageError } = await supabase.storage.from("homework").remove([row.storage_path]);
+        if (storageError) throw storageError;
+      }
+      await delR("homework", row.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to delete homework.");
+    }
   };
 
   return <div className="admin-homework-page" style={{ padding: "clamp(14px,3vw,28px)", maxWidth: 1100, margin: "0 auto", fontFamily: "Poppins,system-ui,sans-serif", color: C.text, boxSizing: "border-box", width: "100%", overflowX: "hidden" }}>
