@@ -4,6 +4,8 @@ import test from "node:test";
 
 const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const optimizer = fs.readFileSync("src/lg/fileOptimizer.ts", "utf8");
+const overlay = fs.readFileSync("src/PdfOptimizationOverlay.tsx", "utf8");
+const main = fs.readFileSync("src/main.tsx", "utf8");
 const adminHomework = fs.readFileSync("src/admin/HomeworkPage.tsx", "utf8");
 const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8");
 const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
@@ -14,6 +16,27 @@ test("PDF optimizer dependency and safe fallback are present", () => {
   assert.match(optimizer, /compressPDF/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /stripMetadata: false/);
+});
+
+test("PDF optimization reports processing, success, safe fallback and failure states", () => {
+  assert.match(optimizer, /lg:pdf-optimization/);
+  assert.match(optimizer, /status: "processing"/);
+  assert.match(optimizer, /status: "optimized"/);
+  assert.match(optimizer, /status: "original-kept"/);
+  assert.match(optimizer, /status: "failed"/);
+  assert.match(optimizer, /savingsBytes/);
+  assert.match(optimizer, /savingsPercent/);
+});
+
+test("global optimization overlay shows all requested measurements and final status", () => {
+  assert.match(overlay, /Original size/);
+  assert.match(overlay, /Optimized size/);
+  assert.match(overlay, /Data saved/);
+  assert.match(overlay, /Compression/);
+  assert.match(overlay, /Optimization successful and verified/);
+  assert.match(overlay, /Original kept/);
+  assert.match(overlay, /optimizer could not safely complete/i);
+  assert.match(main, /PdfOptimizationOverlay/);
 });
 
 test("admin homework runs PDFs through the optimizer before Storage", () => {
