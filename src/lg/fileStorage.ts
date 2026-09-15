@@ -33,7 +33,9 @@ async function callGateway<T = Record<string, unknown>>(body: Record<string, unk
 
 async function uploadToSession(sessionUrl: string, file: File, onProgress?: (value: number) => void): Promise<Record<string, unknown>> {
   const chunkSize = 8 * 1024 * 1024;
+  const maxTransientRetries = 4;
   let offset = 0;
+  let transientRetries = 0;
 
   while (offset < file.size) {
     const end = Math.min(offset + chunkSize, file.size);
@@ -50,21 +52,30 @@ async function uploadToSession(sessionUrl: string, file: File, onProgress?: (val
         body: chunk,
       });
     } catch {
-      const statusResponse = await fetch(sessionUrl, {
-        method: "PUT",
-        headers: { "Content-Range": `bytes */${file.size}` },
-      });
-      if (statusResponse.ok) return await statusResponse.json();
-      const range = statusResponse.headers.get("Range");
-      if (statusResponse.status !== 308 && statusResponse.status !== 404) {
-        throw new Error(`Upload resume check failed (${statusResponse.status}).`);
+      if (++transientRetries > maxTransientRetries) {
+        throw new Error("Upload connection was interrupted repeatedly. Please retry the upload.");
       }
-      if (statusResponse.status === 404) throw new Error("Google Drive upload session expired. Please retry the upload.");
-      offset = range ? Number(range.match(/(\\d+)$/)?.[1] || -1) + 1 : 0;
-      continue;
+      try {
+        const statusResponse = await fetch(sessionUrl, {
+          method: "PUT",
+          headers: { "Content-Range": `bytes */${file.size}` },
+        });
+        if (statusResponse.ok) return await statusResponse.json();
+        if (statusResponse.status === 404) throw new Error("Google Drive upload session expired. Please retry the upload.");
+        if (statusResponse.status !== 308) throw new Error(`Upload resume check failed (${statusResponse.status}).`);
+        const range = statusResponse.headers.get("Range");
+        offset = range ? Number(range.match(/(\\d+)$/)?.[1] || -1) + 1 : 0;
+        await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (transientRetries - 1)));
+        continue;
+      } catch (resumeError) {
+        if (resumeError instanceof Error && resumeError.message.includes("expired")) throw resumeError;
+        await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (transientRetries - 1)));
+        continue;
+      }
     }
 
     if (response.status === 308) {
+      transientRetries = 0;
       const range = response.headers.get("Range");
       const receivedThrough = range ? Number(range.match(/(\\d+)$/)?.[1] || -1) : end - 1;
       offset = receivedThrough + 1;
@@ -73,12 +84,16 @@ async function uploadToSession(sessionUrl: string, file: File, onProgress?: (val
     }
 
     if (response.ok) {
+      transientRetries = 0;
       onProgress?.(100);
       return await response.json();
     }
 
     if ([429, 500, 502, 503, 504].includes(response.status)) {
-      await new Promise((resolve) => setTimeout(resolve, 750));
+      if (++transientRetries > maxTransientRetries) {
+        throw new Error(`Google Drive upload failed after retries (${response.status}).`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (transientRetries - 1)));
       continue;
     }
 
