@@ -9,6 +9,7 @@ type OptimizationDetail = {
   savingsPercent?: number | null;
   progress?: number;
   message?: string;
+  validationReason?: string;
 };
 
 const mb = (bytes?: number | null) => bytes == null ? "—" : `${(bytes / 1048576).toFixed(1)} MB`;
@@ -64,7 +65,7 @@ export default function PdfOptimizationOverlay() {
         <div style={{ marginTop: 16, fontSize: 12, lineHeight: 1.55, color: "#64748B" }}>
           {successful && "The optimized PDF passed the safety checks and the smaller file is being uploaded."}
           {fallback && "No safe reduction was found, so the original PDF is kept. No content is intentionally removed."}
-          {failed && "The optimizer could not safely complete. The original PDF is kept instead."}
+          {failed && `The compressed file was rejected for safety. The original PDF is kept instead.${detail.validationReason ? ` Reason: ${detail.validationReason}` : ""}`}
           {processing && "The original file is not replaced until optimization and validation finish."}
         </div>
 
