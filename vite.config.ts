@@ -16,6 +16,8 @@ export default defineConfig({
     tailwindcss(),
     tsconfigPaths(),
   ],
+  assetsInclude: ["**/*.wasm"],
+  optimizeDeps: { exclude: ["qpdf-run"] },
   build: {
     outDir: "dist",
     emptyOutDir: true,
