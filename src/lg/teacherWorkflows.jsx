@@ -337,16 +337,16 @@ export function T6Materials({ teacher }) {
     setBusy(true);
     setError("");
     try {
+      if (material.storage_path) {
+        const { error: storageError } = await supabase.storage.from("materials").remove([material.storage_path]);
+        if (storageError) throw storageError;
+      }
       const { error: deleteError } = await supabase
         .from("materials")
         .delete()
         .eq("id", material.id)
         .eq("tid", teacher.id);
       if (deleteError) throw deleteError;
-      if (material.storage_path) {
-        const { error: storageError } = await supabase.storage.from("materials").remove([material.storage_path]);
-        if (storageError) throw storageError;
-      }
       await refresh();
     } catch (error) {
       setError(errorText(error));
