@@ -26,7 +26,7 @@ const emit = (detail: Record<string, unknown>) => {
   }
 };
 
-type PdfValidation = { valid: boolean; reason?: string };
+type PdfCheck = { valid: boolean; pageCount: number; reason?: string };
 
 async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   const { createQpdfRunner } = await import("qpdf-run");
@@ -40,79 +40,50 @@ async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
     wasmUrl,
     timeoutMs: Math.max(
       60_000,
-      Math.min(180_000, 20_000 + Math.ceil(inputSize / (1024 * 1024)) * 2_500),
+      Math.min(180_000, 30_000 + Math.ceil(inputSize / (1024 * 1024)) * 5_000),
     ),
   });
 }
 
-async function qpdfCheck(
+async function checkPdf(
   qpdf: QpdfRunner,
   bytes: Uint8Array,
   name: string,
-): Promise<{ pageCount: number }> {
+): Promise<PdfCheck> {
+  const header = new TextDecoder("ascii").decode(bytes.slice(0, 5));
+  if (header !== "%PDF-") {
+    return { valid: false, pageCount: 0, reason: "output does not start with a PDF header" };
+  }
+
   const check = await qpdf.run({
     inputs: { [name]: bytes },
     args: ["--check", name],
   });
 
+  // qpdf exit code 3 means warnings; the file can still be usable.
   if (check.exitCode !== 0 && check.exitCode !== 3) {
-    throw new Error(
-      `qpdf check failed (exit ${check.exitCode ?? "unknown"}): ${[...check.stderr, ...check.stdout].join(" ").trim() || "no diagnostic"}`,
-    );
+    return {
+      valid: false,
+      pageCount: 0,
+      reason: `qpdf check failed (exit ${check.exitCode ?? "unknown"}): ${[...check.stderr, ...check.stdout].join(" ").trim() || "no diagnostic"}`,
+    };
   }
 
-  const pageResult = await qpdf.run({
+  const pages = await qpdf.run({
     inputs: { [name]: bytes },
     args: ["--show-npages", name],
   });
-
-  const pageText = pageResult.stdout.join("\n").trim();
+  const pageText = pages.stdout.join("\n").trim();
   const match = pageText.match(/^\s*(\d+)\s*$/m);
   if (!match) {
-    throw new Error(
-      `qpdf could not determine page count: ${[...pageResult.stderr, ...pageResult.stdout].join(" ").trim() || "no diagnostic"}`,
-    );
-  }
-
-  return { pageCount: Number(match[1]) };
-}
-
-/**
- * Validate with the same PDF engine that produced the candidate.
- * pdf-lib is deliberately not used here because it can reject valid PDFs
- * containing structures/features it does not fully support.
- */
-async function validatePdfCandidate(
-  inputBytes: Uint8Array,
-  candidateBytes: Uint8Array,
-  inputSize: number,
-): Promise<PdfValidation> {
-  const header = new TextDecoder("ascii").decode(candidateBytes.slice(0, 5));
-  if (header !== "%PDF-") {
-    return { valid: false, reason: "optimized output is not a PDF" };
-  }
-
-  const qpdf = await createQpdfRunnerForFile(inputSize);
-  try {
-    const source = await qpdfCheck(qpdf, inputBytes, "source.pdf");
-    const candidate = await qpdfCheck(qpdf, candidateBytes, "candidate.pdf");
-
-    if (candidate.pageCount !== source.pageCount) {
-      return {
-        valid: false,
-        reason: `page count changed (${source.pageCount} → ${candidate.pageCount})`,
-      };
-    }
-
-    return { valid: true };
-  } catch (error) {
     return {
       valid: false,
-      reason: error instanceof Error ? error.message : "qpdf validation failed",
+      pageCount: 0,
+      reason: `qpdf could not determine page count: ${[...pages.stderr, ...pages.stdout].join(" ").trim() || "no diagnostic"}`,
     };
-  } finally {
-    await qpdf.destroy();
   }
+
+  return { valid: true, pageCount: Number(match[1]) };
 }
 
 const originalResult = (
@@ -129,50 +100,76 @@ const originalResult = (
   engine: "original",
 });
 
-async function qpdfOptimize(input: File, onProgress?: OptimizationProgress): Promise<Uint8Array> {
+async function optimizeWithQpdf(
+  input: File,
+  onProgress?: OptimizationProgress,
+): Promise<{ bytes: Uint8Array; validation: PdfCheck } | null> {
   const qpdf = await createQpdfRunnerForFile(input.size);
-
   try {
-    onProgress?.("Starting safe PDF optimizer…");
     const bytes = new Uint8Array(await input.arrayBuffer());
-    const baseArgs = [
-      "--compress-streams=y",
-      "--decode-level=generalized",
-      "--recompress-flate",
-      "--compression-level=9",
-      "--object-streams=generate",
-      "--optimize-images",
-    ];
-
-    const runProfile = async (jpegQuality: number) => {
-      const result = await qpdf.runOne({
-        input: bytes,
-        inputName: "input.pdf",
-        outputName: "output.pdf",
-        args: [
-          ...baseArgs,
-          `--jpeg-quality=${jpegQuality}`,
-          "--",
-          "input.pdf",
-          "output.pdf",
-        ],
-      });
-      if (!(result instanceof Uint8Array) || result.length === 0) {
-        throw new Error(`qpdf returned no output at JPEG quality ${jpegQuality}`);
-      }
-      return result;
-    };
-
-    const highQuality = await runProfile(85);
-    if (highQuality.byteLength < input.size) {
-      onProgress?.("Safe PDF optimization completed at high quality.");
-      return highQuality;
+    const source = await checkPdf(qpdf, bytes, "source.pdf");
+    if (!source.valid) {
+      throw new Error(`source PDF failed qpdf validation: ${source.reason}`);
     }
 
-    onProgress?.("Trying stronger image compression because the first pass did not reduce the file…");
-    const stronger = await runProfile(75);
-    const best = stronger.byteLength < highQuality.byteLength ? stronger : highQuality;
-    onProgress?.("Safe PDF optimization completed.");
+    // Pass 1: lossless/structural optimization. This is the reliable baseline.
+    onProgress?.("Optimizing PDF structure…");
+    const structural = await qpdf.runOne({
+      input: bytes,
+      inputName: "input.pdf",
+      outputName: "structural.pdf",
+      args: [
+        "--compress-streams=y",
+        "--decode-level=generalized",
+        "--recompress-flate",
+        "--compression-level=9",
+        "--object-streams=generate",
+        "--",
+        "input.pdf",
+        "structural.pdf",
+      ],
+    });
+
+    const structuralCheck = await checkPdf(qpdf, structural, "structural.pdf");
+    const candidates: Array<{ bytes: Uint8Array; validation: PdfCheck }> = [];
+    if (structuralCheck.valid && structuralCheck.pageCount === source.pageCount) {
+      candidates.push({ bytes: structural, validation: structuralCheck });
+    }
+
+    // Pass 2: image optimization. qpdf decides whether replacing an image is
+    // actually smaller, so we do not force a quality setting that may be
+    // unsupported by the bundled qpdf version or unnecessarily degrade content.
+    onProgress?.("Optimizing embedded images…");
+    const imageOptimized = await qpdf.runOne({
+      input: bytes,
+      inputName: "input.pdf",
+      outputName: "images.pdf",
+      args: [
+        "--compress-streams=y",
+        "--decode-level=generalized",
+        "--recompress-flate",
+        "--compression-level=9",
+        "--object-streams=generate",
+        "--optimize-images",
+        "--",
+        "input.pdf",
+        "images.pdf",
+      ],
+    });
+
+    const imageCheck = await checkPdf(qpdf, imageOptimized, "images.pdf");
+    if (imageCheck.valid && imageCheck.pageCount === source.pageCount) {
+      candidates.push({ bytes: imageOptimized, validation: imageCheck });
+    }
+
+    if (!candidates.length) {
+      throw new Error("qpdf produced no valid candidate with the original page count");
+    }
+
+    const best = candidates.reduce((smallest, candidate) =>
+      candidate.bytes.byteLength < smallest.bytes.byteLength ? candidate : smallest,
+    );
+
     return best;
   } finally {
     await qpdf.destroy();
@@ -212,10 +209,12 @@ export async function optimizePdfFile(
       message: "Analyzing PDF…",
     });
 
-    const inputBytes = new Uint8Array(await input.arrayBuffer());
-    const candidateBytes = await qpdfOptimize(input, onProgress);
-    const candidateSize = candidateBytes.byteLength;
+    const optimized = await optimizeWithQpdf(input, onProgress);
+    if (!optimized) {
+      return originalResult(input, "original-kept");
+    }
 
+    const candidateSize = optimized.bytes.byteLength;
     if (candidateSize <= 0 || candidateSize >= input.size) {
       const fallback = originalResult(input, "original-kept");
       emit({
@@ -228,7 +227,6 @@ export async function optimizePdfFile(
 
     const savingsBytes = input.size - candidateSize;
     const savingsPercent = percent(savingsBytes, input.size);
-
     emit({
       status: "processing",
       fileName: input.name,
@@ -236,30 +234,16 @@ export async function optimizePdfFile(
       optimizedSize: candidateSize,
       savingsBytes,
       savingsPercent,
-      message: "Validating optimized PDF with qpdf…",
+      message: "Optimized PDF verified — preparing upload…",
     });
-    onProgress?.("Validating optimized PDF with qpdf…");
+    onProgress?.("Optimization verified. Preparing upload…");
 
-    const validation = await validatePdfCandidate(inputBytes, candidateBytes, input.size);
-    if (!validation.valid) {
-      console.warn("PDF optimization validation rejected candidate:", validation.reason);
-      const fallback = originalResult(input, "failed");
-      emit({
-        ...fallback,
-        fileName: input.name,
-        validationReason: validation.reason,
-        message: "Compression rejected by safety checks — original PDF kept.",
-      });
-      onProgress?.("Compression rejected by safety checks; uploading the original PDF.");
-      return fallback;
-    }
-
-    const optimizedFile = new File([candidateBytes], input.name, {
+    const optimizedFile = new File([optimized.bytes], input.name, {
       type: PDF_MIME,
       lastModified: input.lastModified,
     });
 
-    const optimizedResult: OptimizationResult = {
+    const result: OptimizationResult = {
       file: optimizedFile,
       originalSize: input.size,
       optimizedSize: optimizedFile.size,
@@ -270,20 +254,17 @@ export async function optimizePdfFile(
       engine: "qpdf-wasm",
     };
 
-    onProgress?.("Optimization verified. Preparing upload…");
     emit({
-      ...optimizedResult,
+      ...result,
       file: undefined,
       fileName: input.name,
       message: "Optimization successful and verified.",
     });
-
-    return optimizedResult;
+    return result;
   } catch (error) {
     console.warn("PDF optimization skipped; uploading original file.", error);
     const fallback = originalResult(input, "failed");
     const reason = error instanceof Error ? error.message : "unknown optimization error";
-
     onProgress?.("Optimization failed; uploading the original PDF.");
     emit({
       ...fallback,
@@ -292,7 +273,6 @@ export async function optimizePdfFile(
       validationReason: reason,
       message: "Optimization failed — original PDF uploaded instead.",
     });
-
     return fallback;
   }
 }
