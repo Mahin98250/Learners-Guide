@@ -12,8 +12,7 @@ const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8")
 const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
-test("PDF optimizer uses the published qpdf WASM package and safe fallback", () => {
-  assert.match(pkg.dependencies["pdf-lib"], /^\^1\.17\.1$/);
+test("PDF optimizer uses qpdf WASM and safe fallback", () => {
   assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
   assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
@@ -22,25 +21,26 @@ test("PDF optimizer uses the published qpdf WASM package and safe fallback", () 
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF validation is performed by qpdf and preserves page count", () => {
-  assert.match(optimizer, /header !== "%PDF-"/);
+test("PDF validation uses qpdf inspection commands correctly and preserves page count", () => {
   assert.match(optimizer, /checkPdf/);
-  assert.match(optimizer, /--check/);
-  assert.match(optimizer, /--show-npages/);
-  assert.match(optimizer, /page count/);
+  assert.match(optimizer, /qpdf\.run\(\{/);
+  assert.match(optimizer, /args: \["--check", "--", name\]/);
+  assert.match(optimizer, /args: \["--show-npages", "--", name\]/);
+  assert.match(optimizer, /exitCode !== 0 && check\.exitCode !== 3/);
+  assert.match(optimizer, /pageCount === source\.pageCount/);
   assert.match(optimizer, /validationReason/);
-  assert.match(optimizer, /checkedName/);
-  assert.match(optimizer, /outputName: checkedName/);
+  assert.doesNotMatch(optimizer, /checkedName/);
+  assert.doesNotMatch(optimizer, /outputName: checkedName/);
+  assert.doesNotMatch(optimizer, /header !== "%PDF-"/);
   assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /sameMetadata/);
 });
 
-test("qpdf runner uses supported browser assets, copies transferable inputs, and is cleaned up", () => {
+test("qpdf runner uses supported browser assets and is cleaned up", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
-  assert.match(optimizer, /copyForQpdf/);
-  assert.match(optimizer, /inputs: \{\[name\]: copyForQpdf\(bytes\)\}/);
+  assert.match(optimizer, /bytes\.slice\(\)/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
   assert.match(optimizer, /--object-streams=generate/);
@@ -64,7 +64,7 @@ test("PDF optimization reports processing, success, safe fallback and failure st
   assert.match(optimizer, /savingsPercent/);
 });
 
-test("global optimization overlay shows all requested measurements and final status", () => {
+test("global optimization overlay shows requested measurements and final status", () => {
   assert.match(overlay, /Original size/);
   assert.match(overlay, /Optimized size/);
   assert.match(overlay, /Data saved/);
