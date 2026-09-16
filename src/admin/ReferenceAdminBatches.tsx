@@ -5,7 +5,7 @@ import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type 
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-function Batches({ data, reload }: { data: Row[]; reload: () => void }) {
+export function Batches({ data, reload }: { data: Row[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [form, setForm] = useState<any>({
       name: "",
