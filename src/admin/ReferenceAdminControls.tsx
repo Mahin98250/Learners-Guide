@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { A } from "./ReferenceAdminShared";
 
-function Badge({ v }: { v: any }) {
+export function Badge({ v }: { v: any }) {
   const x = String(v ?? "—");
   const c: Record<string, string> = {
     active: A.green,
@@ -23,7 +23,7 @@ function Badge({ v }: { v: any }) {
     </span>
   );
 }
-function Btn({
+export function Btn({
   children,
   onClick,
   color = A.accent,
@@ -52,7 +52,7 @@ function Btn({
     </button>
   );
 }
-function Modal({
+export function Modal({
   title,
   onClose,
   children,
@@ -92,7 +92,7 @@ function Modal({
     </div>
   );
 }
-function Field({
+export function Field({
   label,
   value,
   onChange,
@@ -148,7 +148,7 @@ function Field({
     </div>
   );
 }
-function Confirm({ text, onYes, onNo }: { text: string; onYes: () => void; onNo: () => void }) {
+export function Confirm({ text, onYes, onNo }: { text: string; onYes: () => void; onNo: () => void }) {
   return (
     <Modal title="Are you sure?" onClose={onNo}>
       <p style={{ color: A.sub }}>{text}</p>
@@ -163,7 +163,7 @@ function Confirm({ text, onYes, onNo }: { text: string; onYes: () => void; onNo:
     </Modal>
   );
 }
-function Table({
+export function Table({
   rows,
   columns,
   actions,
