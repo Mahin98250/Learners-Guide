@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addR, delR, gdb, updR } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
-import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type UserRow, type StudentRow, type TeacherRow, type PageKey, type ResultRow } from "./ReferenceAdminShared";
+import { A, META, subjects, days, slots, gradeOptions, sectionOptions, type Row, type UserRow, type StudentRow, type TeacherRow, type PageKey, type ResultRow } from "./ReferenceAdminShared";
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
