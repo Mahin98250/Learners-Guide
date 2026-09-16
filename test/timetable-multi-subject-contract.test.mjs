@@ -24,7 +24,7 @@ test("admin timetable supports multi-subject lectures plus edit/delete actions",
 });
 
 test("student timetable reads the canonical combined subject display field", () => {
-  const source = read("src/lg/data.js");
+  const source = dataSource;
   assert.match(source, /subject_name/);
   assert.match(source, /timetable_entries/);
 });
