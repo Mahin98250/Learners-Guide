@@ -29,6 +29,8 @@ test("PDF validation is performed by qpdf and preserves page count", () => {
   assert.match(optimizer, /--show-npages/);
   assert.match(optimizer, /page count/);
   assert.match(optimizer, /validationReason/);
+  assert.match(optimizer, /checkedName/);
+  assert.match(optimizer, /outputName: checkedName/);
   assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /sameMetadata/);
 });
