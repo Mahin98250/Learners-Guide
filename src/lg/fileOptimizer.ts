@@ -45,58 +45,55 @@ async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   });
 }
 
-// qpdf-run transfers input ArrayBuffers to its Web Worker. Every qpdf call
-// therefore receives its own copy so a previous call can never detach the
-// buffer needed by a later pass.
-const copyForQpdf = (bytes: Uint8Array) => bytes.slice();
-
 async function checkPdf(
   qpdf: QpdfRunner,
   bytes: Uint8Array,
   name: string,
 ): Promise<PdfCheck> {
-  const header = new TextDecoder("ascii").decode(bytes.slice(0, 5));
-  if (header !== "%PDF-") {
-    return { valid: false, pageCount: 0, reason: "output does not start with a PDF header" };
-  }
-
-  // qpdf's --check is an inspection command, but the qpdf WASM execution
-  // path used by the app can require an explicit output target. Run the
-  // check together with a harmless PDF rewrite so the command always has a
-  // concrete output file and the produced bytes are themselves validated.
-  const checkedName = `${name.replace(/[^a-zA-Z0-9_.-]/g, "_")}.checked.pdf`;
-  let checked: Uint8Array;
   try {
-    checked = await qpdf.runOne({
-      input: copyForQpdf(bytes),
-      inputName: name,
-      outputName: checkedName,
-      args: ["--check", "--", name, checkedName],
+    // --check is an inspection command. It must run through qpdf.run(), not
+    // runOne(), because it intentionally produces diagnostics rather than a
+    // PDF output file.
+    const check = await qpdf.run({
+      inputs: { [name]: bytes.slice() },
+      args: ["--check", "--", name],
     });
+
+    if (check.exitCode !== 0 && check.exitCode !== 3) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `qpdf --check exited with ${check.exitCode}: ${[...check.stderr, ...check.stdout].join(" ").trim() || "no diagnostic"}`,
+      };
+    }
+
+    const pages = await qpdf.run({
+      inputs: { [name]: bytes.slice() },
+      args: ["--show-npages", "--", name],
+    });
+    if (pages.exitCode !== 0) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `qpdf could not determine page count: ${[...pages.stderr, ...pages.stdout].join(" ").trim() || "no diagnostic"}`,
+      };
+    }
+
+    const pageText = pages.stdout.join("\n").trim();
+    const match = pageText.match(/^\s*(\d+)\s*$/m);
+    if (!match) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `qpdf returned an invalid page count: ${pageText || "no page count"}`,
+      };
+    }
+
+    return { valid: true, pageCount: Number(match[1]) };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    return { valid: false, pageCount: 0, reason: `qpdf check failed: ${reason}` };
+    return { valid: false, pageCount: 0, reason: `qpdf validation failed: ${reason}` };
   }
-
-  if (checked.byteLength === 0) {
-    return { valid: false, pageCount: 0, reason: "qpdf check produced an empty output" };
-  }
-
-  const pages = await qpdf.run({
-    inputs: { [name]: copyForQpdf(checked) },
-    args: ["--show-npages", name],
-  });
-  const pageText = pages.stdout.join("\n").trim();
-  const match = pageText.match(/^\s*(\d+)\s*$/m);
-  if (!match) {
-    return {
-      valid: false,
-      pageCount: 0,
-      reason: `qpdf could not determine page count: ${[...pages.stderr, ...pages.stdout].join(" ").trim() || "no diagnostic"}`,
-    };
-  }
-
-  return { valid: true, pageCount: Number(match[1]) };
 }
 
 const originalResult = (
@@ -127,7 +124,7 @@ async function optimizeWithQpdf(
 
     onProgress?.("Optimizing PDF structure…");
     const structural = await qpdf.runOne({
-      input: copyForQpdf(bytes),
+      input: bytes.slice(),
       inputName: "input.pdf",
       outputName: "structural.pdf",
       args: [
@@ -150,7 +147,7 @@ async function optimizeWithQpdf(
 
     onProgress?.("Optimizing embedded images…");
     const imageOptimized = await qpdf.runOne({
-      input: copyForQpdf(bytes),
+      input: bytes.slice(),
       inputName: "input.pdf",
       outputName: "images.pdf",
       args: [
