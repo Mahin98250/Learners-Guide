@@ -34,7 +34,7 @@ test("Phase 5: auth validates server-managed role and linked/institute profile s
 });
 
 test("Phase 5: shared data layer keeps explicit projections and scoped timetable reads", () => {
-  const data = read("src/lg/data.js");
+  const data = dataSource;
   assert.match(data, /TABLE_SELECTS/);
   assert.match(data, /selectForTable\(t\)/);
   assert.doesNotMatch(data, /from\(t\)\.select\(["']\*["']\)/);
