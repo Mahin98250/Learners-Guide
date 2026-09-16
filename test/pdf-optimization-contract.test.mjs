@@ -12,33 +12,36 @@ const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8")
 const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
-test("PDF optimizer uses the safe in-app engine and keeps a safe fallback", () => {
+
+test("PDF optimizer uses qpdf WASM and keeps a safe fallback", () => {
   assert.match(pkg.dependencies["pdf-lib"], /^\^1\.17\.1$/);
   assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
   assert.match(optimizer, /qpdfOptimize/);
-  assert.match(optimizer, /candidate\.size >= input\.size/);
+  assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF validation keeps structural safety without false metadata/page-box rejection", () => {
+test("PDF validation uses qpdf itself instead of pdf-lib", () => {
   assert.match(optimizer, /header !== "%PDF-"/);
+  assert.match(optimizer, /qpdfCheck/);
+  assert.match(optimizer, /--check/);
+  assert.match(optimizer, /--show-npages/);
   assert.match(optimizer, /page count changed/);
-  assert.match(optimizer, /invalid page size/);
-  assert.doesNotMatch(optimizer, /sameMetadata/);
-  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
-  assert.doesNotMatch(optimizer, /DIMENSION_TOLERANCE_PT/);
   assert.match(optimizer, /validationReason/);
+  assert.doesNotMatch(optimizer, /PDFDocument\.load/);
+  assert.doesNotMatch(optimizer, /sameMetadata/);
+  assert.doesNotMatch(optimizer, /DIMENSION_TOLERANCE_PT/);
 });
 
-test("PDF image replacement updates the complete image dictionary", () => {
-  assert.match(optimizer, /--optimize-images/);
-  assert.match(optimizer, /--recompress-flate/);
-  assert.match(optimizer, /qpdf\.destroy\(\)/);
+test("qpdf runner is bundled correctly and always cleaned up", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
-  assert.match(optimizer, /createQpdfRunner/);
+  assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
+  assert.match(optimizer, /await qpdf\.destroy\(\)/);
+  assert.match(optimizer, /--optimize-images/);
+  assert.match(optimizer, /--recompress-flate/);
 });
 
 test("PDF optimization reports processing, success, safe fallback and failure states", () => {
@@ -58,7 +61,8 @@ test("global optimization overlay shows all requested measurements and final sta
   assert.match(overlay, /Compression/);
   assert.match(overlay, /Optimization successful and verified/);
   assert.match(overlay, /Original kept/);
-  assert.match(overlay, /optimizer could not safely complete/i);
+  assert.match(overlay, /compressed file was rejected for safety/i);
+  assert.match(overlay, /validationReason/);
   assert.match(main, /PdfOptimizationOverlay/);
 });
 
