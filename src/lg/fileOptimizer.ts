@@ -1,5 +1,3 @@
-import { PDFDocument } from "pdf-lib";
-
 export type OptimizationProgress = (message: string) => void;
 export type OptimizationStatus = "optimized" | "original-kept" | "failed";
 
@@ -28,46 +26,102 @@ const emit = (detail: Record<string, unknown>) => {
 
 type PdfValidation = { valid: boolean; reason?: string };
 
-async function validatePdfCandidate(input: File, candidate: Blob): Promise<PdfValidation> {
-  const [inputBytes, candidateBytes] = await Promise.all([
-    input.arrayBuffer(),
-    candidate.arrayBuffer(),
-  ]);
+type QpdfRunner = Awaited<ReturnType<typeof createQpdfRunner>>;
 
+async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
+  const { createQpdfRunner } = await import("qpdf-run");
+  const workerUrl = new URL("qpdf-run/worker", import.meta.url).href;
+  const qpdfJsUrl = new URL("qpdf-run/qpdf.js", import.meta.url).href;
+  const wasmUrl = new URL("qpdf-run/qpdf.wasm", import.meta.url).href;
+
+  return createQpdfRunner({
+    workerUrl,
+    qpdfJsUrl,
+    wasmUrl,
+    timeoutMs: Math.max(
+      60_000,
+      Math.min(180_000, 20_000 + Math.ceil(inputSize / (1024 * 1024)) * 2_500),
+    ),
+  });
+}
+
+async function qpdfCheck(
+  qpdf: QpdfRunner,
+  bytes: Uint8Array,
+  name: string,
+): Promise<{ pageCount: number; diagnostics: string }> {
+  const check = await qpdf.run({
+    inputs: { [name]: bytes },
+    args: ["--check", name],
+  });
+
+  if (check.exitCode !== 0 && check.exitCode !== 3) {
+    throw new Error(
+      `qpdf check failed (exit ${check.exitCode ?? "unknown"}): ${[...check.stderr, ...check.stdout].join(" ").trim() || "no diagnostic"}`,
+    );
+  }
+
+  const pageResult = await qpdf.run({
+    inputs: { [name]: bytes },
+    args: ["--show-npages", name],
+  });
+
+  const pageText = pageResult.stdout.join("\n").trim();
+  const match = pageText.match(/\d+/);
+  if (!match) {
+    throw new Error(
+      `qpdf could not determine page count: ${[...pageResult.stderr, ...pageResult.stdout].join(" ").trim() || "no diagnostic"}`,
+    );
+  }
+
+  return {
+    pageCount: Number(match[0]),
+    diagnostics: [...check.warnings, ...pageResult.warnings].join(" ").trim(),
+  };
+}
+
+/**
+ * Validate with the same PDF engine that produced the candidate.
+ *
+ * pdf-lib is deliberately not used here: it is a higher-level PDF editor and
+ * can reject otherwise valid PDFs containing structures/features it does not
+ * fully support. qpdf is specifically designed as a content-preserving PDF
+ * transformer and can validate the generated file with --check.
+ */
+async function validatePdfCandidate(
+  inputBytes: Uint8Array,
+  candidateBytes: Uint8Array,
+  inputSize: number,
+): Promise<PdfValidation> {
   const header = new TextDecoder("ascii").decode(candidateBytes.slice(0, 5));
   if (header !== "%PDF-") {
     return { valid: false, reason: "optimized output is not a PDF" };
   }
 
-  let source: PDFDocument;
-  let optimized: PDFDocument;
+  const qpdf = await createQpdfRunnerForFile(inputSize);
   try {
-    [source, optimized] = await Promise.all([
-      PDFDocument.load(inputBytes, { updateMetadata: false, ignoreEncryption: true }),
-      PDFDocument.load(candidateBytes, { updateMetadata: false, ignoreEncryption: true }),
-    ]);
+    const source = await qpdfCheck(qpdf, inputBytes, "source.pdf");
+    const candidate = await qpdfCheck(qpdf, candidateBytes, "candidate.pdf");
+
+    if (candidate.pageCount !== source.pageCount) {
+      return {
+        valid: false,
+        reason: `page count changed (${source.pageCount} → ${candidate.pageCount})`,
+      };
+    }
+
+    return {
+      valid: true,
+      reason: candidate.diagnostics || undefined,
+    };
   } catch (error) {
     return {
       valid: false,
-      reason: `optimized PDF could not be reopened: ${error instanceof Error ? error.message : "unknown error"}`,
+      reason: error instanceof Error ? error.message : "qpdf validation failed",
     };
+  } finally {
+    await qpdf.destroy();
   }
-
-  const sourcePages = source.getPageCount();
-  const optimizedPages = optimized.getPageCount();
-  if (sourcePages !== optimizedPages) {
-    return { valid: false, reason: `page count changed (${sourcePages} → ${optimizedPages})` };
-  }
-
-  for (const page of optimized.getPages()) {
-    const width = page.getWidth();
-    const height = page.getHeight();
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-      return { valid: false, reason: "optimized PDF contains an invalid page size" };
-    }
-  }
-
-  return { valid: true };
 }
 
 const originalResult = (
@@ -84,18 +138,8 @@ const originalResult = (
   engine: "original",
 });
 
-async function qpdfOptimize(input: File, onProgress?: OptimizationProgress): Promise<Blob> {
-  const { createQpdfRunner } = await import("qpdf-run");
-  const workerUrl = new URL("qpdf-run/worker", import.meta.url).href;
-  const qpdfJsUrl = new URL("qpdf-run/qpdf.js", import.meta.url).href;
-  const wasmUrl = new URL("qpdf-run/qpdf.wasm", import.meta.url).href;
-
-  const qpdf = await createQpdfRunner({
-    workerUrl,
-    qpdfJsUrl,
-    wasmUrl,
-    timeoutMs: Math.max(60_000, Math.min(180_000, 20_000 + Math.ceil(input.size / (1024 * 1024)) * 2500)),
-  });
+async function qpdfOptimize(input: File, onProgress?: OptimizationProgress): Promise<Uint8Array> {
+  const qpdf = await createQpdfRunnerForFile(input.size);
 
   try {
     onProgress?.("Starting safe PDF optimizer…");
@@ -122,7 +166,7 @@ async function qpdfOptimize(input: File, onProgress?: OptimizationProgress): Pro
     }
 
     onProgress?.("Safe PDF optimization completed.");
-    return new Blob([result], { type: PDF_MIME });
+    return result;
   } finally {
     await qpdf.destroy();
   }
@@ -161,8 +205,9 @@ export async function optimizePdfFile(
       message: "Analyzing PDF…",
     });
 
-    const candidate = await qpdfOptimize(input, onProgress);
-    const candidateSize = candidate.size;
+    const inputBytes = new Uint8Array(await input.arrayBuffer());
+    const candidateBytes = await qpdfOptimize(input, onProgress);
+    const candidateSize = candidateBytes.byteLength;
 
     if (candidateSize <= 0 || candidateSize >= input.size) {
       const fallback = originalResult(input, "original-kept");
@@ -184,10 +229,11 @@ export async function optimizePdfFile(
       optimizedSize: candidateSize,
       savingsBytes,
       savingsPercent,
-      message: "Validating optimized PDF…",
+      message: "Validating optimized PDF with qpdf…",
     });
+    onProgress?.("Validating optimized PDF with qpdf…");
 
-    const validation = await validatePdfCandidate(input, candidate);
+    const validation = await validatePdfCandidate(inputBytes, candidateBytes, input.size);
     if (!validation.valid) {
       console.warn("PDF optimization validation rejected candidate:", validation.reason);
       const fallback = originalResult(input, "failed");
@@ -201,7 +247,7 @@ export async function optimizePdfFile(
       return fallback;
     }
 
-    const optimizedFile = new File([candidate], input.name, {
+    const optimizedFile = new File([candidateBytes], input.name, {
       type: PDF_MIME,
       lastModified: input.lastModified,
     });
