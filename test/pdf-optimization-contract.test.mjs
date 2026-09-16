@@ -33,10 +33,12 @@ test("PDF validation is performed by qpdf and preserves page count", () => {
   assert.doesNotMatch(optimizer, /sameMetadata/);
 });
 
-test("qpdf runner uses supported browser assets and is cleaned up", () => {
+test("qpdf runner uses supported browser assets, copies transferable inputs, and is cleaned up", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
+  assert.match(optimizer, /copyForQpdf/);
+  assert.match(optimizer, /inputs: \{\[name\]: copyForQpdf\(bytes\)\}/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
   assert.match(optimizer, /--object-streams=generate/);
