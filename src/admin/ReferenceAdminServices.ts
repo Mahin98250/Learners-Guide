@@ -1,7 +1,7 @@
 import { supabase } from "@/lg/supabase";
 import { gdb } from "@/lg/data";
 
-async function provision(
+async export function provision(
   role: string,
   loginId: string,
   password: string,
@@ -16,7 +16,7 @@ async function provision(
   if (data?.error) throw new Error(data.error);
   return data;
 }
-async function removeAuth(authId?: string | null) {
+async export function removeAuth(authId?: string | null) {
   if (!authId) return;
   const { data, error } = await supabase.functions.invoke("admin-provision-user", {
     body: {
