@@ -2,7 +2,7 @@ import { LGLogo } from "@/lg/ui";
 import { A, NAV, type PageKey } from "./ReferenceAdminShared";
 import { Btn } from "./ReferenceAdminControls";
 
-function Sidebar({
+export function Sidebar({
   page,
   setPage,
   onLogout,
@@ -76,7 +76,7 @@ function Sidebar({
     </aside>
   );
 }
-function Top({
+export function Top({
   meta,
   onRefresh,
 }: {
