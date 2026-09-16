@@ -4,7 +4,7 @@ import fs from "node:fs";
 
 const read = (file) => fs.readFileSync(file, "utf8");
 const dataSource = [
-  dataSource,
+  read("src/lg/data.js"),
   read("src/lg/data/index.ts"),
   read("src/lg/data/constants.ts"),
   read("src/lg/data/cache.ts"),
