@@ -166,7 +166,6 @@ export function T5HomeworkWithFiles({ teacher }) {
           await supabase.storage.from("homework").remove([path]).catch(() => {});
           await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
           inserted = false;
-          storageUploaded = false;
           throw uploadError;
         }
         storageUploaded = true;
@@ -179,13 +178,12 @@ export function T5HomeworkWithFiles({ teacher }) {
       setForm((current) => ({ ...current, desc: "", due: "", file: null }));
       await refresh();
     } catch (e) {
-      // Only compensate a file that was actually uploaded. A successful
-      // operation followed by a refresh error must not be rolled back.
-      if (storageUploaded && path) {
+      // Do not roll back a successful upload merely because refreshing the list failed.
+      // Only compensate when an actual Storage object was created and the operation
+      // is still marked as inserted.
+      if (storageUploaded && path && inserted) {
         await supabase.storage.from("homework").remove([path]).catch(() => {});
-        if (inserted) {
-          await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
-        }
+        await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
       }
       setError(errText(e));
     } finally {
@@ -230,3 +228,79 @@ export function T5HomeworkWithFiles({ teacher }) {
               setForm((current) => ({ ...current, batchId: event.target.value, subject: batch?.subjects?.[0] || "" }));
             }} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9 }}>
               {batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name} · Class {batch.cls || "-"}-{batch.sec || "-"}</option>)}
+            </select>
+            <select value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9 }}>
+              {selected?.subjects?.map((subject) => <option key={subject}>{subject}</option>)}
+            </select>
+            <textarea value={form.desc} onChange={(event) => setForm({ ...form, desc: event.target.value })} placeholder="Homework description" rows={3} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9, resize: "vertical" }} />
+            <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9 }} />
+            <input type="file" accept={ACCEPT} disabled={saving} onChange={chooseFile} style={{ width: "100%", padding: 8, borderRadius: 10, border: `1px dashed ${C.border}`, marginBottom: 6 }} />
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{form.file ? `📎 ${fileLabel(form.file)}` : "Optional attachment · PDF, PPT/PPTX, DOC/DOCX, PNG/JPG · max 50 MB"}{form.file?.type === "application/pdf" ? " · PDF optimized automatically" : ""}</div>
+            <GBtn ch={saving ? (processing || "Saving…") : "Assign Homework ✓"} onClick={save} />
+          </>
+        )}
+      </Card>
+      <Sec title={`My Homework (${rows.length})`} />
+      {rows.map((homework) => (
+        <Card key={homework.id} style={{ marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+            <div>
+              <Badge label={homework.subject} />
+              <div style={{ fontWeight: 700, color: C.text, marginTop: 5 }}>{homework.desc}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginTop: 5 }}>Due: {homework.due}</div>
+              {homework.pdfname && <div style={{ fontSize: 11, color: C.sub, marginTop: 5 }}>📎 {homework.pdfname}</div>}
+            </div>
+            <button onClick={() => void remove(homework)} style={{ border: 0, borderRadius: 9, padding: "6px 9px", background: "#FFF1F2", color: C.red, cursor: "pointer" }}>🗑</button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+export function TeacherAppWithHomeworkFiles({ user, onLogout }) {
+  const [tab, setTab] = useState("home");
+  const [showNotif, setShowNotif] = useState(false);
+  const [teacher, setTeacher] = useState({ id: user.ref, name: user.name, subject: "", classes: [] });
+
+  useEffect(() => {
+    let alive = true;
+    void loadTeacherProfile(user.ref)
+      .then((profile) => { if (alive && profile) setTeacher(profile); })
+      .catch((e) => console.error("Unable to load teacher profile:", e));
+    return () => { alive = false; };
+  }, [user.ref]);
+
+  const tabs = [
+    { key: "home", icon: "🏠", label: "Home" },
+    { key: "schedule", icon: "📅", label: "Schedule" },
+    { key: "attendance", icon: "✅", label: "Attend." },
+    { key: "homework", icon: "📝", label: "HW" },
+    { key: "tests", icon: "📋", label: "Tests" },
+    { key: "materials", icon: "📚", label: "Notes" },
+    { key: "announcements", icon: "📢", label: "News" },
+  ];
+
+  const content = tab === "home"
+    ? <THHome teacher={teacher} />
+    : tab === "schedule"
+      ? <THSchedule teacher={teacher} />
+      : tab === "attendance"
+        ? <THAttendance teacher={teacher} />
+        : tab === "homework"
+          ? <T5HomeworkWithFiles teacher={teacher} />
+          : tab === "tests"
+            ? <TTests teacher={teacher} />
+            : tab === "materials"
+              ? <T6Materials teacher={teacher} />
+              : <TeacherAnnouncements teacher={teacher} />;
+
+  return <Shell>
+    <AppBar title={teacher.name || "Teacher"} onLogout={onLogout} onBell={() => setShowNotif((v) => !v)} />
+    {showNotif && <NotifPanel user={user} onClose={() => setShowNotif(false)} />}
+    <div style={{ padding: "16px 16px 88px", maxWidth: 900, margin: "0 auto" }}>{content}</div>
+    <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 1000, background: "#fff", borderTop: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {tabs.map((item) => <button key={item.key} onClick={() => setTab(item.key)} style={{ border: 0, background: "transparent", padding: "9px 3px", color: tab === item.key ? C.accent : C.sub, fontSize: 10, fontWeight: 800, cursor: "pointer" }}><div style={{ fontSize: 18 }}>{item.icon}</div>{item.label}</button>)}
+    </nav>
+  </Shell>;
+}
