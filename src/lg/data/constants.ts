@@ -1,0 +1,11 @@
+/** Shared UI and domain constants. */
+export const C={bg:"linear-gradient(160deg,#1a1060 0%,#2d1b8e 45%,#0e0a3a 100%)",sidebar:"#0F1B3D",card:"#FFFFFF",accent:"#5B4FE8",gold:"#F5A623",green:"#22C55E",red:"#EF4444",amber:"#F59E0B",purple:"#8B5CF6",cyan:"#06B6D4",text:"#1a1060",sub:"#64748B",border:"#E2E8F0",light:"#F0F4FF"} as const;
+export const formatTime12=(value:unknown):string=>{if(value==null||String(value).trim()==="")return"—";const raw=String(value).trim().toUpperCase();const m=raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/);if(!m)return String(value);let h=Number(m[1]),min=m[2],ampm=m[3];if(!ampm){if(h<0||h>23)return String(value);ampm=h>=12?"PM":"AM";h=h%12||12;}else if(h<1||h>12)return String(value);return `${h}:${min} ${ampm}`};
+export const formatTimeRange12=(start:unknown,end:unknown):string=>`${formatTime12(start)}–${formatTime12(end)}`;
+export const ROLES=[{key:"teacher",label:"Teacher",sub:"Manage classes & students",grad:"linear-gradient(135deg,#5B4FE8,#7B6FF5)",color:"#5B4FE8"},{key:"student",label:"Student",sub:"View classes & homework",grad:"linear-gradient(135deg,#F5A623,#F97316)",color:"#F5A623"},{key:"parent",label:"Parent",sub:"Track your child's progress",grad:"linear-gradient(135deg,#22C55E,#16A34A)",color:"#22C55E"}] as const;
+export const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"] as const;
+export const today=()=>(DAYS[new Date().getDay()]) as typeof DAYS[number];
+export const uid=():string=>`u${Date.now()}${Math.random().toString(36).slice(2,6)}`;
+export const SUBJECTS_BY_CLASS={"9":["Science","English","Maths","Social Studies"],"10":["Science","English","Maths","Social Studies"],"11":["Accountancy","Business Studies","Economics","Applied Mathematics","Informatics Practices","Entrepreneurship","Physical Education"],"12":["Accountancy","Business Studies","Economics","Applied Mathematics","Informatics Practices","Entrepreneurship","Physical Education"]} as const;
+export const ALL_SUBJECTS=[...new Set(Object.values(SUBJECTS_BY_CLASS).flat())];
+export const subjectsForClasses=(classes:string[]=[]):string[]=>[...new Set(classes.map(String).flatMap(cls=>SUBJECTS_BY_CLASS[cls as keyof typeof SUBJECTS_BY_CLASS]||[]))];
