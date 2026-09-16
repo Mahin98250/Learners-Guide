@@ -60,21 +60,30 @@ async function checkPdf(
     return { valid: false, pageCount: 0, reason: "output does not start with a PDF header" };
   }
 
-  const check = await qpdf.run({
-    inputs: { [name]: copyForQpdf(bytes) },
-    args: ["--check", name],
-  });
+  // qpdf's --check is an inspection command, but the qpdf WASM execution
+  // path used by the app can require an explicit output target. Run the
+  // check together with a harmless PDF rewrite so the command always has a
+  // concrete output file and the produced bytes are themselves validated.
+  const checkedName = `${name.replace(/[^a-zA-Z0-9_.-]/g, "_")}.checked.pdf`;
+  let checked: Uint8Array;
+  try {
+    checked = await qpdf.runOne({
+      input: copyForQpdf(bytes),
+      inputName: name,
+      outputName: checkedName,
+      args: ["--check", "--", name, checkedName],
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { valid: false, pageCount: 0, reason: `qpdf check failed: ${reason}` };
+  }
 
-  if (check.exitCode !== 0 && check.exitCode !== 3) {
-    return {
-      valid: false,
-      pageCount: 0,
-      reason: `qpdf check failed (exit ${check.exitCode ?? "unknown"}): ${[...check.stderr, ...check.stdout].join(" ").trim() || "no diagnostic"}`,
-    };
+  if (checked.byteLength === 0) {
+    return { valid: false, pageCount: 0, reason: "qpdf check produced an empty output" };
   }
 
   const pages = await qpdf.run({
-    inputs: { [name]: copyForQpdf(bytes) },
+    inputs: { [name]: copyForQpdf(checked) },
     args: ["--show-npages", name],
   });
   const pageText = pages.stdout.join("\n").trim();
