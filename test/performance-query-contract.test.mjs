@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const read = (file) => fs.readFileSync(file, "utf8");
+const dataSource = [
+  dataSource,
+  read("src/lg/data/index.ts"),
+  read("src/lg/data/constants.ts"),
+  read("src/lg/data/cache.ts"),
+  read("src/lg/data/storage.ts"),
+  read("src/lg/data/queries.js"),
+  read("src/lg/data/mutations.js"),
+].join("\n");
 
 test("Performance: admin analytics keeps bounded explicit projections", () => {
   const source = read("src/admin/AdminAnalytics.tsx");
@@ -15,7 +24,7 @@ test("Performance: admin analytics keeps bounded explicit projections", () => {
 });
 
 test("Performance: shared data layer coalesces concurrent table reads", () => {
-  const source = read("src/lg/data.js");
+  const source = dataSource;
   assert.match(source, /const inflight=new Map/);
   assert.match(source, /inflight\.has\(t\)/);
   assert.match(source, /inflight\.set\(t,request\)/);
@@ -23,7 +32,7 @@ test("Performance: shared data layer coalesces concurrent table reads", () => {
 });
 
 test("Performance: shared memory cache has a bounded TTL and is reset on auth session changes", () => {
-  const source = read("src/lg/data.js");
+  const source = dataSource;
   assert.match(source, /const MEMORY_CACHE_TTL_MS=15_000/);
   assert.match(source, /expiresAt:Date\.now\(\)\+MEMORY_CACHE_TTL_MS/);
   assert.match(source, /supabase\.auth\.onAuthStateChange\(event=>\{if\(event===\"SIGNED_IN\"\|\|event===\"SIGNED_OUT\"\)clearCache\(\)\}\)/);
