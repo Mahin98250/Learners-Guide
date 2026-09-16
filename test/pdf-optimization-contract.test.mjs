@@ -12,39 +12,42 @@ const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8")
 const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
-
-test("PDF optimizer uses qpdf WASM and keeps a safe fallback", () => {
+test("PDF optimizer uses the published qpdf WASM package and safe fallback", () => {
   assert.match(pkg.dependencies["pdf-lib"], /^\^1\.17\.1$/);
-  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.3$/);
-  assert.match(optimizer, /qpdfOptimize/);
+  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
+  assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF validation uses qpdf itself instead of pdf-lib", () => {
+test("PDF validation is performed by qpdf and preserves page count", () => {
   assert.match(optimizer, /header !== "%PDF-"/);
-  assert.match(optimizer, /qpdfCheck/);
+  assert.match(optimizer, /checkPdf/);
   assert.match(optimizer, /--check/);
   assert.match(optimizer, /--show-npages/);
-  assert.match(optimizer, /page count changed/);
+  assert.match(optimizer, /page count/);
   assert.match(optimizer, /validationReason/);
   assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /sameMetadata/);
-  assert.doesNotMatch(optimizer, /DIMENSION_TOLERANCE_PT/);
 });
 
-test("qpdf runner is bundled correctly and always cleaned up", () => {
+test("qpdf runner uses supported browser assets and is cleaned up", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
-  assert.match(optimizer, /--jpeg-quality=\$\{jpegQuality\}/);
-  assert.match(optimizer, /runProfile\(85\)/);
-  assert.match(optimizer, /runProfile\(75\)/);
+  assert.match(optimizer, /--object-streams=generate/);
   assert.match(optimizer, /--recompress-flate/);
+});
+
+test("PDF optimization has structural and image optimization passes", () => {
+  assert.match(optimizer, /structural\.pdf/);
+  assert.match(optimizer, /images\.pdf/);
+  assert.match(optimizer, /candidates/);
+  assert.match(optimizer, /candidate\.bytes\.byteLength/);
 });
 
 test("PDF optimization reports processing, success, safe fallback and failure states", () => {
