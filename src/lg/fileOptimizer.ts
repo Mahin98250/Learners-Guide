@@ -45,6 +45,11 @@ async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   });
 }
 
+// qpdf-run transfers input ArrayBuffers to its Web Worker. Every qpdf call
+// therefore receives its own copy so a previous call can never detach the
+// buffer needed by a later pass.
+const copyForQpdf = (bytes: Uint8Array) => bytes.slice();
+
 async function checkPdf(
   qpdf: QpdfRunner,
   bytes: Uint8Array,
@@ -56,11 +61,10 @@ async function checkPdf(
   }
 
   const check = await qpdf.run({
-    inputs: { [name]: bytes },
+    inputs: { [name]: copyForQpdf(bytes) },
     args: ["--check", name],
   });
 
-  // qpdf exit code 3 means warnings; the file can still be usable.
   if (check.exitCode !== 0 && check.exitCode !== 3) {
     return {
       valid: false,
@@ -70,7 +74,7 @@ async function checkPdf(
   }
 
   const pages = await qpdf.run({
-    inputs: { [name]: bytes },
+    inputs: { [name]: copyForQpdf(bytes) },
     args: ["--show-npages", name],
   });
   const pageText = pages.stdout.join("\n").trim();
@@ -112,10 +116,9 @@ async function optimizeWithQpdf(
       throw new Error(`source PDF failed qpdf validation: ${source.reason}`);
     }
 
-    // Pass 1: lossless/structural optimization. This is the reliable baseline.
     onProgress?.("Optimizing PDF structure…");
     const structural = await qpdf.runOne({
-      input: bytes,
+      input: copyForQpdf(bytes),
       inputName: "input.pdf",
       outputName: "structural.pdf",
       args: [
@@ -136,12 +139,9 @@ async function optimizeWithQpdf(
       candidates.push({ bytes: structural, validation: structuralCheck });
     }
 
-    // Pass 2: image optimization. qpdf decides whether replacing an image is
-    // actually smaller, so we do not force a quality setting that may be
-    // unsupported by the bundled qpdf version or unnecessarily degrade content.
     onProgress?.("Optimizing embedded images…");
     const imageOptimized = await qpdf.runOne({
-      input: bytes,
+      input: copyForQpdf(bytes),
       inputName: "input.pdf",
       outputName: "images.pdf",
       args: [
@@ -166,11 +166,9 @@ async function optimizeWithQpdf(
       throw new Error("qpdf produced no valid candidate with the original page count");
     }
 
-    const best = candidates.reduce((smallest, candidate) =>
+    return candidates.reduce((smallest, candidate) =>
       candidate.bytes.byteLength < smallest.bytes.byteLength ? candidate : smallest,
     );
-
-    return best;
   } finally {
     await qpdf.destroy();
   }
