@@ -5,7 +5,7 @@ import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type 
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-function SearchProfiles({ students, teachers }: { students: Row[]; teachers: Row[] }) {
+export function SearchProfiles({ students, teachers }: { students: Row[]; teachers: Row[] }) {
   const [q, setQ] = useState(""),
     [type, setType] = useState<"student" | "teacher">("student"),
     [sel, setSel] = useState<Row | null>(null);
