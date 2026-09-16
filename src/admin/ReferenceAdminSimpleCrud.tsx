@@ -5,7 +5,7 @@ import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type 
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-function SimpleCrud({ page, rows, reload }: { page: PageKey; rows: Row[]; reload: () => void }) {
+export function SimpleCrud({ page, rows, reload }: { page: PageKey; rows: Row[]; reload: () => void }) {
   const table = META[page].table!;
   const fieldMap: Record<string, string[]> = {
     attendance: ["sid", "date", "status", "by"],
