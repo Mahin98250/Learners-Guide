@@ -5,7 +5,7 @@ import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type 
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-function Marks({ rows }: { rows: Row[] }) {
+export function Marks({ rows }: { rows: Row[] }) {
   const pct = (r: Row) =>
     Math.round((Number(r.marks || 0) / Math.max(1, Number(r.total || 100))) * 100);
   return (
