@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 
-const A = {
+export const A = {
   bg: "#F0F4FF",
   sidebar: "#0F1B3D",
   accent: "#4361EE",
@@ -16,7 +16,7 @@ const A = {
   border: "#E2E8F0",
   light: "#F8FAFF",
 };
-type PageKey =
+export type PageKey =
   | "dashboard"
   | "students"
   | "teachers"
@@ -32,8 +32,8 @@ type PageKey =
   | "marks"
   | "search"
   | "adminmsgs";
-type Row = Record<string, any> & { id?: string | number };
-type UserRow = Row & {
+export type Row = Record<string, any> & { id?: string | number };
+export type UserRow = Row & {
   ref?: string | null;
   role?: string;
   auth_id?: string | null;
@@ -41,7 +41,7 @@ type UserRow = Row & {
   phone?: string;
   status?: string;
 };
-type StudentRow = Row & {
+export type StudentRow = Row & {
   sid?: string;
   name?: string;
   cls?: string;
@@ -50,14 +50,14 @@ type StudentRow = Row & {
   parentPhone?: string;
   status?: string;
 };
-type TeacherRow = Row & {
+export type TeacherRow = Row & {
   tid?: string;
   name?: string;
   subject?: string;
   phone?: string;
   status?: string;
 };
-type ResultRow = Row & {
+export type ResultRow = Row & {
   sid?: string;
   subject?: string;
   exam?: string;
@@ -66,9 +66,9 @@ type ResultRow = Row & {
   date?: string;
   tid?: string;
 };
-type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Props = { user: AdminUser; onLogout: () => void };
-const NAV: Array<[PageKey, string, string]> = [
+export type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
+export type Props = { user: AdminUser; onLogout: () => void };
+export const NAV: Array<[PageKey, string, string]> = [
   ["dashboard", "🏠", "Dashboard"],
   ["students", "🎓", "Students"],
   ["teachers", "👨‍🏫", "Teachers"],
@@ -85,7 +85,7 @@ const NAV: Array<[PageKey, string, string]> = [
   ["search", "🔍", "Search Profiles"],
   ["adminmsgs", "✉️", "Messages"],
 ];
-const META: Record<PageKey, { title: string; subtitle: string; table?: string }> = {
+export const META: Record<PageKey, { title: string; subtitle: string; table?: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Full overview of your institute" },
   students: {
     title: "Students",
@@ -138,7 +138,7 @@ const META: Record<PageKey, { title: string; subtitle: string; table?: string }>
     table: "messages",
   },
 };
-const subjects = [
+export const subjects = [
   "Mathematics",
   "Science",
   "English",
@@ -152,8 +152,8 @@ const subjects = [
   "Sanskrit",
   "Physical Education",
 ];
-const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const slots = [
+export const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export const slots = [
   "7:00–8:00 AM",
   "8:00–9:00 AM",
   "9:00–10:00 AM",
@@ -165,6 +165,6 @@ const slots = [
   "3:00–4:00 PM",
   "4:00–5:00 PM",
 ];
-const gradeOptions = ["9", "10", "11", "12"];
-const sectionOptions = ["A", "B", "C", "D", "All"];
-const css = `*{box-sizing:border-box}.admin{min-height:100vh;background:${A.bg};color:${A.text};font-family:Poppins,system-ui,sans-serif}.admin button,.admin input,.admin select,.admin textarea{font:inherit}.nav{border:0;background:transparent;color:#ffffff8c;width:100%;padding:11px 14px;margin:3px 0;border-radius:12px;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer}.nav:hover{background:#ffffff12}.nav.active{background:${A.accent};color:#fff;box-shadow:0 6px 20px #4361ee59}.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:750;cursor:pointer;display:inline-flex;align-items:center;gap:7px}.btn:hover{filter:brightness(1.05);transform:translateY(-1px)}.card{background:#fff;border:1px solid #eef2ff;border-radius:20px;box-shadow:0 4px 20px #0f1b3d12}.modal{position:fixed;inset:0;background:#0f1b3d99;z-index:50;display:grid;place-items:center;padding:16px}.modalbox{background:#fff;border-radius:22px;width:min(720px,100%);max-height:92vh;overflow:auto;padding:26px;box-shadow:0 24px 72px #0f1b3d30}.field{margin-bottom:13px}.field label{display:block;font-size:12px;font-weight:750;color:${A.sub};margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:11px 13px;border:1.5px solid ${A.border};border-radius:11px;background:${A.light};color:${A.text};outline:none}.field textarea{min-height:90px;resize:vertical}.tablewrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:13px}.table th{background:${A.light};padding:12px 14px;text-align:left;color:${A.sub};white-space:nowrap}.table td{padding:12px 14px;border-top:1px solid ${A.border};white-space:nowrap}.table tr:hover td{background:#f8faff}.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}.grid{display:grid;gap:16px}@media(max-width:900px){.shell{display:block!important}.side{position:relative!important;width:100%!important;min-height:auto!important}.navrow{display:flex;overflow-x:auto;padding-bottom:6px}.nav{width:auto;white-space:nowrap}.sidebottom{display:none!important}.main{min-height:auto!important}.top{padding:16px!important}.content{padding:16px!important}.twocol{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:520px){.stats{grid-template-columns:1fr!important}.modalbox{padding:18px}.actions{flex-wrap:wrap}.actions>*{flex:1}.top h1{font-size:18px!important}}`;
+export const gradeOptions = ["9", "10", "11", "12"];
+export const sectionOptions = ["A", "B", "C", "D", "All"];
+export const css = `*{box-sizing:border-box}.admin{min-height:100vh;background:${A.bg};color:${A.text};font-family:Poppins,system-ui,sans-serif}.admin button,.admin input,.admin select,.admin textarea{font:inherit}.nav{border:0;background:transparent;color:#ffffff8c;width:100%;padding:11px 14px;margin:3px 0;border-radius:12px;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer}.nav:hover{background:#ffffff12}.nav.active{background:${A.accent};color:#fff;box-shadow:0 6px 20px #4361ee59}.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:750;cursor:pointer;display:inline-flex;align-items:center;gap:7px}.btn:hover{filter:brightness(1.05);transform:translateY(-1px)}.card{background:#fff;border:1px solid #eef2ff;border-radius:20px;box-shadow:0 4px 20px #0f1b3d12}.modal{position:fixed;inset:0;background:#0f1b3d99;z-index:50;display:grid;place-items:center;padding:16px}.modalbox{background:#fff;border-radius:22px;width:min(720px,100%);max-height:92vh;overflow:auto;padding:26px;box-shadow:0 24px 72px #0f1b3d30}.field{margin-bottom:13px}.field label{display:block;font-size:12px;font-weight:750;color:${A.sub};margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:11px 13px;border:1.5px solid ${A.border};border-radius:11px;background:${A.light};color:${A.text};outline:none}.field textarea{min-height:90px;resize:vertical}.tablewrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:13px}.table th{background:${A.light};padding:12px 14px;text-align:left;color:${A.sub};white-space:nowrap}.table td{padding:12px 14px;border-top:1px solid ${A.border};white-space:nowrap}.table tr:hover td{background:#f8faff}.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}.grid{display:grid;gap:16px}@media(max-width:900px){.shell{display:block!important}.side{position:relative!important;width:100%!important;min-height:auto!important}.navrow{display:flex;overflow-x:auto;padding-bottom:6px}.nav{width:auto;white-space:nowrap}.sidebottom{display:none!important}.main{min-height:auto!important}.top{padding:16px!important}.content{padding:16px!important}.twocol{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:520px){.stats{grid-template-columns:1fr!important}.modalbox{padding:18px}.actions{flex-wrap:wrap}.actions>*{flex:1}.top h1{font-size:18px!important}}`;
