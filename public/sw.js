@@ -1,4 +1,4 @@
-const CACHE = "learners-guide-v36";
+const CACHE = "learners-guide-v37";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./file_00000000451c82118020d2baea54f76b.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
@@ -42,9 +42,6 @@ self.addEventListener("push", (event) => {
     try { payload = event.data ? event.data.json() : {}; }
     catch { payload = { body: event.data?.text?.() || "" }; }
     const tag = payload.notificationId || `lg-${Date.now()}`;
-    // A notification id represents one logical event. If a retry delivers the
-    // same event again, keep it as one visible notification and do not alert the
-    // user a second time. Different events may still appear independently.
     try {
       const existing = await self.registration.getNotifications({ tag });
       existing.forEach((notification) => notification.close());
