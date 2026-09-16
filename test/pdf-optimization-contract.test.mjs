@@ -41,6 +41,9 @@ test("qpdf runner is bundled correctly and always cleaned up", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
+  assert.match(optimizer, /--jpeg-quality=\$\{jpegQuality\}/);
+  assert.match(optimizer, /runProfile\(85\)/);
+  assert.match(optimizer, /runProfile\(75\)/);
   assert.match(optimizer, /--recompress-flate/);
 });
 
