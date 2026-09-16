@@ -49,7 +49,7 @@ async function qpdfCheck(
   qpdf: QpdfRunner,
   bytes: Uint8Array,
   name: string,
-): Promise<{ pageCount: number; diagnostics: string }> {
+): Promise<{ pageCount: number }> {
   const check = await qpdf.run({
     inputs: { [name]: bytes },
     args: ["--check", name],
@@ -74,10 +74,7 @@ async function qpdfCheck(
     );
   }
 
-  return {
-    pageCount: Number(match[1]),
-    diagnostics: [...check.warnings, ...pageResult.warnings].join(" ").trim(),
-  };
+  return { pageCount: Number(match[1]) };
 }
 
 /**
@@ -138,29 +135,45 @@ async function qpdfOptimize(input: File, onProgress?: OptimizationProgress): Pro
   try {
     onProgress?.("Starting safe PDF optimizer…");
     const bytes = new Uint8Array(await input.arrayBuffer());
-    const result = await qpdf.runOne({
-      input: bytes,
-      inputName: "input.pdf",
-      outputName: "output.pdf",
-      args: [
-        "--compress-streams=y",
-        "--decode-level=generalized",
-        "--recompress-flate",
-        "--compression-level=9",
-        "--object-streams=generate",
-        "--optimize-images",
-        "--",
-        "input.pdf",
-        "output.pdf",
-      ],
-    });
+    const baseArgs = [
+      "--compress-streams=y",
+      "--decode-level=generalized",
+      "--recompress-flate",
+      "--compression-level=9",
+      "--object-streams=generate",
+      "--optimize-images",
+    ];
 
-    if (!(result instanceof Uint8Array) || result.length === 0) {
-      throw new Error("qpdf returned no output");
+    const runProfile = async (jpegQuality: number) => {
+      const result = await qpdf.runOne({
+        input: bytes,
+        inputName: "input.pdf",
+        outputName: "output.pdf",
+        args: [
+          ...baseArgs,
+          `--jpeg-quality=${jpegQuality}`,
+          "--",
+          "input.pdf",
+          "output.pdf",
+        ],
+      });
+      if (!(result instanceof Uint8Array) || result.length === 0) {
+        throw new Error(`qpdf returned no output at JPEG quality ${jpegQuality}`);
+      }
+      return result;
+    };
+
+    const highQuality = await runProfile(85);
+    if (highQuality.byteLength < input.size) {
+      onProgress?.("Safe PDF optimization completed at high quality.");
+      return highQuality;
     }
 
+    onProgress?.("Trying stronger image compression because the first pass did not reduce the file…");
+    const stronger = await runProfile(75);
+    const best = stronger.byteLength < highQuality.byteLength ? stronger : highQuality;
     onProgress?.("Safe PDF optimization completed.");
-    return result;
+    return best;
   } finally {
     await qpdf.destroy();
   }
