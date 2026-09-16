@@ -5,7 +5,7 @@ import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type 
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-function Accounts({ rows, reload }: { rows: Row[]; reload: () => void }) {
+export function Accounts({ rows, reload }: { rows: Row[]; reload: () => void }) {
   const users = rows.filter((x) => x.role !== "admin");
   const toggle = async (u: Row) => {
     await updR("users", u.id, { status: u.status === "active" ? "inactive" : "active" });
