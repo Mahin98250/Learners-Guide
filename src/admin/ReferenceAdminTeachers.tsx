@@ -5,7 +5,7 @@ import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type 
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => void }) {
+export function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [edit, setEdit] = useState<Row | null>(null),
     [del, setDel] = useState<Row | null>(null),
