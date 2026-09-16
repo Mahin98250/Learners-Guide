@@ -43,15 +43,19 @@ test("qpdf runner uses supported browser assets and is cleaned up", () => {
   assert.match(optimizer, /bytes\.slice\(\)/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
+  assert.match(optimizer, /--jpeg-quality=\$\{quality\}/);
+  assert.match(optimizer, /JPEG_QUALITY_LEVELS = \[60, 40\]/);
   assert.match(optimizer, /--object-streams=generate/);
   assert.match(optimizer, /--recompress-flate/);
 });
 
-test("PDF optimization has structural and image optimization passes", () => {
-  assert.match(optimizer, /structural\.pdf/);
-  assert.match(optimizer, /images\.pdf/);
+test("PDF optimization uses one structural+image pass at multiple quality levels", () => {
+  assert.match(optimizer, /for \(const quality of JPEG_QUALITY_LEVELS\)/);
+  assert.match(optimizer, /optimized-\$\{quality\}\.pdf/);
   assert.match(optimizer, /candidates/);
   assert.match(optimizer, /candidate\.bytes\.byteLength/);
+  assert.doesNotMatch(optimizer, /structural\.pdf/);
+  assert.doesNotMatch(optimizer, /images\.pdf/);
 });
 
 test("PDF optimization reports processing, success, safe fallback and failure states", () => {
