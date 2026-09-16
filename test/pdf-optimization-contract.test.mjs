@@ -69,9 +69,9 @@ test("global optimization overlay shows requested measurements and final status"
   assert.match(overlay, /Optimized size/);
   assert.match(overlay, /Data saved/);
   assert.match(overlay, /Compression/);
-  assert.match(overlay, /Optimization successful and verified/);
+  assert.match(overlay, /passed qpdf validation and the page-count check/i);
   assert.match(overlay, /Original kept/);
-  assert.match(overlay, /compressed file was rejected for safety/i);
+  assert.match(overlay, /validation\/optimization pipeline/i);
   assert.match(overlay, /validationReason/);
   assert.match(main, /PdfOptimizationOverlay/);
 });
@@ -86,9 +86,11 @@ test("admin homework runs PDFs through the optimizer before Storage", () => {
   assert.match(adminHomework, /file_size: uploadFile\?\.size/);
 });
 
-test("teacher homework runs PDFs through the optimizer before Storage", () => {
+test("teacher homework runs PDFs through the optimizer before Storage and cleans up partial failures", () => {
   assert.match(teacherHomework, /optimizePdfFile\(uploadFile, setProcessing\)/);
   assert.match(teacherHomework, /file_size: uploadFile\.size/);
+  assert.match(teacherHomework, /storage\.from\("homework"\)\.remove\(\[path\]\)/);
+  assert.match(teacherHomework, /storageUploaded/);
 });
 
 test("teacher material uploads PDFs through the optimizer before Storage", () => {
