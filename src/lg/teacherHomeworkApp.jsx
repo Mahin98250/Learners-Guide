@@ -125,6 +125,7 @@ export function T5HomeworkWithFiles({ teacher }) {
     const homeworkId = uid();
     let inserted = false;
     let storageUploaded = false;
+    let completed = false;
 
     try {
       const base = {
@@ -175,13 +176,13 @@ export function T5HomeworkWithFiles({ teacher }) {
         inserted = true;
       }
 
+      completed = true;
       setForm((current) => ({ ...current, desc: "", due: "", file: null }));
       await refresh();
     } catch (e) {
-      // Do not roll back a successful upload merely because refreshing the list failed.
-      // Only compensate when an actual Storage object was created and the operation
-      // is still marked as inserted.
-      if (storageUploaded && path && inserted) {
+      // A successful upload followed only by a refresh error must remain stored.
+      // Compensation is limited to an incomplete operation.
+      if (!completed && storageUploaded && path && inserted) {
         await supabase.storage.from("homework").remove([path]).catch(() => {});
         await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
       }
