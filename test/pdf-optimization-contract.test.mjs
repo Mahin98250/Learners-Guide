@@ -21,18 +21,20 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF validation uses qpdf inspection commands correctly and preserves page count", () => {
-  assert.match(optimizer, /checkPdf/);
-  assert.match(optimizer, /qpdf\.run\(\{/);
-  assert.match(optimizer, /args: \["--check", "--", name\]/);
-  assert.match(optimizer, /args: \["--show-npages", "--", name\]/);
-  assert.match(optimizer, /exitCode !== 0 && check\.exitCode !== 3/);
-  assert.match(optimizer, /pageCount === source\.pageCount/);
-  assert.match(optimizer, /validationReason/);
+test("PDF validation uses a real PDF parser and preserves page geometry", () => {
+  assert.match(optimizer, /validatePdf/);
+  assert.match(optimizer, /import\("pdf-lib"\)/);
+  assert.match(optimizer, /PDFDocument\.load/);
+  assert.match(optimizer, /throwOnInvalidObject: true/);
+  assert.match(optimizer, /pageCount/);
+  assert.match(optimizer, /pageSizes/);
+  assert.match(optimizer, /samePageCount/);
+  assert.match(optimizer, /samePageSizes/);
+  assert.doesNotMatch(optimizer, /qpdf\.run\(\{[\s\S]*?--check/);
+  assert.doesNotMatch(optimizer, /qpdf\.run\(\{[\s\S]*?--show-npages/);
   assert.doesNotMatch(optimizer, /checkedName/);
   assert.doesNotMatch(optimizer, /outputName: checkedName/);
   assert.doesNotMatch(optimizer, /header !== "%PDF-"/);
-  assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /sameMetadata/);
 });
 
@@ -40,7 +42,6 @@ test("qpdf runner uses supported browser assets and is cleaned up", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
-  assert.match(optimizer, /bytes\.slice\(\)/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
   assert.match(optimizer, /--jpeg-quality=\$\{quality\}/);
@@ -73,7 +74,7 @@ test("global optimization overlay shows requested measurements and final status"
   assert.match(overlay, /Optimized size/);
   assert.match(overlay, /Data saved/);
   assert.match(overlay, /Compression/);
-  assert.match(overlay, /passed qpdf validation and the page-count check/i);
+  assert.match(overlay, /passed PDF structural validation and page-geometry checks/i);
   assert.match(overlay, /Original kept/);
   assert.match(overlay, /validation\/optimization pipeline/i);
   assert.match(overlay, /validationReason/);
