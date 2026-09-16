@@ -1,79 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { C, addR, delR, gdb, updR } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
-
-type Row = Record<string, any> & { id: string | number };
-type Kind = "students" | "teachers";
-type ProvisionRole = "student" | "parent" | "teacher";
-
-const CLASSES = ["9", "10", "11", "12"];
-const SECTIONS = ["A", "B", "C", "D"];
-const SUBJECTS = ["English", "Social Studies", "Mathematics", "Science", "Hindi", "Gujarati", "Computer Science", "Accountancy", "Business Studies", "Economics", "Applied Mathematics", "Informatics Practices", "Entrepreneurship", "Physical Education", "Legal Studies", "Psychology"];
-const card: React.CSSProperties = { background: "#fff", border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: "0 4px 20px rgba(15,27,61,.07)" };
-const DEFAULT_STUDENT_PASSWORD = "Student@1234";
-const DEFAULT_PARENT_PASSWORD = "Parent@1234";
-const DEFAULT_TEACHER_PASSWORD = "Teacher@1234";
-
-async function ensureAdminSession() {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error(`Unable to read administrator session: ${error.message}`);
-  let session = data.session;
-  const expiresAt = Number(session?.expires_at || 0);
-  if (!session || (expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000) + 60)) {
-    const refreshed = await supabase.auth.refreshSession();
-    if (refreshed.error || !refreshed.data.session) {
-      await supabase.auth.signOut({ scope: "local" });
-      throw new Error("Your administrator session has expired. Please sign in again.");
-    }
-    session = refreshed.data.session;
-  }
-  if (session.user.app_metadata?.role !== "admin") throw new Error("Administrator access is required to manage student accounts.");
-  return session;
-}
-
-async function provision(role: ProvisionRole, loginId: string, name: string, ref: string, action: "create" | "update" | "delete", authId?: string | null, password?: string) {
-  await ensureAdminSession();
-  const body: Record<string, unknown> = { action, role, loginId, name, ref };
-  if (authId) body.authId = authId;
-  if (password) body.password = password;
-  let result = await supabase.functions.invoke("admin-provision-user", { body });
-  if (result.error && /401|unauthorized|jwt|token|authorization/i.test(result.error.message || "")) {
-    await ensureAdminSession();
-    result = await supabase.functions.invoke("admin-provision-user", { body });
-  }
-  if (result.error) throw new Error(result.error.message || "Authentication service failed.");
-  if (result.data?.error) throw new Error(String(result.data.error));
-  return result.data as { authId?: string; email?: string; deleted?: boolean; repaired?: boolean; created?: boolean; updated?: boolean };
-}
-
-const normalizePhone = (value: string) => value.replace(/\s+/g, "").trim();
-const validatePassword = (password: string, label: string) => { if (password.length < 8) throw new Error(`${label} must be at least 8 characters.`); };
-const authRowId = (authId?: string) => authId || crypto.randomUUID();
-
-async function nextId(kind: Kind) {
-  const rows = (await gdb(kind)) as Row[];
-  const field = kind === "students" ? "sid" : "tid";
-  const prefix = kind === "students" ? "LG-" : "LGT";
-  const width = kind === "students" ? 3 : 2;
-  const used = new Set(rows.map((r) => String(r[field] ?? "").trim().toUpperCase()));
-  const re = kind === "students" ? /^LG-?(\d+)$/i : /^LGT-?(\d+)$/i;
-  let max = 0;
-  for (const row of rows) { const match = String(row[field] ?? "").match(re); if (match) max = Math.max(max, Number(match[1])); }
-  let n = max + 1;
-  let value = `${prefix}${String(n).padStart(width, "0")}`;
-  while (used.has(value.toUpperCase())) { n += 1; value = `${prefix}${String(n).padStart(width, "0")}`; }
-  return value;
-}
-
-function Input({ label, value, onChange, placeholder, type = "text", required = false, note = "" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean; note?: string }) {
-  return <label style={{ display: "block" }}><span style={{ display: "block", fontSize: 12, fontWeight: 750, color: C.sub, marginBottom: 6 }}>{label}{required && <span style={{ color: C.red }}> *</span>}</span><input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", border: `1.5px solid ${C.border}`, borderRadius: 11, background: "#F8FAFF", color: C.text, outline: "none" }} />{note && <span style={{ display: "block", marginTop: 5, fontSize: 10, color: C.sub }}>{note}</span>}</label>;
-}
-function Select({ label, value, onChange, options, required = false }: { label: string; value: string; onChange: (v: string) => void; options: string[]; required?: boolean }) {
-  return <label style={{ display: "block" }}><span style={{ display: "block", fontSize: 12, fontWeight: 750, color: C.sub, marginBottom: 6 }}>{label}{required && <span style={{ color: C.red }}> *</span>}</span><select value={value} onChange={(e) => onChange(e.target.value)} required={required} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", border: `1.5px solid ${C.border}`, borderRadius: 11, background: "#F8FAFF", color: C.text, outline: "none" }}><option value="">Select…</option>{options.map((o) => <option key={o} value={o}>{o}</option>)}</select></label>;
-}
-function MultiSelect({ label, value, onChange, options }: { label: string; value: string[]; onChange: (v: string[]) => void; options: string[] }) {
-  return <div><div style={{ fontSize: 12, fontWeight: 750, color: C.sub, marginBottom: 6 }}>{label} <span style={{ fontWeight: 500 }}>(choose one or more)</span></div><div style={{ display: "flex", flexWrap: "wrap", gap: 7, padding: 10, border: `1.5px solid ${C.border}`, borderRadius: 11, background: "#F8FAFF", maxHeight: 180, overflowY: "auto" }}>{options.map((o) => { const checked = value.includes(o); return <button key={o} type="button" onClick={() => onChange(checked ? value.filter((x) => x !== o) : [...value, o])} style={{ border: `1px solid ${checked ? C.accent : C.border}`, borderRadius: 9, padding: "7px 10px", background: checked ? "#EEF2FF" : "#fff", color: checked ? C.accent : C.sub, fontWeight: checked ? 800 : 600, cursor: "pointer", fontSize: 11 }}>{checked ? "✓ " : ""}{o}</button>; })}</div></div>;
-}
+import {
+  CLASSES,
+  SECTIONS,
+  SUBJECTS,
+  card,
+  DEFAULT_STUDENT_PASSWORD,
+  DEFAULT_PARENT_PASSWORD,
+  DEFAULT_TEACHER_PASSWORD,
+  type Row,
+  type Kind,
+  type ProvisionRole,
+} from "./AdminRecordsConstants";
+import {
+  ensureAdminSession,
+  provision,
+  normalizePhone,
+  validatePassword,
+  authRowId,
+  nextId,
+} from "./AdminRecordsAuth";
+import { Input, Select, MultiSelect } from "./AdminRecordsFields";
 
 export default function AdminRecordsPage({ kind }: { kind: Kind }) {
   const isStudent = kind === "students";
