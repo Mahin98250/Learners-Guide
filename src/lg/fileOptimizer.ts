@@ -18,10 +18,9 @@ const PDF_MIME = "application/pdf";
 const MIN_INPUT_BYTES = 512 * 1024;
 const JPEG_QUALITY_LEVELS = [60, 40] as const;
 
-type PdfValidation = {
+type PdfInspection = {
   valid: boolean;
   pageCount: number;
-  pageSizes: string[];
   reason?: string;
 };
 
@@ -51,36 +50,52 @@ async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   });
 }
 
-async function validatePdf(bytes: Uint8Array, label: string): Promise<PdfValidation> {
+async function inspectPdf(
+  qpdf: QpdfRunner,
+  bytes: Uint8Array,
+  label: string,
+): Promise<PdfInspection> {
   try {
-    // qpdf is the transformation engine. pdf-lib is deliberately used only as
-    // a browser-side structural gate after qpdf has produced a candidate. This
-    // avoids using qpdf's --check inspection command as a second failure point;
-    // qpdf already has to parse the input successfully to produce the output.
-    const { PDFDocument } = await import("pdf-lib");
-    const document = await PDFDocument.load(bytes, {
-      updateMetadata: false,
-      throwOnInvalidObject: true,
-    });
-    const pages = document.getPages();
-    const pageSizes = pages.map((page) => {
-      const { width, height } = page.getSize();
-      return `${Math.round(width * 100) / 100}x${Math.round(height * 100) / 100}`;
+    // Use qpdf's documented stdout-only inspection command. Do not use
+    // --check here: the browser WASM wrapper has already successfully parsed
+    // the PDF when it creates an optimized output, and --check was the source
+    // of the previous false rejection path.
+    const result = await qpdf.run({
+      inputs: { "input.pdf": bytes },
+      args: ["--show-npages", "input.pdf"],
     });
 
-    return {
-      valid: pages.length > 0,
-      pageCount: pages.length,
-      pageSizes,
-    };
+    if (result.exitCode !== 0 && result.exitCode !== 3) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `${label} page inspection failed with qpdf exit code ${result.exitCode}: ${[...result.stderr, ...result.stdout].join(" ").trim() || "no diagnostic"}`,
+      };
+    }
+
+    const output = result.stdout.join("\n").trim();
+    const match = output.match(/^(\d+)$/m);
+    if (!match) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `${label} returned no usable page count: ${output || "no diagnostic"}`,
+      };
+    }
+
+    const pageCount = Number(match[1]);
+    if (!Number.isSafeInteger(pageCount) || pageCount <= 0) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `${label} returned an invalid page count: ${match[1]}`,
+      };
+    }
+
+    return { valid: true, pageCount };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    return {
-      valid: false,
-      pageCount: 0,
-      pageSizes: [],
-      reason: `${label} failed PDF structural validation: ${reason}`,
-    };
+    return { valid: false, pageCount: 0, reason: `${label} inspection failed: ${reason}` };
   }
 }
 
@@ -101,20 +116,17 @@ const originalResult = (
 async function optimizeWithQpdf(
   input: File,
   onProgress?: OptimizationProgress,
-): Promise<{ bytes: Uint8Array; validation: PdfValidation } | null> {
+): Promise<{ bytes: Uint8Array; inspection: PdfInspection } | null> {
   const qpdf = await createQpdfRunnerForFile(input.size);
   try {
     const bytes = new Uint8Array(await input.arrayBuffer());
-    const source = await validatePdf(bytes, "Source PDF");
+    const source = await inspectPdf(qpdf, bytes, "Source PDF");
     if (!source.valid) {
-      throw new Error(source.reason || "Source PDF failed structural validation");
+      throw new Error(source.reason || "Source PDF could not be inspected safely");
     }
 
-    const candidates: Array<{ bytes: Uint8Array; validation: PdfValidation }> = [];
+    const candidates: Array<{ bytes: Uint8Array; inspection: PdfInspection }> = [];
 
-    // One qpdf pass can perform both structural optimization and image
-    // recompression. Trying two JPEG qualities gives the MVP an aggressive
-    // path without introducing a second PDF transformation engine.
     for (const quality of JPEG_QUALITY_LEVELS) {
       onProgress?.(`Compressing images at quality ${quality}…`);
       const candidate = await qpdf.runOne({
@@ -135,20 +147,18 @@ async function optimizeWithQpdf(
         ],
       });
 
-      const validation = await validatePdf(candidate, `Optimized PDF (quality ${quality})`);
-      const samePageCount = validation.valid && validation.pageCount === source.pageCount;
-      const samePageSizes =
-        samePageCount &&
-        validation.pageSizes.length === source.pageSizes.length &&
-        validation.pageSizes.every((size, index) => size === source.pageSizes[index]);
+      if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
+        continue;
+      }
 
-      if (samePageSizes) {
-        candidates.push({ bytes: candidate, validation });
+      const inspection = await inspectPdf(qpdf, candidate, `Optimized PDF (quality ${quality})`);
+      if (inspection.valid && inspection.pageCount === source.pageCount) {
+        candidates.push({ bytes: candidate, inspection });
       }
     }
 
     if (!candidates.length) {
-      throw new Error("qpdf produced no candidate that passed page-count and page-size validation");
+      throw new Error("qpdf produced no candidate with the original page count");
     }
 
     return candidates.reduce((smallest, candidate) =>
