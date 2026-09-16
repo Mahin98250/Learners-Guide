@@ -15,7 +15,7 @@ const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8")
 
 test("PDF optimizer uses qpdf WASM and keeps a safe fallback", () => {
   assert.match(pkg.dependencies["pdf-lib"], /^\^1\.17\.1$/);
-  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
+  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.3$/);
   assert.match(optimizer, /qpdfOptimize/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
