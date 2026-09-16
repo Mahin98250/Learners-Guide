@@ -1,0 +1,13 @@
+import { C } from "@/lg/data";
+
+export function Input({ label, value, onChange, placeholder, type = "text", required = false, note = "" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean; note?: string }) {
+  return <label style={{ display: "block" }}><span style={{ display: "block", fontSize: 12, fontWeight: 750, color: C.sub, marginBottom: 6 }}>{label}{required && <span style={{ color: C.red }}> *</span>}</span><input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", border: `1.5px solid ${C.border}`, borderRadius: 11, background: "#F8FAFF", color: C.text, outline: "none" }} />{note && <span style={{ display: "block", marginTop: 5, fontSize: 10, color: C.sub }}>{note}</span>}</label>;
+}
+
+export function Select({ label, value, onChange, options, required = false }: { label: string; value: string; onChange: (v: string) => void; options: string[]; required?: boolean }) {
+  return <label style={{ display: "block" }}><span style={{ display: "block", fontSize: 12, fontWeight: 750, color: C.sub, marginBottom: 6 }}>{label}{required && <span style={{ color: C.red }}> *</span>}</span><select value={value} onChange={(e) => onChange(e.target.value)} required={required} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", border: `1.5px solid ${C.border}`, borderRadius: 11, background: "#F8FAFF", color: C.text, outline: "none" }}><option value="">Select…</option>{options.map((o) => <option key={o} value={o}>{o}</option>)}</select></label>;
+}
+
+export function MultiSelect({ label, value, onChange, options }: { label: string; value: string[]; onChange: (v: string[]) => void; options: string[] }) {
+  return <div><div style={{ fontSize: 12, fontWeight: 750, color: C.sub, marginBottom: 6 }}>{label} <span style={{ fontWeight: 500 }}>(choose one or more)</span></div><div style={{ display: "flex", flexWrap: "wrap", gap: 7, padding: 10, border: `1.5px solid ${C.border}`, borderRadius: 11, background: "#F8FAFF", maxHeight: 180, overflowY: "auto" }}>{options.map((o) => { const checked = value.includes(o); return <button key={o} type="button" onClick={() => onChange(checked ? value.filter((x) => x !== o) : [...value, o])} style={{ border: `1px solid ${checked ? C.accent : C.border}`, borderRadius: 9, padding: "7px 10px", background: checked ? "#EEF2FF" : "#fff", color: checked ? C.accent : C.sub, fontWeight: checked ? 800 : 600, cursor: "pointer", fontSize: 11 }}>{checked ? "✓ " : ""}{o}</button>; })}</div></div>;
+}
