@@ -1,3 +1,5 @@
+import type { QpdfRunner } from "qpdf-run";
+
 export type OptimizationProgress = (message: string) => void;
 export type OptimizationStatus = "optimized" | "original-kept" | "failed";
 
@@ -25,8 +27,6 @@ const emit = (detail: Record<string, unknown>) => {
 };
 
 type PdfValidation = { valid: boolean; reason?: string };
-
-type QpdfRunner = Awaited<ReturnType<typeof createQpdfRunner>>;
 
 async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   const { createQpdfRunner } = await import("qpdf-run");
@@ -67,7 +67,7 @@ async function qpdfCheck(
   });
 
   const pageText = pageResult.stdout.join("\n").trim();
-  const match = pageText.match(/\d+/);
+  const match = pageText.match(/^\s*(\d+)\s*$/m);
   if (!match) {
     throw new Error(
       `qpdf could not determine page count: ${[...pageResult.stderr, ...pageResult.stdout].join(" ").trim() || "no diagnostic"}`,
@@ -75,18 +75,15 @@ async function qpdfCheck(
   }
 
   return {
-    pageCount: Number(match[0]),
+    pageCount: Number(match[1]),
     diagnostics: [...check.warnings, ...pageResult.warnings].join(" ").trim(),
   };
 }
 
 /**
  * Validate with the same PDF engine that produced the candidate.
- *
- * pdf-lib is deliberately not used here: it is a higher-level PDF editor and
- * can reject otherwise valid PDFs containing structures/features it does not
- * fully support. qpdf is specifically designed as a content-preserving PDF
- * transformer and can validate the generated file with --check.
+ * pdf-lib is deliberately not used here because it can reject valid PDFs
+ * containing structures/features it does not fully support.
  */
 async function validatePdfCandidate(
   inputBytes: Uint8Array,
@@ -110,10 +107,7 @@ async function validatePdfCandidate(
       };
     }
 
-    return {
-      valid: true,
-      reason: candidate.diagnostics || undefined,
-    };
+    return { valid: true };
   } catch (error) {
     return {
       valid: false,
