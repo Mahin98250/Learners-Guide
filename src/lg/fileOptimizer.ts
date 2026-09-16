@@ -16,6 +16,7 @@ export type OptimizationResult = {
 
 const PDF_MIME = "application/pdf";
 const MIN_INPUT_BYTES = 512 * 1024;
+const JPEG_QUALITY_LEVELS = [60, 40] as const;
 
 const percent = (saved: number, original: number) =>
   original > 0 ? Math.max(0, Math.round((saved / original) * 1000) / 10) : 0;
@@ -51,9 +52,6 @@ async function checkPdf(
   name: string,
 ): Promise<PdfCheck> {
   try {
-    // --check is an inspection command. It must run through qpdf.run(), not
-    // runOne(), because it intentionally produces diagnostics rather than a
-    // PDF output file.
     const check = await qpdf.run({
       inputs: { [name]: bytes.slice() },
       args: ["--check", "--", name],
@@ -122,50 +120,35 @@ async function optimizeWithQpdf(
       throw new Error(`source PDF failed qpdf validation: ${source.reason}`);
     }
 
-    onProgress?.("Optimizing PDF structure…");
-    const structural = await qpdf.runOne({
-      input: bytes.slice(),
-      inputName: "input.pdf",
-      outputName: "structural.pdf",
-      args: [
-        "--compress-streams=y",
-        "--decode-level=generalized",
-        "--recompress-flate",
-        "--compression-level=9",
-        "--object-streams=generate",
-        "--",
-        "input.pdf",
-        "structural.pdf",
-      ],
-    });
-
-    const structuralCheck = await checkPdf(qpdf, structural, "structural.pdf");
     const candidates: Array<{ bytes: Uint8Array; validation: PdfCheck }> = [];
-    if (structuralCheck.valid && structuralCheck.pageCount === source.pageCount) {
-      candidates.push({ bytes: structural, validation: structuralCheck });
-    }
 
-    onProgress?.("Optimizing embedded images…");
-    const imageOptimized = await qpdf.runOne({
-      input: bytes.slice(),
-      inputName: "input.pdf",
-      outputName: "images.pdf",
-      args: [
-        "--compress-streams=y",
-        "--decode-level=generalized",
-        "--recompress-flate",
-        "--compression-level=9",
-        "--object-streams=generate",
-        "--optimize-images",
-        "--",
-        "input.pdf",
-        "images.pdf",
-      ],
-    });
+    // One qpdf pass can perform both structural optimization and image
+    // recompression. Trying two JPEG qualities gives the MVP a real
+    // aggressive-compression path without adding another PDF engine.
+    for (const quality of JPEG_QUALITY_LEVELS) {
+      onProgress?.(`Compressing images at quality ${quality}…`);
+      const candidate = await qpdf.runOne({
+        input: bytes.slice(),
+        inputName: "input.pdf",
+        outputName: `optimized-${quality}.pdf`,
+        args: [
+          "--compress-streams=y",
+          "--decode-level=generalized",
+          "--recompress-flate",
+          "--compression-level=9",
+          "--object-streams=generate",
+          "--optimize-images",
+          `--jpeg-quality=${quality}`,
+          "--",
+          "input.pdf",
+          `optimized-${quality}.pdf`,
+        ],
+      });
 
-    const imageCheck = await checkPdf(qpdf, imageOptimized, "images.pdf");
-    if (imageCheck.valid && imageCheck.pageCount === source.pageCount) {
-      candidates.push({ bytes: imageOptimized, validation: imageCheck });
+      const validation = await checkPdf(qpdf, candidate, `optimized-${quality}.pdf`);
+      if (validation.valid && validation.pageCount === source.pageCount) {
+        candidates.push({ bytes: candidate, validation });
+      }
     }
 
     if (!candidates.length) {
@@ -275,7 +258,7 @@ export async function optimizePdfFile(
       file: undefined,
       fileName: input.name,
       validationReason: reason,
-      message: "Optimization failed — original PDF uploaded instead.",
+      message: "Optimization failed — uploading the original PDF.",
     });
     return fallback;
   }
