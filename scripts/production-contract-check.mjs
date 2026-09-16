@@ -10,10 +10,13 @@ const check = (ok, message) => {
 };
 
 const data = read("src/lg/data.js");
+const dataQueries = read("src/lg/data/queries.js");
+const dataMutations = read("src/lg/data/mutations.js");
+const dataSource = `${data}\n${dataQueries}\n${dataMutations}`;
 const teacher = read("src/lg/teacherHomeworkApp.jsx");
 const app = read("src/routes/app.tsx");
 const config = read("supabase/config.toml");
-const dc = compact(data);
+const dc = compact(dataSource);
 const tc = compact(teacher);
 
 check(/(?:const|let|var)TABLE_SELECTS=/.test(dc), "src/lg/data.js: table projection map is missing");
