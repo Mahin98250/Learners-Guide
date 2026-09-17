@@ -1,42 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { C, addR, delR, gdb, updR } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
-
-type Row = Record<string, any> & { id?: string | number };
-type Option = { v: string; l: string };
-
-const CLASSES = ["9", "10", "11", "12"];
-const SECTIONS = ["A", "B", "C", "D"];
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SUBJECTS: Record<string, string[]> = {
-  "9": ["English", "Science", "Maths", "Social Studies"],
-  "10": ["English", "Science", "Maths", "Social Studies"],
-  "11": ["Accountancy", "Business Studies", "Economics", "Applied Mathematics", "Informatics Practices", "Entrepreneurship", "Physical Education"],
-  "12": ["Accountancy", "Business Studies", "Economics", "Applied Mathematics", "Informatics Practices", "Entrepreneurship", "Physical Education"],
-};
-
-const css = `
-.bt{padding:28px;background:#F7F9FF;min-height:100%;color:${C.text}}
-.card{background:#fff;border:1px solid ${C.border};border-radius:18px;box-shadow:0 4px 20px rgba(15,27,61,.07)}
-.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}
-.field{display:block}.field span{display:block;font-size:12px;font-weight:750;color:${C.sub};margin-bottom:6px}.field input,.field select,.field textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid ${C.border};border-radius:10px;background:#F8FAFF}.field textarea{min-height:80px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.days{display:flex;gap:8px;flex-wrap:wrap}.days label,.subjects label{border:1px solid ${C.border};border-radius:10px;padding:8px 10px;font-size:12px;cursor:pointer}.subjects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subjects label.selected,.days label.selected{background:#EEF2FF;border-color:${C.accent}}
-.table{width:100%;border-collapse:collapse}.table th{background:#F8FAFF;color:${C.sub};padding:12px;text-align:left;font-size:12px}.table td{padding:12px;border-top:1px solid ${C.border};font-size:13px;vertical-align:top}.modal{position:fixed;inset:0;background:rgba(15,27,61,.58);z-index:100;display:grid;place-items:center;padding:16px}.modalbox{width:min(900px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;padding:24px}@media(max-width:700px){.bt{padding:16px}.grid,.subjects{grid-template-columns:1fr}}
-`;
-
-function Button({ children, onClick, outline = false, color = C.accent, disabled = false }: { children: React.ReactNode; onClick?: () => void; outline?: boolean; color?: string; disabled?: boolean }) {
-  return <button type="button" className="btn" disabled={disabled} onClick={onClick} style={{ background: outline ? "transparent" : color, color: outline ? color : "#fff", border: outline ? `1.5px solid ${color}` : 0, opacity: disabled ? 0.6 : 1 }}>{children}</button>;
-}
-
-function Field({ label, value, onChange, options, type = "text", placeholder = "" }: { label: string; value: string; onChange: (v: string) => void; options?: Option[]; type?: string; placeholder?: string }) {
-  return <label className="field"><span>{label}</span>{options ? <select value={value} onChange={e => onChange(e.target.value)}><option value="">Select…</option>{options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select> : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}</label>;
-}
-
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return <div className="modal" onClick={onClose}><div className="modalbox" onClick={e => e.stopPropagation()}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h2 style={{ margin: 0 }}>{title}</h2><button type="button" onClick={onClose} style={{ border: 0, background: "#F1F5F9", borderRadius: 9, padding: 8, cursor: "pointer" }}>✕</button></div>{children}</div></div>;
-}
-
-const emptySchedule = { batchId: "", teacherId: "", subjects: [] as string[], days: [] as string[], start: "17:00", end: "18:00", room: "" };
+import { Button, Field, Modal } from "./BatchesTimetableControls";
+import { CLASSES, DAYS, SECTIONS, SUBJECTS, css, emptySchedule, type Row, type Option } from "./BatchesTimetableConstants";
 
 export default function BatchesTimetablePage() {
   const [tab, setTab] = useState<"batches" | "timetable">("batches");
