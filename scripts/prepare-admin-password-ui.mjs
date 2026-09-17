@@ -1,63 +1,58 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const file = path.resolve("src/admin/ReferenceAdminPanel.tsx");
-let source = fs.readFileSync(file, "utf8");
-const before = source;
+const files = {
+  students: path.resolve("src/admin/ReferenceAdminStudents.tsx"),
+  teachers: path.resolve("src/admin/ReferenceAdminTeachers.tsx"),
+};
 
-// Keep the actual admin component as the source of truth. This prebuild step only
-// normalizes documented default credentials and deterministic student roll-number UI.
-const studentStart = source.indexOf("function Students");
-const teacherStart = source.indexOf("function Teachers");
-const simpleCrudStart = source.indexOf("function SimpleCrud");
+const read = (file) => fs.readFileSync(file, "utf8");
+const writeIfChanged = (file, before, source) => {
+  if (source === before) return false;
+  fs.writeFileSync(file, source);
+  return true;
+};
 
-if (studentStart >= 0 && teacherStart > studentStart) {
-  const prefix = source.slice(0, studentStart);
-  const body = source
-    .slice(studentStart, teacherStart)
-    .replaceAll('pass: "1234"', 'pass: "Student@1234"')
-    .replaceAll('placeholder="Default: 1234"', 'placeholder="Default: Student@1234"')
-    .replaceAll('parent@1234', 'Parent@1234');
-  const orderedBody = body
-    .replace(
-      /return `LG-?\$\{String\(Math\.max\(0, \.\.\.nums\) \+ 1\)\.padStart\(3, "0"\)\}`;/,
-      'return `LG-${String(Math.max(0, ...nums) + 1).padStart(3, "0")}`;',
-    )
-    .replace(
-      /const rows = data\.filter\(\n    \(s\) => !q \|\| `\$\{s\.name\} \$\{s\.sid\}`\.toLowerCase\(\)\.includes\(q\.toLowerCase\(\)\),\n  \);/,
-      `const rows = data\n    .filter(\n      (s) => !q || \`${"${s.name}"} ${"${s.sid}"}\`.toLowerCase().includes(q.toLowerCase()),\n    )\n    .sort((a, b) => {\n      const rollA = Number(String(a.sid || "").match(/\\d+/)?.[0] || Number.MAX_SAFE_INTEGER);\n      const rollB = Number(String(b.sid || "").match(/\\d+/)?.[0] || Number.MAX_SAFE_INTEGER);\n      return rollA - rollB || String(a.name || "").localeCompare(String(b.name || ""));\n    });`,
-    );
-  source = prefix + orderedBody + source.slice(teacherStart);
-}
+// Keep the actual extracted admin components as the source of truth. This
+// prebuild step only normalizes documented default credentials and the
+// deterministic student roll-number UI.
+const studentBefore = read(files.students);
+let studentSource = studentBefore;
+studentSource = studentSource
+  .replaceAll('pass: "1234"', 'pass: "Student@1234"')
+  .replaceAll('placeholder="Default: 1234"', 'placeholder="Default: Student@1234"')
+  .replaceAll("parent@1234", "Parent@1234")
+  .replace(
+    /return `LG-?\$\{String\(Math\.max\(0, \.\.\.nums\) \+ 1\)\.padStart\(3, "0"\)\}`;/,
+    'return `LG-${String(Math.max(0, ...nums) + 1).padStart(3, "0")}`;',
+  );
 
-const teacherEnd = simpleCrudStart > teacherStart ? simpleCrudStart : source.length;
-if (teacherStart >= 0 && teacherEnd > teacherStart) {
-  const prefix = source.slice(0, teacherStart);
-  const body = source
-    .slice(teacherStart, teacherEnd)
-    .replaceAll('pass: "1234"', 'pass: "Teacher@1234"');
-  source = prefix + body + source.slice(teacherEnd);
-}
-
-// Normalize the parent credential used by the actual runtime save path.
-source = source.replaceAll('pass: "parent@1234"', 'pass: "Parent@1234"');
-source = source.replaceAll('Parent default password: <b>parent@1234</b>', 'Parent default password: <b>Parent@1234</b>');
-
-// Keep the UI documentation synchronized with provisioning.
-if (!source.includes("Default login passwords: Student <b>Student@1234</b> · Parent <b>Parent@1234</b>")) {
-  source = source.replace(
+if (!studentSource.includes("Default login passwords: Student <b>Student@1234</b> · Parent <b>Parent@1234</b>")) {
+  studentSource = studentSource.replace(
     '              Parent default password: <b>Parent@1234</b>\n            </div>',
     '              Default login passwords: Student <b>Student@1234</b> · Parent <b>Parent@1234</b>\n            </div>',
   );
 }
 
-if (!source.includes("Default teacher password: <b>Teacher@1234</b>")) {
-  const teacherPasswordField = `          <Field\n            label="Password"\n            value={form.pass}\n            onChange={(v) => setForm({ ...form, pass: v })}\n          />`;
-  source = source.replace(
+const teacherBefore = read(files.teachers);
+let teacherSource = teacherBefore.replaceAll('pass: "1234"', 'pass: "Teacher@1234"');
+if (!teacherSource.includes("Default teacher password: <b>Teacher@1234</b>")) {
+  const teacherPasswordField = `          <Field
+            label="Password"
+            value={form.pass}
+            onChange={(v) => setForm({ ...form, pass: v })}
+          />`;
+  teacherSource = teacherSource.replace(
     teacherPasswordField,
-    `${teacherPasswordField}\n          <div style={{ background: "#fff7ed", padding: 12, borderRadius: 12, fontSize: 12, color: "#92400e", marginBottom: 13 }}>\n            Default teacher password: <b>Teacher@1234</b>\n          </div>`,
+    `${teacherPasswordField}\n          <div style={{ background: "#fff7ed", padding: 12, borderRadius: 12, fontSize: 12, color: "#92400e", marginBottom: 13 }}>
+            Default teacher password: <b>Teacher@1234</b>
+          </div>`,
   );
 }
 
-if (source !== before) fs.writeFileSync(file, source);
-console.log("Admin default-password and student-roll UI prepared.");
+const changedStudents = writeIfChanged(files.students, studentBefore, studentSource);
+const changedTeachers = writeIfChanged(files.teachers, teacherBefore, teacherSource);
+
+console.log(
+  `Admin default-password and student-roll UI prepared. students=${changedStudents ? "updated" : "unchanged"}, teachers=${changedTeachers ? "updated" : "unchanged"}`,
+);
