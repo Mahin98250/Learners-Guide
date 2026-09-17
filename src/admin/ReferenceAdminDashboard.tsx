@@ -1,9 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { addR, delR, gdb, updR } from "@/lg/data";
-import { supabase } from "@/lg/supabase";
-import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type UserRow, type StudentRow, type TeacherRow, type PageKey, type ResultRow } from "./ReferenceAdminShared";
-import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
-import { provision, removeAuth } from "./ReferenceAdminServices";
+import { A, type PageKey, type Row } from "./ReferenceAdminShared";
+import { Badge } from "./ReferenceAdminControls";
 
 export function Dashboard({
   data,
@@ -37,7 +33,7 @@ export function Dashboard({
             <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>{x[2] ?? ""}</div>
             <div style={{ fontSize: 12, color: A.sub }}>{x[1] ?? ""}</div>
           </div>
-        ))}
+        )).map((x) => x)}
       </div>
       <div className="twocol grid" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 20 }}>
         <div className="card" style={{ padding: 22 }}>
