@@ -13,11 +13,12 @@ const writeFixture = (root) => {
   fs.mkdirSync(adminDir, { recursive: true });
   fs.writeFileSync(
     path.join(adminDir, "ReferenceAdminStudents.tsx"),
-    `const form = { pass: "1234" };\nconst help = 'placeholder="Default: 1234"';\nconst parent = 'pass: "parent@1234"';\nconst parentHelp = '              Parent default password: <b>parent@1234</b>\\n            </div>';\nconst nextSid = () => {\n  const nums = [];\n  return \`LG\${String(Math.max(0, ...nums) + 1).padStart(3, "0")}\`;\n};\n`,
+    `const form = { pass: "1234" };\nconst help = 'placeholder="Default: 1234"';\nconst parent = 'pass: "parent@1234"';\nconst nextSid = () => {\n  const nums = [];\n  return \`LG\${String(Math.max(0, ...nums) + 1).padStart(3, "0")}\`;\n};\nconst parentHelp = \`\n              Parent default password: <b>parent@1234</b>\n            </div>\`;
+`,
   );
   fs.writeFileSync(
     path.join(adminDir, "ReferenceAdminTeachers.tsx"),
-    `const form = { pass: "1234" };\nconst teacherPasswordField = \`          <Field\\n            label="Password"\\n            value={form.pass}\\n            onChange={(v) => setForm({ ...form, pass: v })}\\n          />\`;\n`,
+    `const form = { pass: "1234" };\nconst teacherPasswordField = \`          <Field\n            label="Password"\n            value={form.pass}\n            onChange={(v) => setForm({ ...form, pass: v })}\n          />\`;\n`,
   );
 };
 
@@ -46,7 +47,10 @@ test("admin prebuild prepares extracted student and teacher modules", () => {
     assert.match(students, /Student@1234/);
     assert.match(students, /Default: Student@1234/);
     assert.match(students, /Parent@1234/);
-    assert.match(students, /return `LG-\$\{String\(Math\.max\(0, \.\.\.nums\) \+ 1\)\.padStart\(3, "0"\)\}`;/);
+    assert.match(
+      students,
+      /return `LG-\$\{String\(Math\.max\(0, \.\.\.nums\) \+ 1\)\.padStart\(3, "0"\)\}`;/,
+    );
     assert.match(
       students,
       /Default login passwords: Student <b>Student@1234<\/b> · Parent <b>Parent@1234<\/b>/,
