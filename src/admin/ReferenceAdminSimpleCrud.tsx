@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { addR, delR, gdb, updR } from "@/lg/data";
-import { supabase } from "@/lg/supabase";
-import { A, META, subjects, days, slots, gradeOptions, sectionOptions, type Row, type UserRow, type StudentRow, type TeacherRow, type PageKey, type ResultRow } from "./ReferenceAdminShared";
+import { useEffect, useMemo, useState } from "react";
+import { addR, delR, gdb } from "@/lg/data";
+import {
+  A,
+  META,
+  subjects,
+  days,
+  gradeOptions,
+  sectionOptions,
+  type Row,
+  type PageKey,
+} from "./ReferenceAdminShared";
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
-import { provision, removeAuth } from "./ReferenceAdminServices";
 
 export function SimpleCrud({ page, rows, reload }: { page: PageKey; rows: Row[]; reload: () => void }) {
   const table = META[page].table!;
