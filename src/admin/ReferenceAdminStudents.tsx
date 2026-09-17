@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { addR, delR, gdb, updR } from "@/lg/data";
 import { A, gradeOptions, sectionOptions, type Row, type StudentRow, type UserRow } from "./ReferenceAdminShared";
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
