@@ -13,14 +13,35 @@ const dataSource = [
   read("src/lg/data/mutations.js"),
 ].join("\n");
 
+const timetableSource = [
+  read("src/admin/batches/BatchesTimetablePage.tsx"),
+  read("src/admin/batches/BatchesTimetableConstants.ts"),
+  read("src/admin/batches/BatchesTimetableControls.tsx"),
+].join("\n");
+
 test("admin timetable supports multi-subject lectures plus edit/delete actions", () => {
-  const source = read("src/admin/batches/BatchesTimetablePage.tsx");
-  assert.match(source, /subject_names/);
-  assert.match(source, /scheduleForm\.subjects\.includes\(subject\)/);
-  assert.match(source, /setScheduleForm\(f => \(\{ \.\.\.f, subjects:/);
-  assert.match(source, /editingSchedule/);
-  assert.match(source, /removeSchedule/);
-  assert.match(source, /setDeleteSchedule\(x\)/);
+  assert.match(timetableSource, /subject_names/);
+  assert.match(timetableSource, /scheduleForm\.subjects\.includes\(subject\)/);
+  assert.match(timetableSource, /setScheduleForm\(f => \(\{ \.\.\.f, subjects:/);
+  assert.match(timetableSource, /editingSchedule/);
+  assert.match(timetableSource, /removeSchedule/);
+  assert.match(timetableSource, /setDeleteSchedule\(x\)/);
+});
+
+test("admin timetable keeps constants and reusable controls outside the page orchestrator", () => {
+  const page = read("src/admin/batches/BatchesTimetablePage.tsx");
+  const constants = read("src/admin/batches/BatchesTimetableConstants.ts");
+  const controls = read("src/admin/batches/BatchesTimetableControls.tsx");
+
+  assert.match(page, /BatchesTimetableConstants/);
+  assert.match(page, /BatchesTimetableControls/);
+  assert.doesNotMatch(page, /const CLASSES =/);
+  assert.doesNotMatch(page, /function Button\(/);
+  assert.match(constants, /export const CLASSES/);
+  assert.match(constants, /export const SUBJECTS/);
+  assert.match(controls, /export function Button/);
+  assert.match(controls, /export function Field/);
+  assert.match(controls, /export function Modal/);
 });
 
 test("student timetable reads the canonical combined subject display field", () => {
