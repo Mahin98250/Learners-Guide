@@ -1,5 +1,3 @@
-
-
 export const A = {
   bg: "#F0F4FF",
   sidebar: "#0F1B3D",
