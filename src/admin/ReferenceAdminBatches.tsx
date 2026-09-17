@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { addR, delR, gdb, updR } from "@/lg/data";
-import { supabase } from "@/lg/supabase";
-import { A, subjects, days, slots, gradeOptions, sectionOptions, type Row, type UserRow, type StudentRow, type TeacherRow, type PageKey, type ResultRow } from "./ReferenceAdminShared";
-import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
-import { provision, removeAuth } from "./ReferenceAdminServices";
+import { useEffect, useState } from "react";
+import { addR, delR, gdb } from "@/lg/data";
+import {
+  A,
+  subjects,
+  days,
+  gradeOptions,
+  sectionOptions,
+  type Row,
+} from "./ReferenceAdminShared";
+import { Badge, Btn, Field, Modal, Table } from "./ReferenceAdminControls";
 
 export function Batches({ data, reload }: { data: Row[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
