@@ -1,5 +1,4 @@
 import { supabase } from "@/lg/supabase";
-import { gdb } from "@/lg/data";
 
 export async function provision(
   role: string,
