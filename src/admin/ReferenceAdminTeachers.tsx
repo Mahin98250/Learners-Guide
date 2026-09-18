@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { addR, delR, gdb, updR } from "@/lg/data";
-import { A, subjects, gradeOptions, type Row, type TeacherRow, type UserRow } from "./ReferenceAdminShared";
+import { A, subjects, type Row, type TeacherRow, type UserRow } from "./ReferenceAdminShared";
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
