@@ -4,11 +4,20 @@ import { supabase } from "@/lg/supabase";
 import { A, subjects, gradeOptions, sectionOptions, type Row } from "./ReferenceAdminShared";
 import { Btn, Field, Modal } from "./ReferenceAdminControls";
 
+type MaterialForm = {
+  title: string;
+  subject: string;
+  cls: string;
+  sec: string;
+  desc: string;
+  date: string;
+};
+
 export function Materials({ data, reload }: { data: Row[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     ref = useRef<HTMLInputElement>(null),
-    [form, setForm] = useState<any>({
+    [form, setForm] = useState<MaterialForm>({
       title: "",
       subject: "Mathematics",
       cls: "10",
