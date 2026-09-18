@@ -4,12 +4,24 @@ import { A, gradeOptions, sectionOptions, type Row, type StudentRow, type UserRo
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
+type StudentForm = {
+  name: string;
+  sid: string;
+  cls: string;
+  sec: string;
+  enroll: string;
+  status: string;
+  pass: string;
+  parentName: string;
+  parentPhone: string;
+};
+
 export function Students({ data, reload }: { data: StudentRow[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [edit, setEdit] = useState<Row | null>(null),
     [del, setDel] = useState<Row | null>(null),
     [q, setQ] = useState(""),
-    [form, setForm] = useState<any>({
+    [form, setForm] = useState<StudentForm>({
       name: "",
       sid: "",
       cls: "10",
