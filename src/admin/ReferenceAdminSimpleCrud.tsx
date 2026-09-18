@@ -12,6 +12,8 @@ import {
 } from "./ReferenceAdminShared";
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 
+type CrudForm = Record<string, string>;
+
 export function SimpleCrud({ page, rows, reload }: { page: PageKey; rows: Row[]; reload: () => void }) {
   const table = META[page].table!;
   const fieldMap: Record<string, string[]> = {
@@ -40,7 +42,7 @@ export function SimpleCrud({ page, rows, reload }: { page: PageKey; rows: Row[];
   const [students, setStudents] = useState<Row[]>([]);
   const [open, setOpen] = useState(false),
     [del, setDel] = useState<Row | null>(null),
-    [form, setForm] = useState<any>({});
+    [form, setForm] = useState<CrudForm>({});
   useEffect(() => {
     if (!needsStudents) return;
     void gdb("students")
