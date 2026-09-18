@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { C, uid } from "@/lg/data";
+import { C, uid } from "@/lg/data/constants";
 import { supabase } from "@/lg/supabase";
 import { optimizePdfFile } from "@/lg/fileOptimizer";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
