@@ -4,7 +4,16 @@ import { A, subjects, gradeOptions, type Row, type TeacherRow, type UserRow } fr
 import { Badge, Btn, Confirm, Field, Modal, Table } from "./ReferenceAdminControls";
 import { provision, removeAuth } from "./ReferenceAdminServices";
 
-type TeacherForm = {\n  name: string;\n  tid: string;\n  subject: string;\n  phone: string;\n  status: string;\n  pass: string;\n};\n\nexport function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => void }) {
+type TeacherForm = {
+  name: string;
+  tid: string;
+  subject: string;
+  phone: string;
+  status: string;
+  pass: string;
+};
+
+export function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => void }) {
   const [open, setOpen] = useState(false),
     [edit, setEdit] = useState<Row | null>(null),
     [del, setDel] = useState<Row | null>(null),
