@@ -1,6 +1,6 @@
 import { C } from "@/lg/data";
 
-export type Row = Record<string, any> & { id: string | number };
+export type Row = Record<string, unknown> & { id: string | number };
 export type Kind = "students" | "teachers";
 export type ProvisionRole = "student" | "parent" | "teacher";
 
