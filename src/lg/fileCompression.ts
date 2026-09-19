@@ -117,12 +117,6 @@ async function optimizeImage(
     if (!context) return originalResult(input, kind);
 
     context.drawImage(image, 0, 0);
-    const mimeType: "image/jpeg" | "image/png" | "image/webp" =
-      input.type === "image/png" || extension === ".png"
-        ? "image/png"
-        : input.type === "image/webp" || extension === ".webp"
-          ? "image/webp"
-          : "image/jpeg";
     const qualities = [0.82, 0.68] as const;
     const candidates: Blob[] = [];
 
