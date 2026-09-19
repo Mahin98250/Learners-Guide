@@ -24,7 +24,9 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
 
 test("PDF inspection uses qpdf and preserves the original page count", () => {
   assert.match(optimizer, /async function inspectPdf/);
-  assert.match(optimizer, /--show-npages/);
+  assert.match(optimizer, /--json-key=pages/);
+  assert.match(optimizer, /outputName: "inspection\.json"/);
+  assert.match(optimizer, /JSON\.parse\(new TextDecoder\(\)\.decode\(inspectionBytes\)\)/);
   assert.match(optimizer, /source\.pageCount/);
   assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
   assert.doesNotMatch(optimizer, /validatePdf/);
