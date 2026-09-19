@@ -67,4 +67,10 @@ test("Performance: admin entry keeps login separate from the legacy panel tree",
   assert.doesNotMatch(source, /import \{ AdminLogin \} from/);
   assert.doesNotMatch(source, /import \{ AdminWithDrive \} from/);
   assert.doesNotMatch(source, /ReferenceAdminPanel/);
+  const login = read("src/admin/AdminLogin.tsx");
+  assert.match(login, /from ["']@\/lg\/ui\/branding["']/);
+  assert.match(login, /from ["']@\/lg\/ui\/styles["']/);
+  assert.match(login, /from ["']@\/lg\/data\/constants["']/);
+  assert.doesNotMatch(login, /from ["']@\/lg\/ui["']/);
+  assert.doesNotMatch(login, /from ["']@\/lg\/data["']/);
 });
