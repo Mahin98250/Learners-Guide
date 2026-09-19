@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { compressFile } from "@/lg/fileCompression";
 
 type Folder = {
   id: string;
@@ -269,9 +270,11 @@ export function MaterialsDrive() {
     setBusy(true);
     setError("");
     try {
+      const compressed = await compressFile(file);
+      const uploadFile = compressed.file;
       const { error: uploadError } = await supabase.storage
         .from("materials")
-        .upload(path, file, { upsert: false, contentType: file.type || undefined });
+        .upload(path, uploadFile, { upsert: false, contentType: uploadFile.type || file.type || undefined });
       if (uploadError) throw uploadError;
 
       const { error: insertError } = await supabase.from("materials").insert({
@@ -279,8 +282,8 @@ export function MaterialsDrive() {
         name: safe,
         folder_id: current.id,
         storage_path: path,
-        file_size: file.size,
-        mime_type: file.type || null,
+        file_size: uploadFile.size,
+        mime_type: uploadFile.type || file.type || null,
       });
       if (insertError) {
         await supabase.storage.from("materials").remove([path]);
