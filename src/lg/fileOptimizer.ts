@@ -65,6 +65,7 @@ async function inspectPdf(
       inputName: "input.pdf",
       outputName: "inspection.json",
       args: [
+        "--json-output",
         "--json-key=pages",
         "--",
         "input.pdf",
