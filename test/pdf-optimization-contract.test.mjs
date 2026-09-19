@@ -84,25 +84,25 @@ test("Storage client does not trigger a second hidden optimization pass", () => 
   assert.doesNotMatch(supabaseClient, /originalStorageFrom/);
 });
 
-test("admin homework runs PDFs through the optimizer before Storage", () => {
-  assert.match(adminHomework, /optimizePdfFile\(file,setProcessing\)/);
+test("admin homework runs files through the unified compression pipeline before Storage", () => {
+  assert.match(adminHomework, /compressFile\(file, setProcessing\)/);
   assert.match(adminHomework, /file_size: uploadFile\?\.size/);
 });
 
-test("teacher homework runs PDFs through the optimizer before Storage and cleans up partial failures", () => {
-  assert.match(teacherHomework, /optimizePdfFile\(uploadFile, setProcessing\)/);
+test("teacher homework runs files through the unified compression pipeline before Storage and cleans up partial failures", () => {
+  assert.match(teacherHomework, /compressFile\(uploadFile, setProcessing\)/);
   assert.match(teacherHomework, /file_size: uploadFile\.size/);
   assert.match(teacherHomework, /storage\.from\("homework"\)\.remove\(\[path\]\)/);
   assert.match(teacherHomework, /storageUploaded/);
 });
 
-test("teacher material uploads PDFs through the optimizer before Storage", () => {
-  assert.match(teacherMaterials, /optimizePdfFile\(selectedFile, setProcessing\)/);
+test("teacher material uploads files through the unified compression pipeline before Storage", () => {
+  assert.match(teacherMaterials, /compressFile\(selectedFile, setProcessing\)/);
   assert.match(teacherMaterials, /file_size: uploadFile\.size/);
 });
 
-test("active admin materials uploader runs PDFs through the optimizer before Storage", () => {
-  assert.match(adminMaterials, /optimizePdfFile\(file,setProcessing\)/);
+test("active admin materials uploader runs files through the unified compression pipeline before Storage", () => {
+  assert.match(adminMaterials, /compressFile\(file,setProcessing\)/);
   assert.match(adminMaterials, /file_size:uploadFile\.size/);
 });
 test("all supported upload paths use the unified file compression entry point", () => {
