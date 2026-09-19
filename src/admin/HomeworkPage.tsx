@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { delR, gdb, C, subjectsForClasses } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
-import { optimizePdfFile } from "@/lg/fileOptimizer";
+import { compressFile } from "@/lg/fileCompression";
 
 type Row = Record<string, any>;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
@@ -49,7 +49,7 @@ export default function HomeworkPage() {
     try {
       let uploadFile = file;
       if (file) {
-        const optimized = await optimizePdfFile(file, setProcessing);
+        const optimized = await compressFile(file, setProcessing);
         uploadFile = optimized.file;
         if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
       }
