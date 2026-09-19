@@ -65,7 +65,7 @@ export function getCompressionKind(file: File): SupportedCompressionKind {
 
 async function blobFromCanvas(
   canvas: HTMLCanvasElement,
-  mimeType: "image/jpeg" | "image/webp",
+  mimeType: "image/jpeg" | "image/png" | "image/webp",
   quality: number,
 ): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, mimeType, quality));
