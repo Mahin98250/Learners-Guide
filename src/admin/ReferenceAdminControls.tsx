@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { A } from "./ReferenceAdminShared";
 
-export function Badge({ v }: { v: any }) {
+export function Badge({ v }: { v: unknown }) {
   const x = String(v ?? "—");
   const c: Record<string, string> = {
     active: A.green,
@@ -102,7 +102,7 @@ export function Field({
   required = false,
 }: {
   label: string;
-  value: any;
+  value: string | number | null | undefined;
   onChange: (v: string) => void;
   type?: string;
   placeholder?: string;
