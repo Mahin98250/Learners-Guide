@@ -26,6 +26,7 @@ test("PDF inspection uses qpdf and preserves the original page count", () => {
   assert.match(optimizer, /async function inspectPdf/);
   assert.match(optimizer, /--json-key=pages/);
   assert.match(optimizer, /outputName: "inspection\.json"/);
+  assert.match(optimizer, /outputs: \["inspection\.json"\]/);
   assert.match(optimizer, /JSON\.parse\(new TextDecoder\(\)\.decode\(inspectionBytes\)\)/);
   assert.match(optimizer, /source\.pageCount/);
   assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
