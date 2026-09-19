@@ -8,10 +8,10 @@ const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 
 test("unified compression detects the formats the teacher upload UI accepts", () => {
   assert.match(compression, /extension === "\.pdf"/);
-  assert.match(compression, /IMAGE_MIME_TYPES = new Set\(\["image\/jpeg", "image\/webp"\]\)/);
+  assert.match(compression, /IMAGE_MIME_TYPES = new Set\(\["image\/jpeg", "image\/png", "image\/webp"\]\)/);
   assert.match(compression, /OOXML_EXTENSIONS = new Set\(\["\.docx", "\.docm", "\.pptx", "\.pptm", "\.xlsx", "\.xlsm"\]\)/);
   assert.match(teacherHomework, /const ACCEPT = "\.pdf,\.ppt,\.pptx,\.doc,\.docx,\.png,\.jpg,\.jpeg"/);
-  assert.match(teacherMaterials, /const ACCEPT = "\.pdf,\.ppt,\.pptx,\.doc,\.docx,\.png,\.jpg,\.jpeg"/);
+  assert.match(teacherMaterials, /const ACCEPT = "\.pdf,\.ppt,\.pptx,\.doc,\.docx,\.png,\.jpg,\.jpeg"/);\n  assert.match(compression, /extension === "\.png"/);
 });
 
 test("Office compression validates package structure, signatures, and byte-preserving round trips", () => {
