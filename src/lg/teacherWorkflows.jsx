@@ -276,11 +276,9 @@ export function T6Materials({ teacher }) {
     let storagePath = "";
     try {
       let uploadFile = selectedFile;
-      if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
-        const optimized = await compressFile(selectedFile, setProcessing);
-        uploadFile = optimized.file;
-        if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
-      }
+      const optimized = await compressFile(selectedFile, setProcessing);
+      uploadFile = optimized.file;
+      if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
       const randomId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : uid();
       const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       storagePath = `teacher/${teacher.id}/${targetBatch.id}/${randomId}-${safeName}`;
