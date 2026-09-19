@@ -1,6 +1,6 @@
 import { C } from "@/lg/data";
 
-export type Row = Record<string, any> & { id?: string | number };
+export type Row = Record<string, unknown> & { id?: string | number };
 export type Option = { v: string; l: string };
 
 export const CLASSES = ["9", "10", "11", "12"];
