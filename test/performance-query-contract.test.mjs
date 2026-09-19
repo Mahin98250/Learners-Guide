@@ -60,7 +60,7 @@ test("Performance: authenticated portal bundles are lazy-loaded after session di
   assert.doesNotMatch(source, /import \{ ParentApp \} from/);
 });
 
-test("Performance: admin bundles are lazy-loaded only on the admin route", () => {
+test("Performance: admin entry keeps login separate from the legacy panel tree", () => {
   const source = read("src/routes/admin.tsx");
   assert.match(source, /const AdminLogin\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/ReferenceAdminPanel["']\s*\)/);
   assert.match(source, /const AdminWithDrive\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/AdminWithDrive["']\s*\)/);
