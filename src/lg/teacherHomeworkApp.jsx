@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data/constants";
 import { supabase } from "@/lg/supabase";
-import { optimizePdfFile } from "@/lg/fileOptimizer";
+import { compressFile } from "@/lg/fileCompression";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
 import { NotifPanel } from "@/lg/panels";
 import { THHome, THSchedule, THAttendance } from "@/lg/teacher";
@@ -142,7 +142,7 @@ export function T5HomeworkWithFiles({ teacher }) {
 
       let uploadFile = form.file;
       if (uploadFile?.type === "application/pdf" || uploadFile?.name.toLowerCase().endsWith(".pdf")) {
-        const optimized = await optimizePdfFile(uploadFile, setProcessing);
+        const optimized = await compressFile(uploadFile, setProcessing);
         uploadFile = optimized.file;
         if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
       }
