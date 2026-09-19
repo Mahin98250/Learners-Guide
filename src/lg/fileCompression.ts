@@ -8,7 +8,7 @@ export type FileCompressionResult = OptimizationResult & {
   kind: SupportedCompressionKind;
 };
 
-const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/webp"]);
+const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const OOXML_EXTENSIONS = new Set([".docx", ".docm", ".pptx", ".pptm", ".xlsx", ".xlsm"]);
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".rar", ".7z", ".tar", ".gz"]);
 const MIN_IMAGE_BYTES = 256 * 1024;
@@ -77,14 +77,16 @@ async function optimizeImage(
 ): Promise<FileCompressionResult> {
   const kind: SupportedCompressionKind = "image";
   const extension = extensionOf(input);
-  const mimeType =
-    IMAGE_MIME_TYPES.has(input.type)
+  const mimeType: "image/jpeg" | "image/png" | "image/webp" | null =
+    input.type === "image/jpeg" || input.type === "image/png" || input.type === "image/webp"
       ? input.type
       : extension === ".webp"
         ? "image/webp"
-        : extension === ".jpg" || extension === ".jpeg"
-          ? "image/jpeg"
-          : null;
+        : extension === ".png"
+          ? "image/png"
+          : extension === ".jpg" || extension === ".jpeg"
+            ? "image/jpeg"
+            : null;
 
   if (input.size < MIN_IMAGE_BYTES || !mimeType) {
     return originalResult(input, kind);
@@ -115,7 +117,12 @@ async function optimizeImage(
     if (!context) return originalResult(input, kind);
 
     context.drawImage(image, 0, 0);
-    const mimeType = input.type === "image/webp" ? "image/webp" : "image/jpeg";
+    const mimeType: "image/jpeg" | "image/png" | "image/webp" =
+      input.type === "image/png" || extension === ".png"
+        ? "image/png"
+        : input.type === "image/webp" || extension === ".webp"
+          ? "image/webp"
+          : "image/jpeg";
     const qualities = [0.82, 0.68] as const;
     const candidates: Blob[] = [];
 
