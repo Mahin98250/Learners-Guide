@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data";
-import { optimizePdfFile } from "@/lg/fileOptimizer";
+import { compressFile } from "@/lg/fileCompression";
 import { supabase } from "@/lg/supabase";
 import { Card, Sec } from "@/lg/ui";
 
@@ -277,7 +277,7 @@ export function T6Materials({ teacher }) {
     try {
       let uploadFile = selectedFile;
       if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
-        const optimized = await optimizePdfFile(selectedFile, setProcessing);
+        const optimized = await compressFile(selectedFile, setProcessing);
         uploadFile = optimized.file;
         if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
       }
