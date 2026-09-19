@@ -76,7 +76,17 @@ async function optimizeImage(
   onProgress?: OptimizationProgress,
 ): Promise<FileCompressionResult> {
   const kind: SupportedCompressionKind = "image";
-  if (input.size < MIN_IMAGE_BYTES || !IMAGE_MIME_TYPES.has(input.type)) {
+  const extension = extensionOf(input);
+  const mimeType =
+    IMAGE_MIME_TYPES.has(input.type)
+      ? input.type
+      : extension === ".webp"
+        ? "image/webp"
+        : extension === ".jpg" || extension === ".jpeg"
+          ? "image/jpeg"
+          : null;
+
+  if (input.size < MIN_IMAGE_BYTES || !mimeType) {
     return originalResult(input, kind);
   }
 
