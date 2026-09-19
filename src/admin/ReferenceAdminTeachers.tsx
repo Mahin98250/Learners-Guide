@@ -23,7 +23,7 @@ export function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => v
       subject: "Mathematics",
       phone: "",
       status: "active",
-      pass: "1234",
+      pass: "Teacher@1234",
     }),
     [busy, setBusy] = useState(false);
   const next = () => `LGT${String(data.length + 1).padStart(2, "0")}`;
@@ -105,7 +105,7 @@ export function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => v
               subject: "Mathematics",
               phone: "",
               status: "active",
-              pass: "1234",
+              pass: "Teacher@1234",
             });
             setOpen(true);
           }}
@@ -177,6 +177,9 @@ export function Teachers({ data, reload }: { data: TeacherRow[]; reload: () => v
             value={form.pass}
             onChange={(v) => setForm({ ...form, pass: v })}
           />
+          <div style={{ background: "#fff7ed", padding: 12, borderRadius: 12, fontSize: 12, color: "#92400e", marginBottom: 13 }}>
+            Default teacher password: <b>Teacher@1234</b>
+          </div>
           <Field
             label="Status"
             value={form.status}
