@@ -103,3 +103,14 @@ test("active admin materials uploader runs PDFs through the optimizer before Sto
   assert.match(adminMaterials, /optimizePdfFile\(file,setProcessing\)/);
   assert.match(adminMaterials, /file_size:uploadFile\.size/);
 });
+test("all supported upload paths use the unified file compression entry point", () => {
+  const compression = fs.readFileSync("src/lg/fileCompression.ts", "utf8");
+  assert.match(compression, /export async function compressFile/);
+  assert.match(compression, /kind === "pdf"/);
+  assert.match(compression, /optimizePdfFile\(input, onProgress\)/);
+  assert.match(compression, /Non-PDF formats intentionally remain unchanged/);
+  for (const source of [adminHomework, teacherHomework, teacherMaterials, adminMaterials]) {
+    assert.match(source, /compressFile\(/);
+    assert.doesNotMatch(source, /optimizePdfFile\(/);
+  }
+});
