@@ -56,14 +56,11 @@ async function inspectPdf(
   label: string,
 ): Promise<PdfInspection> {
   try {
-    // qpdf-run requires an output name for every run. Use qpdf's JSON
-    // inspection mode to write a small inspection artifact, then read the
-    // page list from that artifact. This keeps validation inside qpdf WASM
-    // without inventing a fake PDF output for an inspection-only command.
-    const inspectionBytes = await qpdf.runOne({
-      input: bytes,
-      inputName: "input.pdf",
-      outputName: "inspection.json",
+    // qpdf-run wrappers in the wild have differed on stdout-only runs.
+    // Use the stable multi-output API explicitly so inspection always has
+    // a named output file and the wrapper never has to infer one.
+    const result = await qpdf.run({
+      inputs: { "input.pdf": bytes },
       args: [
         "--json-output",
         "--json-key=pages",
@@ -71,13 +68,15 @@ async function inspectPdf(
         "input.pdf",
         "inspection.json",
       ],
+      outputs: ["inspection.json"],
     });
 
+    const inspectionBytes = result.outputs["inspection.json"];
     if (!(inspectionBytes instanceof Uint8Array) || inspectionBytes.byteLength === 0) {
       return {
         valid: false,
         pageCount: 0,
-        reason: `${label} returned no inspection output`,
+        reason: `${label} returned no inspection output${result.stderr.length ? `: ${result.stderr.join(" ")}` : ""}`,
       };
     }
 
