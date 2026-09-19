@@ -142,7 +142,6 @@ export function T5HomeworkWithFiles({ teacher }) {
 
       let uploadFile = form.file;
       if (uploadFile) {
- {
         const safe = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         path = `teacher/${teacher.id}/${selected.id}/${crypto.randomUUID()}-${safe}`;
         const { error: insertError } = await supabase.from("homework").insert({
