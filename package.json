@@ -4,8 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/prepare-admin-password-ui.mjs && vite",
-    "prebuild": "node scripts/prepare-admin-password-ui.mjs",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "prettier --check .",
