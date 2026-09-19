@@ -100,6 +100,6 @@ test("teacher material uploads PDFs through the optimizer before Storage", () =>
 });
 
 test("active admin materials uploader runs PDFs through the optimizer before Storage", () => {
-  assert.match(adminMaterials, /optimizePdfFile\\(file,setProcessing\\)/);
+  assert.match(adminMaterials, /optimizePdfFile\(file,setProcessing\)/);
   assert.match(adminMaterials, /file_size:uploadFile\.size/);
 });
