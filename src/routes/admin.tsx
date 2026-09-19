@@ -4,7 +4,7 @@ import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 
 const AdminLogin = lazy(() =>
-  import("@/admin/ReferenceAdminPanel").then((module) => ({ default: module.AdminLogin })),
+  import("@/admin/AdminLogin").then((module) => ({ default: module.AdminLogin })),
 );
 const AdminWithDrive = lazy(() =>
   import("@/admin/AdminWithDrive").then((module) => ({ default: module.AdminWithDrive })),
