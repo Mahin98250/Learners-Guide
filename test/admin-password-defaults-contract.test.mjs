@@ -6,16 +6,29 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("legacy admin credential defaults are explicit source constants", () => {
-  const students = read("src/admin/ReferenceAdminStudents.tsx");
-  const teachers = read("src/admin/ReferenceAdminTeachers.tsx");
+test("active admin credential defaults are centralized and legacy admin tree is retired", () => {
+  const constants = read("src/admin/records/AdminRecordsConstants.ts");
+  const records = read("src/admin/records/AdminRecordsPage.tsx");
+  const teachers = read("src/admin/records/TeacherRecordsPage.tsx");
 
-  assert.match(students, /pass: "Student@1234"/);
-  assert.match(students, /placeholder="Default: Student@1234"/);
-  assert.match(students, /Parent default password: <b>Parent@1234<\/b>|Default login passwords: Student <b>Student@1234<\/b> · Parent <b>Parent@1234<\/b>/);
-  assert.doesNotMatch(students, /pass: "1234"/);
+  assert.match(constants, /DEFAULT_STUDENT_PASSWORD\s*=\s*"Student@1234"/);
+  assert.match(constants, /DEFAULT_PARENT_PASSWORD\s*=\s*"Parent@1234"/);
+  assert.match(constants, /DEFAULT_TEACHER_PASSWORD\s*=\s*"Teacher@1234"/);
+  assert.match(records, /DEFAULT_STUDENT_PASSWORD/);
+  assert.match(records, /DEFAULT_PARENT_PASSWORD/);
+  assert.match(records, /Default password: Student@1234/);
+  assert.match(records, /Default password: Parent@1234/);
+  assert.match(teachers, /DEFAULT_TEACHER_PASSWORD/);
+  assert.match(teachers, /Default: Teacher@1234/);
+  assert.doesNotMatch(teachers, /const DEFAULT_PASSWORD = "1234"/);
 
-  assert.match(teachers, /pass: "Teacher@1234"/);
-  assert.match(teachers, /Default teacher password: <b>Teacher@1234<\/b>/);
-  assert.doesNotMatch(teachers, /pass: "1234"/);
+  for (const legacy of [
+    "src/admin/ReferenceAdminPanel.tsx",
+    "src/admin/ReferenceAdminRouter.tsx",
+    "src/admin/ReferenceAdminStudents.tsx",
+    "src/admin/ReferenceAdminTeachers.tsx",
+    "src/admin/ReferenceAdminBatches.tsx",
+  ]) {
+    assert.equal(fs.existsSync(path.join(root, legacy)), false, legacy);
+  }
 });
