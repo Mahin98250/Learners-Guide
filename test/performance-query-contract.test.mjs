@@ -62,8 +62,11 @@ test("Performance: authenticated portal bundles are lazy-loaded after session di
 
 test("Performance: admin entry keeps login separate from the legacy panel tree", () => {
   const source = read("src/routes/admin.tsx");
-  assert.match(source, /const AdminLogin\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/ReferenceAdminPanel["']\s*\)/);
+  assert.match(source, /const AdminLogin\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/AdminLogin["']\s*\)/);
   assert.match(source, /const AdminWithDrive\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/AdminWithDrive["']\s*\)/);
   assert.doesNotMatch(source, /import \{ AdminLogin \} from/);
   assert.doesNotMatch(source, /import \{ AdminWithDrive \} from/);
+  const legacy = read("src/admin/ReferenceAdminPanel.tsx");
+  assert.match(legacy, /export \{ AdminLogin \} from ["\']\.\/AdminLogin["\']/);
+  assert.doesNotMatch(legacy, /ReferenceAdmin(Batches|Students|Teachers|Dashboard|Router)/);
 });
