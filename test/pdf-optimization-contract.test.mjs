@@ -26,7 +26,7 @@ test("PDF inspection uses qpdf and preserves the original page count", () => {
   assert.match(optimizer, /async function inspectPdf/);
   assert.match(optimizer, /--show-npages/);
   assert.match(optimizer, /source\.pageCount/);
-  assert.match(optimizer, /inspection\\.pageCount === source\\.pageCount/);
+  assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
   assert.doesNotMatch(optimizer, /validatePdf/);
   assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /throwOnInvalidObject/);
