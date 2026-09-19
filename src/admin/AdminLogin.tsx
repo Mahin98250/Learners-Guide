@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
+import { LGLogo } from "@/lg/ui/branding";
+import { GLOBAL_CSS } from "@/lg/ui/styles";
 import { signIn } from "@/lg/auth";
-import { C } from "@/lg/data";
+import { C } from "@/lg/data/constants";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 
