@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { addR, delR } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
+import { compressFile } from "@/lg/fileCompression";
 import { A, subjects, gradeOptions, sectionOptions, type Row } from "./ReferenceAdminShared";
 import { Btn, Field, Modal } from "./ReferenceAdminControls";
 
@@ -31,18 +32,20 @@ export function Materials({ data, reload }: { data: Row[]; reload: () => void })
     if (f.size > 50 * 1024 * 1024) return alert("Maximum file size is 50 MB.");
     setBusy(true);
     try {
-      const path = `${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const compressed = await compressFile(f);
+      const uploadFile = compressed.file;
+      const path = `1789832695170-${uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { error } = await supabase.storage
         .from("materials")
-        .upload(path, f, { upsert: false, contentType: f.type });
+        .upload(path, uploadFile, { upsert: false, contentType: uploadFile.type || f.type });
       if (error) throw error;
       await addR("materials", {
         id: "m" + Date.now(),
         ...form,
-        pdfname: f.name,
+        pdfname: uploadFile.name,
         storage_path: path,
         pdfurl: null,
-        size: f.size,
+        size: uploadFile.size,
       });
       setOpen(false);
       setForm({
