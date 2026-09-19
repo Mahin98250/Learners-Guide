@@ -28,7 +28,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
       sec: "A",
       enroll: new Date().toISOString().slice(0, 10),
       status: "active",
-      pass: "1234",
+      pass: "Student@1234",
       parentName: "",
       parentPhone: "",
     }),
@@ -67,7 +67,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
           const a = await provision(
             "parent",
             form.parentPhone,
-            "parent@1234",
+            "Parent@1234",
             form.parentName,
             String(edit.id),
             pu.auth_id,
@@ -75,7 +75,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
           await updR("users", pu.id, {
             name: form.parentName,
             phone: form.parentPhone,
-            pass: "parent@1234",
+            pass: "Parent@1234",
             auth_id: a.authId,
           });
         }
@@ -83,7 +83,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
         const id = "s" + Date.now();
         await addR("students", { ...form, id });
         const sa = await provision("student", form.sid, form.pass, form.name, id);
-        const pa = await provision("parent", form.parentPhone, "parent@1234", form.parentName, id);
+        const pa = await provision("parent", form.parentPhone, "Parent@1234", form.parentName, id);
         await addR("users", {
           id: "u" + Date.now() + "s",
           name: form.name,
@@ -100,7 +100,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
           name: form.parentName,
           phone: form.parentPhone,
           email: pa.email,
-          pass: "parent@1234",
+          pass: "Parent@1234",
           role: "parent",
           ref: id,
           status: "active",
@@ -161,7 +161,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
               sec: "A",
               enroll: new Date().toISOString().slice(0, 10),
               status: "active",
-              pass: "1234",
+              pass: "Student@1234",
               parentName: "",
               parentPhone: "",
             });
@@ -263,7 +263,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
               label="Student Password"
               value={form.pass}
               onChange={(v) => setForm({ ...form, pass: v })}
-              placeholder="Default: 1234"
+              placeholder="Default: Student@1234"
             />
             <Field
               label="Parent / Guardian Name"
@@ -286,7 +286,7 @@ export function Students({ data, reload }: { data: StudentRow[]; reload: () => v
                 color: "#92400e",
               }}
             >
-              Parent default password: <b>parent@1234</b>
+              Default login passwords: Student <b>Student@1234</b> · Parent <b>Parent@1234</b>
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
