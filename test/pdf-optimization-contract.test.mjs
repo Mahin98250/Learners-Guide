@@ -83,7 +83,7 @@ test("Storage client does not trigger a second hidden optimization pass", () => 
 });
 
 test("admin homework runs PDFs through the optimizer before Storage", () => {
-  assert.match(adminHomework, /optimizePdfFile\\(file,setProcessing\\)/);
+  assert.match(adminHomework, /optimizePdfFile\(file,setProcessing\)/);
   assert.match(adminHomework, /file_size: uploadFile\?\.size/);
 });
 
