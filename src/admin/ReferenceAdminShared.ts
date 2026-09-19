@@ -29,7 +29,7 @@ export type PageKey =
   | "marks"
   | "search"
   | "adminmsgs";
-export type Row = Record<string, any> & { id?: string | number };
+export type Row = Record<string, unknown> & { id?: string | number };
 export type UserRow = Row & {
   ref?: string | null;
   role?: string;
