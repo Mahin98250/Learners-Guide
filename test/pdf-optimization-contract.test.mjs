@@ -17,25 +17,20 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
   assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
+  assert.match(optimizer, /status: "failed"/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF validation uses a real PDF parser and preserves page geometry", () => {
-  assert.match(optimizer, /validatePdf/);
-  assert.match(optimizer, /import\("pdf-lib"\)/);
-  assert.match(optimizer, /PDFDocument\.load/);
-  assert.match(optimizer, /throwOnInvalidObject: true/);
-  assert.match(optimizer, /pageCount/);
-  assert.match(optimizer, /pageSizes/);
-  assert.match(optimizer, /samePageCount/);
-  assert.match(optimizer, /samePageSizes/);
-  assert.doesNotMatch(optimizer, /qpdf\.run\(\{[\s\S]*?--check/);
-  assert.doesNotMatch(optimizer, /qpdf\.run\(\{[\s\S]*?--show-npages/);
-  assert.doesNotMatch(optimizer, /checkedName/);
-  assert.doesNotMatch(optimizer, /outputName: checkedName/);
+test("PDF inspection uses qpdf and preserves the original page count", () => {
+  assert.match(optimizer, /async function inspectPdf/);
+  assert.match(optimizer, /--show-npages/);
+  assert.match(optimizer, /source\.pageCount/);
+  assert.match(optimizer, /candidate\.inspection\.pageCount === source\.pageCount/);
+  assert.doesNotMatch(optimizer, /validatePdf/);
+  assert.doesNotMatch(optimizer, /PDFDocument\.load/);
+  assert.doesNotMatch(optimizer, /throwOnInvalidObject/);
   assert.doesNotMatch(optimizer, /header !== "%PDF-"/);
-  assert.doesNotMatch(optimizer, /sameMetadata/);
 });
 
 test("qpdf runner uses supported browser assets and is cleaned up", () => {
@@ -50,16 +45,17 @@ test("qpdf runner uses supported browser assets and is cleaned up", () => {
   assert.match(optimizer, /--recompress-flate/);
 });
 
-test("PDF optimization uses one structural+image pass at multiple quality levels", () => {
+test("PDF optimization tries multiple quality levels and keeps only smaller candidates", () => {
   assert.match(optimizer, /for \(const quality of JPEG_QUALITY_LEVELS\)/);
   assert.match(optimizer, /optimized-\$\{quality\}\.pdf/);
   assert.match(optimizer, /candidates/);
   assert.match(optimizer, /candidate\.bytes\.byteLength/);
+  assert.match(optimizer, /candidateSize >= input\.size/);
   assert.doesNotMatch(optimizer, /structural\.pdf/);
   assert.doesNotMatch(optimizer, /images\.pdf/);
 });
 
-test("PDF optimization reports processing, success, safe fallback and failure states", () => {
+test("PDF optimization reports processing, success and safe fallback states", () => {
   assert.match(optimizer, /lg:pdf-optimization/);
   assert.match(optimizer, /status: "processing"/);
   assert.match(optimizer, /status: "optimized"/);
@@ -74,7 +70,7 @@ test("global optimization overlay shows requested measurements and final status"
   assert.match(overlay, /Optimized size/);
   assert.match(overlay, /Data saved/);
   assert.match(overlay, /Compression/);
-  assert.match(overlay, /passed PDF structural validation and page-geometry checks/i);
+  assert.match(overlay, /qpdf inspection and page-count checks/i);
   assert.match(overlay, /Original kept/);
   assert.match(overlay, /validation\/optimization pipeline/i);
   assert.match(overlay, /validationReason/);
