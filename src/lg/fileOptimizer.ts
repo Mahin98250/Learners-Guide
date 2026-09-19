@@ -56,43 +56,52 @@ async function inspectPdf(
   label: string,
 ): Promise<PdfInspection> {
   try {
-    // Use qpdf's documented stdout-only inspection command. Do not use
-    // --check here: the browser WASM wrapper has already successfully parsed
-    // the PDF when it creates an optimized output, and --check was the source
-    // of the previous false rejection path.
-    const result = await qpdf.run({
-      inputs: { "input.pdf": bytes },
-      args: ["--show-npages", "input.pdf"],
+    // qpdf-run requires an output name for every run. Use qpdf's JSON
+    // inspection mode to write a small inspection artifact, then read the
+    // page list from that artifact. This keeps validation inside qpdf WASM
+    // without inventing a fake PDF output for an inspection-only command.
+    const inspectionBytes = await qpdf.runOne({
+      input: bytes,
+      inputName: "input.pdf",
+      outputName: "inspection.json",
+      args: [
+        "--json-key=pages",
+        "--",
+        "input.pdf",
+        "inspection.json",
+      ],
     });
 
-    if (result.exitCode !== 0 && result.exitCode !== 3) {
+    if (!(inspectionBytes instanceof Uint8Array) || inspectionBytes.byteLength === 0) {
       return {
         valid: false,
         pageCount: 0,
-        reason: `${label} page inspection failed with qpdf exit code ${result.exitCode}: ${[...result.stderr, ...result.stdout].join(" ").trim() || "no diagnostic"}`,
+        reason: `${label} returned no inspection output`,
       };
     }
 
-    const output = result.stdout.join("\n").trim();
-    const match = output.match(/^(\d+)$/m);
-    if (!match) {
+    let inspection: unknown;
+    try {
+      inspection = JSON.parse(new TextDecoder().decode(inspectionBytes));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
       return {
         valid: false,
         pageCount: 0,
-        reason: `${label} returned no usable page count: ${output || "no diagnostic"}`,
+        reason: `${label} returned invalid JSON inspection output: ${reason}`,
       };
     }
 
-    const pageCount = Number(match[1]);
-    if (!Number.isSafeInteger(pageCount) || pageCount <= 0) {
+    const pages = (inspection as { pages?: unknown }).pages;
+    if (!Array.isArray(pages) || pages.length === 0) {
       return {
         valid: false,
         pageCount: 0,
-        reason: `${label} returned an invalid page count: ${match[1]}`,
+        reason: `${label} returned no usable page list`,
       };
     }
 
-    return { valid: true, pageCount };
+    return { valid: true, pageCount: pages.length };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return { valid: false, pageCount: 0, reason: `${label} inspection failed: ${reason}` };
