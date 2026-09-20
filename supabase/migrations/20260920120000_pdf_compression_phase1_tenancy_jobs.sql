@@ -19,6 +19,34 @@ create table if not exists public.compression_tenant_memberships (
   primary key (tenant_id, user_id)
 );
 
+create table if not exists public.compression_tenant_sources (
+  tenant_id uuid not null references public.compression_tenants(id) on delete cascade,
+  source_bucket text not null check (source_bucket in ('homework','materials')),
+  source_path text not null,
+  created_at timestamptz not null default now(),
+  primary key (tenant_id, source_bucket, source_path)
+);
+
+create index if not exists idx_compression_tenant_sources_path
+  on public.compression_tenant_sources (source_bucket, source_path);
+
+alter table public.compression_tenant_sources enable row level security;
+
+drop policy if exists compression_tenant_sources_member_read on public.compression_tenant_sources;
+create policy compression_tenant_sources_member_read
+on public.compression_tenant_sources
+for select to authenticated
+using (
+  exists (
+    select 1
+    from public.compression_tenant_memberships m
+    where m.tenant_id = compression_tenant_sources.tenant_id
+      and m.user_id = auth.uid()
+  )
+);
+
+revoke insert, update, delete on public.compression_tenant_sources from authenticated;
+
 create table if not exists public.pdf_compression_jobs (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.compression_tenants(id) on delete restrict,
