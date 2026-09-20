@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.file-optimizer]
 verify_jwt = true
+
+[functions.pdf-compression-jobs]
+verify_jwt = true
