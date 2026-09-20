@@ -51,7 +51,7 @@ test("qpdf runner uses supported browser assets and supported compression flags"
 });
 
 test("PDF optimization keeps only a smaller, page-count-preserving candidate", () => {
-  assert.match(optimizer, /const candidateName = "optimized\.pdf"/);
+  assert.match(optimizer, /const candidateName = `optimized-\$\{strategy\.label\}\.pdf`/);
   assert.match(optimizer, /candidate\.byteLength/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /page-count validation/);
