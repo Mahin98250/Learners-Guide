@@ -23,7 +23,8 @@ test("Worker has an explicit resource and validation boundary", () => {
 test("Worker never replaces a PDF unless the candidate is smaller and the source is unchanged", () => {
   assert.ok(worker.includes("optimizedSize >= originalSize"));
   assert.ok(worker.includes("latestSourceObject.updated_at !== sourceObject.updated_at"));
-  assert.ok(worker.includes("admin.storage\n      .from(job.source_bucket)\n      .upload(job.source_path"));
+  assert.ok(worker.includes(".from(job.source_bucket)"));
+  assert.ok(worker.includes(".upload(job.source_path, candidate"));
 });
 
 test("Temporary staging is always cleaned up", () => {
