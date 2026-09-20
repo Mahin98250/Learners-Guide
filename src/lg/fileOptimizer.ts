@@ -88,7 +88,7 @@ async function inspectPdf(
       return {
         valid: false,
         pageCount: 0,
-        reason: `${label} returned an invalid page count: ${match[1]}`,
+        reason: `${label} returned an invalid page count: ${pageCount}`,
       };
     }
 
