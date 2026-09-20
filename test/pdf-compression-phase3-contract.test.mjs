@@ -71,3 +71,14 @@ test("UI surfaces raster image recompression results", () => {
   assert.match(jobs, /PDF images were recompressed/);
   assert.match(overlay, /Images recompressed/);
 });
+
+test("Compression queue works for any authenticated uploader through an isolated bridge tenant", () => {
+  assert.match(edge, /compression-user-\$\{userId\.replace/);
+  assert.match(edge, /membership_role: "owner"/);
+  assert.match(edge, /source ownership and the application record binding are still checked/i);
+});
+
+test("Queue failures are visible instead of being silently swallowed", () => {
+  assert.match(jobs, /Compression job was not created/);
+  assert.match(jobs, /PDF uploaded, but the server compression job could not be queued/);
+});
