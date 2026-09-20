@@ -63,9 +63,9 @@ export default function PdfOptimizationOverlay() {
         </div>
 
         <div style={{ marginTop: 16, fontSize: 12, lineHeight: 1.55, color: "#64748B" }}>
-          {successful && "The optimized PDF passed qpdf inspection and page-count checks, and the smaller file is being uploaded."}
+          {successful && "The optimized PDF passed PDF validation and page-count checks, and the smaller file is being uploaded."}
           {fallback && "No safe size reduction was found, so the original PDF is kept. No content is intentionally removed."}
-          {failed && `The optimized file was rejected by the validation/optimization pipeline. The original PDF is kept instead.${detail.validationReason ? ` Reason: ${detail.validationReason}` : ""}`}
+          {failed && `The optimization pipeline could not safely apply compression. The original PDF is kept instead.${detail.validationReason ? ` Reason: ${detail.validationReason}` : ""}`}
           {processing && "The original file is not replaced until optimization and validation finish."}
         </div>
 
