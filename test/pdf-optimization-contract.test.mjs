@@ -13,7 +13,7 @@ const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
 test("PDF optimizer uses qpdf WASM and safe fallback", () => {
-  assert.equal(pkg.dependencies["qpdf-run"], "0.2.1");
+  assert.equal(pkg.dependencies["qpdf-run"], "0.2.3");
   assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
