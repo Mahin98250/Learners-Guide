@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data";
 import { compressFile } from "@/lg/fileCompression";
+import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
 import { supabase } from "@/lg/supabase";
 import { Card, Sec } from "@/lg/ui";
 
@@ -308,6 +309,11 @@ export function T6Materials({ teacher }) {
         mime_type: uploadFile.type || "application/octet-stream",
       });
       if (insertError) throw insertError;
+      if (/\.pdf$/i.test(storagePath)) {
+        void enqueuePdfCompressionJob("materials", storagePath).catch((queueError) =>
+          console.warn("PDF compression queue unavailable; original upload kept.", queueError),
+        );
+      }
 
       setSelectedFile(null);
       setFileTitle("");

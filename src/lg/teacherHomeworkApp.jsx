@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data/constants";
 import { supabase } from "@/lg/supabase";
 import { compressFile } from "@/lg/fileCompression";
+import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
 import { NotifPanel } from "@/lg/panels";
 import { THHome, THSchedule, THAttendance } from "@/lg/teacher";
@@ -167,6 +168,11 @@ export function T5HomeworkWithFiles({ teacher }) {
           throw uploadError;
         }
         storageUploaded = true;
+        if (/\.pdf$/i.test(path)) {
+          void enqueuePdfCompressionJob("homework", path).catch((queueError) =>
+            console.warn("PDF compression queue unavailable; original upload kept.", queueError),
+          );
+        }
       } else {
         const { error: insertError } = await supabase.from("homework").insert(base);
         if (insertError) throw insertError;

@@ -1,9 +1,16 @@
-import { optimizePdfFile, type OptimizationProgress, type OptimizationResult } from "./fileOptimizer";
+export type OptimizationProgress = (message: string) => void;
 
 export type SupportedCompressionKind = "pdf" | "image" | "office" | "archive" | "other";
-export type CompressionEngine = OptimizationResult["engine"] | "canvas" | "zip-repack";
+export type CompressionEngine = "original" | "server-queue" | "canvas" | "zip-repack";
 
-export type FileCompressionResult = Omit<OptimizationResult, "engine"> & {
+export type FileCompressionResult = {
+  file: File;
+  originalSize: number;
+  optimizedSize: number;
+  savingsBytes: number;
+  savingsPercent: number;
+  optimized: boolean;
+  status: "optimized" | "original-kept" | "failed";
   engine: CompressionEngine;
   kind: SupportedCompressionKind;
 };
@@ -286,13 +293,28 @@ async function optimizeOfficeContainer(
   }
 }
 
+function queuedPdfResult(input: File): FileCompressionResult {
+  return {
+    file: input,
+    originalSize: input.size,
+    optimizedSize: input.size,
+    savingsBytes: 0,
+    savingsPercent: 0,
+    optimized: false,
+    status: "original-kept",
+    engine: "server-queue",
+    kind: "pdf",
+  };
+}
+
 export async function compressFile(
   input: File,
   onProgress?: OptimizationProgress,
 ): Promise<FileCompressionResult> {
   const kind = getCompressionKind(input);
   if (kind === "pdf") {
-    return { ...(await optimizePdfFile(input, onProgress)), kind };
+    onProgress?.("PDF uploaded unchanged; server-side compression will run after upload.");
+    return queuedPdfResult(input);
   }
   if (kind === "image") {
     return optimizeImage(input, onProgress);

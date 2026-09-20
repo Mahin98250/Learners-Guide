@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import { compressFile } from "@/lg/fileCompression";
+import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
 
 type Folder = {
   id: string;
@@ -288,6 +289,11 @@ export function MaterialsDrive() {
       if (insertError) {
         await supabase.storage.from("materials").remove([path]);
         throw insertError;
+      }
+      if (/\.pdf$/i.test(path)) {
+        void enqueuePdfCompressionJob("materials", path).catch((queueError) =>
+          console.warn("PDF compression queue unavailable; original upload kept.", queueError),
+        );
       }
       await load();
     } catch (e) {

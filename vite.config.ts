@@ -17,7 +17,6 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   assetsInclude: ["**/*.wasm"],
-  optimizeDeps: { exclude: ["qpdf-run"] },
   build: {
     outDir: "dist",
     emptyOutDir: true,
