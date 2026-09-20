@@ -56,14 +56,12 @@ async function inspectPdf(
   label: string,
 ): Promise<PdfInspection> {
   try {
-    // Some qpdf-run builds require at least one declared output even when
-    // qpdf itself is running an inspection command. Use qpdf's JSON inspection
-    // mode and explicitly request the pages summary as a tiny output file.
-    const inspectionName = "inspection.json";
+    // qpdf-run supports stdout-only inspection commands when the outputs
+    // property is omitted. Do not provide outputs: [] because some runner
+    // builds interpret an empty output declaration as a missing output file.
     const result = await qpdf.run({
       inputs: { "input.pdf": bytes },
-      args: ["--json", "--json-key=pages", "--", "input.pdf", inspectionName],
-      outputs: [inspectionName],
+      args: ["--show-npages", "input.pdf"],
     });
 
     if (result.exitCode !== 0 && result.exitCode !== 3) {
@@ -74,34 +72,13 @@ async function inspectPdf(
       };
     }
 
-    const inspectionBytes = result.outputs[inspectionName];
-    if (!(inspectionBytes instanceof Uint8Array) || inspectionBytes.byteLength === 0) {
-      return {
-        valid: false,
-        pageCount: 0,
-        reason: `${label} produced no inspection output`,
-      };
-    }
-
-    let payload: { pages?: unknown };
-    try {
-      payload = JSON.parse(new TextDecoder().decode(inspectionBytes)) as { pages?: unknown };
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      return {
-        valid: false,
-        pageCount: 0,
-        reason: `${label} returned invalid inspection JSON: ${reason}`,
-      };
-    }
-
-    const pages = payload.pages;
-    const pageCount = Array.isArray(pages) ? pages.length : 0;
+    const rawPageCount = result.stdout.join("\n").trim();
+    const pageCount = Number(rawPageCount);
     if (!Number.isSafeInteger(pageCount) || pageCount <= 0) {
       return {
         valid: false,
         pageCount: 0,
-        reason: `${label} returned an invalid page count: ${pageCount}`,
+        reason: `${label} returned an invalid page count: ${rawPageCount || "empty output"}`,
       };
     }
 
@@ -111,6 +88,7 @@ async function inspectPdf(
     return { valid: false, pageCount: 0, reason: `${label} inspection failed: ${reason}` };
   }
 }
+
 const originalResult = (
   input: File,
   status: "original-kept" | "failed",
