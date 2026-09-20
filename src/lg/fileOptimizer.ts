@@ -100,38 +100,79 @@ async function optimizeWithQpdf(
       throw new Error(source.reason || "Source PDF could not be inspected safely");
     }
 
-    onProgress?.("Compressing PDF streams and images…");
-    const candidateName = "optimized.pdf";
-    const candidate = await qpdf.runOne({
-      input: bytes,
-      inputName: "input.pdf",
-      outputName: candidateName,
-      args: [
-        "--warning-exit-0",
-        "--compress-streams=y",
-        "--decode-level=generalized",
-        "--recompress-flate",
-        "--compression-level=9",
-        "--object-streams=generate",
-        "--optimize-images",
-        "--",
-        "input.pdf",
-        candidateName,
-      ],
-    });
+    const strategies = [
+      {
+        label: "image-aware",
+        args: [
+          "--compress-streams=y",
+          "--decode-level=generalized",
+          "--recompress-flate",
+          "--compression-level=9",
+          "--object-streams=generate",
+          "--optimize-images",
+        ],
+      },
+      {
+        label: "conservative",
+        args: [
+          "--compress-streams=y",
+          "--decode-level=generalized",
+          "--recompress-flate",
+          "--compression-level=9",
+          "--object-streams=generate",
+        ],
+      },
+    ] as const;
 
-    if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
-      throw new Error("qpdf produced an empty optimized PDF");
-    }
-
-    const inspection = await inspectPdf(candidate, "Optimized PDF");
-    if (!inspection.valid || inspection.pageCount !== source.pageCount) {
-      throw new Error(
-        inspection.reason || "Optimized PDF failed page-count validation",
+    let lastError: unknown = null;
+    for (const strategy of strategies) {
+      onProgress?.(
+        strategy.label === "image-aware"
+          ? "Compressing PDF streams and images…"
+          : "Retrying with a conservative PDF compression pass…",
       );
+      const candidateName = `optimized-${strategy.label}.pdf`;
+
+      try {
+        const candidate = await qpdf.runOne({
+          input: bytes,
+          inputName: "input.pdf",
+          outputName: candidateName,
+          args: [
+            ...strategy.args,
+            "--",
+            "input.pdf",
+            candidateName,
+          ],
+        });
+
+        if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
+          throw new Error(`qpdf produced an empty ${strategy.label} PDF`);
+        }
+
+        const inspection = await inspectPdf(candidate, `Optimized PDF (${strategy.label})`);
+        if (!inspection.valid || inspection.pageCount !== source.pageCount) {
+          throw new Error(
+            inspection.reason ||
+              `Optimized PDF (${strategy.label}) failed page-count validation`,
+          );
+        }
+
+        if (candidate.byteLength < bytes.byteLength) {
+          return { bytes: candidate, inspection };
+        }
+
+        lastError = new Error(
+          `The ${strategy.label} compression pass was valid but did not reduce the file size`,
+        );
+      } catch (error) {
+        lastError = error;
+      }
     }
 
-    return { bytes: candidate, inspection };
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("qpdf could not produce a safe smaller PDF");
   } finally {
     await qpdf.destroy();
   }
