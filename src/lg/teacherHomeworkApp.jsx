@@ -288,7 +288,7 @@ export function TeacherAppWithHomeworkFiles({ user, onLogout }) {
         : tab === "homework"
           ? <T5HomeworkWithFiles teacher={teacher} />
           : tab === "tests"
-            ? <TTests teacher={teacher} />
+            ? <><TTests teacher={teacher} /><TTestResults teacher={teacher} /></>
             : tab === "materials"
               ? <T6Materials teacher={teacher} />
               : <TeacherAnnouncements teacher={teacher} />;
