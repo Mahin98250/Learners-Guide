@@ -17,7 +17,8 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
   assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
-  assert.match(optimizer, /OptimizationStatus = "optimized" \| "original-kept" \| "failed"/);\n  assert.match(optimizer, /originalResult\(input, "failed"\)/);
+  assert.match(optimizer, /OptimizationStatus = "optimized" \| "original-kept" \| "failed"/);
+  assert.match(optimizer, /originalResult\(input, "failed"\)/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
