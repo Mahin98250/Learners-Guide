@@ -40,29 +40,21 @@ async function isTenantMember(
   return !error && !!data;
 }
 
-async function sourceExistsForCaller(
+async function sourceIsBoundToTenant(
   admin: ReturnType<typeof createClient>,
+  tenantId: string,
   bucket: string,
   path: string,
-  userId: string,
 ) {
-  if (bucket === "homework") {
-    const { data } = await admin
-      .from("homework")
-      .select("id")
-      .eq("storage_path", path)
-      .eq("tid", (await admin.auth.admin.getUserById(userId)).data.user?.app_metadata?.ref ?? "")
-      .limit(1);
-    return !!data?.length;
-  }
+  const { data, error } = await admin
+    .from("compression_tenant_sources")
+    .select("tenant_id")
+    .eq("tenant_id", tenantId)
+    .eq("source_bucket", bucket)
+    .eq("source_path", path)
+    .maybeSingle();
 
-  const { data } = await admin
-    .from("materials")
-    .select("id")
-    .eq("storage_path", path)
-    .limit(1);
-
-  return !!data?.length;
+  return !error && !!data;
 }
 
 Deno.serve(async (req) => {
@@ -102,7 +94,7 @@ Deno.serve(async (req) => {
       return json({ error: "You are not a member of this compression tenant" }, 403);
     }
 
-    if (!(await sourceExistsForCaller(admin, bucket, path, user.id))) {
+    if (!(await sourceIsBoundToTenant(admin, tenantId, bucket, path))) {
       return json({ error: "The requested source file is not accessible to this account" }, 403);
     }
 
