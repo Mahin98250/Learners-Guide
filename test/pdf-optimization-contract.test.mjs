@@ -13,11 +13,11 @@ const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
 test("PDF optimizer uses qpdf WASM and safe fallback", () => {
-  assert.match(pkg.dependencies["qpdf-run"], /^\^0\.2\.1$/);
+  assert.equal(pkg.dependencies["qpdf-run"], "0.2.1");
   assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
-  assert.match(optimizer, /status: "failed"/);
+  assert.match(optimizer, /OptimizationStatus = "optimized" \| "original-kept" \| "failed"/);\n  assert.match(optimizer, /originalResult\(input, "failed"\)/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
@@ -26,7 +26,7 @@ test("PDF inspection uses qpdf stdout and preserves the original page count", ()
   assert.match(optimizer, /async function inspectPdf/);
   assert.match(optimizer, /--show-npages/);
   assert.match(optimizer, /result\.stdout/);
-  assert.match(optimizer, /output\.match\(\/\^\\\\d\+\$\/m\)/);
+  assert.match(optimizer, /const match = output\.match/);
   assert.match(optimizer, /source\.pageCount/);
   assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
   assert.doesNotMatch(optimizer, /--json-output/);
@@ -74,8 +74,8 @@ test("global optimization overlay shows requested measurements and final status"
   assert.match(overlay, /Data saved/);
   assert.match(overlay, /Compression/);
   assert.match(overlay, /qpdf inspection and page-count checks/i);
-  assert.match(overlay, /Original kept/);
-  assert.match(overlay, /validation\/optimization pipeline/i);
+  assert.match(overlay, /original PDF is kept/i);
+  assert.match(overlay, /optimization pipeline/i);
   assert.match(overlay, /validationReason/);
   assert.match(main, /PdfOptimizationOverlay/);
 });
@@ -111,7 +111,7 @@ test("all supported upload paths use the unified file compression entry point", 
   assert.match(compression, /export async function compressFile/);
   assert.match(compression, /kind === "pdf"/);
   assert.ok(compression.includes("optimizePdfFile(input, onProgress)"));
-  assert.match(compression, /Non-PDF formats intentionally remain unchanged/);
+  assert.match(compression, /Archives and legacy\/unknown formats are intentionally left untouched/);
   for (const source of [adminHomework, teacherHomework, teacherMaterials, adminMaterials]) {
     assert.match(source, /compressFile\(/);
     assert.doesNotMatch(source, /optimizePdfFile\(/);
