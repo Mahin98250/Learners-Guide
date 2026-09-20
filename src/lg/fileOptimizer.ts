@@ -1,4 +1,3 @@
-import { PDFDocument } from "pdf-lib";
 import type { QpdfRunner } from "qpdf-run";
 
 export type OptimizationProgress = (message: string) => void;
@@ -58,6 +57,7 @@ async function inspectPdf(
     // qpdf-run 0.2.1 does not reliably support stdout-only inspection in all
     // builds, so page-count validation is handled by the already-installed
     // pdf-lib dependency. qpdf itself remains responsible for transformation.
+    const { PDFDocument } = await import("pdf-lib");
     const pdf = await PDFDocument.load(bytes);
     const pageCount = pdf.getPageCount();
     if (!Number.isSafeInteger(pageCount) || pageCount <= 0) {
