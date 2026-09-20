@@ -15,7 +15,7 @@ export type OptimizationResult = {
 };
 
 const PDF_MIME = "application/pdf";
-const MIN_INPUT_BYTES = 512 * 1024;
+const MIN_INPUT_BYTES = 256 * 1024;
 const JPEG_QUALITY_LEVELS = [60, 40] as const;
 
 type PdfInspection = {
@@ -61,7 +61,7 @@ async function inspectPdf(
     // builds interpret an empty output declaration as a missing output file.
     const result = await qpdf.run({
       inputs: { "input.pdf": bytes },
-      args: ["--show-npages", "input.pdf"],
+      args: ["--warning-exit-0", "--show-npages", "input.pdf"],
     });
 
     if (result.exitCode !== 0 && result.exitCode !== 3) {
@@ -124,6 +124,7 @@ async function optimizeWithQpdf(
         inputName: "input.pdf",
         outputName: `optimized-${quality}.pdf`,
         args: [
+          "--warning-exit-0",
           "--compress-streams=y",
           "--decode-level=generalized",
           "--recompress-flate",
