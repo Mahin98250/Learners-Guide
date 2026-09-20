@@ -50,8 +50,8 @@ export default function BatchesTimetablePage() {
   const teacherOptions: Option[] = teachers.filter(t => String(t.status ?? "active") === "active").map(t => ({ v: String(t.id), l: String(t.name ?? t.teacherid ?? t.id) }));
   const selectedBatch = batches.find(b => String(b.id) === String(scheduleForm.batchId));
   const subjectsForBatch = SUBJECTS[String(selectedBatch?.cls ?? "")] ?? [];
-  const batchName = (id: unknown) => batches.find(b => String(b.id) === String(id))?.name ?? "Unknown batch";
-  const teacherName = (id: unknown) => teachers.find(t => String(t.id) === String(id))?.name ?? teachers.find(t => String(t.id) === String(id))?.teacherid ?? "Unknown teacher";
+  const batchName = (id: unknown): string => String(batches.find(b => String(b.id) === String(id))?.name ?? "Unknown batch");
+  const teacherName = (id: unknown): string => String(teachers.find(t => String(t.id) === String(id))?.name ?? teachers.find(t => String(t.id) === String(id))?.teacherid ?? "Unknown teacher");
   const scheduleSubjects = (row: Row): string[] => { const values: string[] = Array.isArray(row.subject_names) ? row.subject_names.map(String) : String(row.subject_name ?? "").split(" + ").map(x => x.trim()).filter(Boolean); return [...new Set(values)]; };
 
   const openBatch = (b?: Row) => {
