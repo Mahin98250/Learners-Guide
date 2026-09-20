@@ -18,7 +18,7 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
   assert.match(optimizer, /OptimizationStatus = "optimized" \| "original-kept" \| "failed"/);
-  assert.match(optimizer, /originalResult\(input, "failed"\)/);
+  assert.match(optimizer, /const fallback = originalResult\(input, "failed"\)/);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
@@ -27,7 +27,7 @@ test("PDF inspection uses qpdf stdout and preserves the original page count", ()
   assert.match(optimizer, /async function inspectPdf/);
   assert.match(optimizer, /--show-npages/);
   assert.match(optimizer, /result\.stdout/);
-  assert.match(optimizer, /Number\(rawPageCount\)/);
+  assert.match(optimizer, /const pageCount = Number\(match\[1\]\)/);
   assert.match(optimizer, /source\.pageCount/);
   assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
   assert.doesNotMatch(optimizer, /outputs: \[\]/);
