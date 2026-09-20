@@ -28,7 +28,7 @@ test("PDF optimization validates page count without unsupported qpdf inspection 
   assert.match(optimizer, /PDFDocument\.load/);
   assert.match(optimizer, /pdf\.getPageCount\(\)/);
   assert.match(optimizer, /source\.pageCount/);
-  assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
+  assert.match(optimizer, /inspection\.pageCount !== source\.pageCount/);
   assert.doesNotMatch(optimizer, /outputs: \[\]/);
   assert.doesNotMatch(optimizer, /--show-npages/);
   assert.doesNotMatch(optimizer, /--json-key=pages/);
