@@ -3,7 +3,7 @@ import { optimizePdfFile, type OptimizationProgress, type OptimizationResult } f
 export type SupportedCompressionKind = "pdf" | "image" | "office" | "archive" | "other";
 export type CompressionEngine = OptimizationResult["engine"] | "canvas" | "zip-repack";
 
-export type FileCompressionResult = OptimizationResult & {
+export type FileCompressionResult = Omit<OptimizationResult, "engine"> & {
   engine: CompressionEngine;
   kind: SupportedCompressionKind;
 };
