@@ -239,6 +239,7 @@ async function processJob(admin: AdminClient, jobId: string) {
         engine: STRUCTURAL_ENGINE,
         original_size: originalSize,
         final_size: originalSize,
+        savings_bytes: 0,
         completed_at: new Date().toISOString(),
       });
       return { status: "original-kept", jobId: job.id, reason: "already-small" };
@@ -352,6 +353,7 @@ async function processJob(admin: AdminClient, jobId: string) {
         engine,
         original_size: originalSize,
         final_size: originalSize,
+        savings_bytes: 0,
         page_count: pageCount,
         image_count: rasterStats.imagesScanned,
         image_recompressed_count: rasterStats.imagesRecompressed,
@@ -369,6 +371,7 @@ async function processJob(admin: AdminClient, jobId: string) {
         engine,
         original_size: originalSize,
         final_size: originalSize,
+        savings_bytes: 0,
         page_count: pageCount,
         image_count: rasterStats.imagesScanned,
         image_recompressed_count: rasterStats.imagesRecompressed,
@@ -399,6 +402,7 @@ async function processJob(admin: AdminClient, jobId: string) {
       engine,
       original_size: originalSize,
       final_size: optimizedSize,
+      savings_bytes: originalSize - optimizedSize,
       page_count: pageCount,
       error_code: null,
       error_message: null,
