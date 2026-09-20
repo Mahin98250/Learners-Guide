@@ -458,13 +458,16 @@ async function resolveTenant(
       .eq("tenant_id", requestedTenantId)
       .eq("user_id", userId)
       .maybeSingle();
+
     if (!membership) return null;
+
     const { data: tenant } = await admin
       .from("compression_tenants")
       .select("id,status")
       .eq("id", requestedTenantId)
       .eq("status", "active")
       .maybeSingle();
+
     return tenant?.id || null;
   }
 
@@ -474,6 +477,7 @@ async function resolveTenant(
     .eq("user_id", userId);
 
   const ids = [...new Set((memberships || []).map((row) => row.tenant_id).filter(Boolean))];
+
   if (ids.length) {
     const { data: tenants } = await admin
       .from("compression_tenants")
@@ -481,19 +485,26 @@ async function resolveTenant(
       .in("id", ids)
       .eq("status", "active")
       .limit(2);
+
     if ((tenants || []).length === 1) return tenants[0].id;
     if ((tenants || []).length > 1) return null;
   }
 
-  if (role !== "admin") return null;
+  // The compression tenant is only a temporary bridge until the real
+  // institute/customer tenant registry is introduced. If an authenticated
+  // user has no bridge tenant yet, give that user an isolated tenant rather
+  // than silently failing the upload. This does NOT grant any source access:
+  // source ownership and the application record binding are still checked.
+  const slug = `compression-user-${userId.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase()}`;
+  const name = role === "admin" ? "Learner's Guide" : `Learner's Guide User ${userId.slice(0, 8)}`;
 
-  const slug = "learners-guide-default";
   const { data: existing } = await admin
     .from("compression_tenants")
-    .select("id")
+    .select("id,status")
     .eq("slug", slug)
     .maybeSingle();
-  if (existing?.id) {
+
+  if (existing?.id && existing.status === "active") {
     await admin.from("compression_tenant_memberships").upsert({
       tenant_id: existing.id,
       user_id: userId,
@@ -505,20 +516,33 @@ async function resolveTenant(
   const { data: created, error: createError } = await admin
     .from("compression_tenants")
     .insert({
-      name: "Learner's Guide",
+      name,
       slug,
       status: "active",
       created_by: userId,
     })
     .select("id")
     .single();
-  if (createError || !created) return null;
 
-  await admin.from("compression_tenant_memberships").upsert({
-    tenant_id: created.id,
-    user_id: userId,
-    membership_role: "owner",
-  });
+  if (createError || !created?.id) {
+    console.error("pdf-compression tenant bridge creation failed:", createError);
+    return null;
+  }
+
+  const { error: membershipError } = await admin
+    .from("compression_tenant_memberships")
+    .upsert({
+      tenant_id: created.id,
+      user_id: userId,
+      membership_role: "owner",
+    });
+
+  if (membershipError) {
+    console.error("pdf-compression tenant membership creation failed:", membershipError);
+    await admin.from("compression_tenants").delete().eq("id", created.id);
+    return null;
+  }
+
   return created.id;
 }
 
