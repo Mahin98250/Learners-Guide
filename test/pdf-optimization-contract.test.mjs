@@ -24,7 +24,7 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
 });
 
 test("PDF optimization validates page count without unsupported qpdf inspection output", () => {
-  assert.match(optimizer, /import \{ PDFDocument \} from "pdf-lib"/);
+  assert.match(optimizer, /import\("pdf-lib"\)/);
   assert.match(optimizer, /PDFDocument\.load/);
   assert.match(optimizer, /pdf\.getPageCount\(\)/);
   assert.match(optimizer, /source\.pageCount/);
