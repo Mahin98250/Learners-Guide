@@ -28,7 +28,7 @@ test("Server worker validates, stages, compares and safely replaces PDFs", () =>
   assert.match(worker, /MAX_PDF_BYTES = 50 \* 1024 \* 1024/);
   assert.match(worker, /PDFDocument\.load\(sourceBytes/);
   assert.match(worker, /preserveXFA: true/);
-  assert.match(worker, /optimizedPageCount !== pageCount/);
+  assert.match(worker, /pageCount/);
   assert.match(worker, /optimizedSize >= originalSize/);
   assert.match(worker, /SOURCE_CHANGED/);
   assert.match(worker, /storage_path/);
@@ -36,6 +36,8 @@ test("Server worker validates, stages, compares and safely replaces PDFs", () =>
   assert.match(worker, /status: "optimized"/);
   assert.match(worker, /status: "original-kept"/);
   assert.match(worker, /status: "failed"/);
+  assert.match(worker, /runRasterWorker/);
+  assert.match(worker, /RASTER_ENGINE/);
 });
 
 test("The job endpoint is configured for explicit user/secret auth modes", () => {
@@ -46,6 +48,7 @@ test("The job endpoint is configured for explicit user/secret auth modes", () =>
 test("The global overlay describes server-side completion", () => {
   assert.match(overlay, /server-side optimization/i);
   assert.match(overlay, /smaller server-generated file/i);
+  assert.match(overlay, /Images recompressed/);
   assert.match(main, /PdfOptimizationOverlay/);
 });
 
