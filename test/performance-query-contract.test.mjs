@@ -35,7 +35,7 @@ test("Performance: shared memory cache has a bounded TTL and is reset on auth se
   const source = dataSource;
   assert.match(source, /const MEMORY_CACHE_TTL_MS=15_000/);
   assert.match(source, /expiresAt:Date\.now\(\)\+MEMORY_CACHE_TTL_MS/);
-  assert.match(source, /supabase\.auth\.onAuthStateChange\(event\).*SIGNED_IN.*SIGNED_OUT.*clearCache/s);
+  assert.match(source, /supabase\.auth\.onAuthStateChange\(\(event\)\).*SIGNED_IN.*SIGNED_OUT.*clearCache/s);
 });
 
 test("Performance: student timetable relies on the shared cache path", () => {
