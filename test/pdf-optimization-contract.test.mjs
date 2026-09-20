@@ -13,52 +13,50 @@ const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 const adminMaterials = fs.readFileSync("src/admin/MaterialsDriveV2.tsx", "utf8");
 
 test("PDF optimizer uses qpdf WASM and safe fallback", () => {
-  assert.equal(pkg.dependencies["qpdf-run"], "0.2.3");
+  assert.equal(pkg.dependencies["qpdf-run"], "0.2.1");
   assert.match(optimizer, /optimizeWithQpdf/);
   assert.match(optimizer, /candidateSize >= input\.size/);
   assert.match(optimizer, /engine: "qpdf-wasm"/);
   assert.match(optimizer, /OptimizationStatus = "optimized" \| "original-kept" \| "failed"/);
-  assert.match(optimizer, /const fallback = originalResult\(input, "failed"\)/);
+  assert.match(optimizer, /const fallback = originalResult\(input, "original-kept"\)/g);
   assert.doesNotMatch(optimizer, /compressPDF/);
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF inspection uses qpdf stdout and preserves the original page count", () => {
-  assert.match(optimizer, /async function inspectPdf/);
-  assert.match(optimizer, /--warning-exit-0/);\n  assert.match(optimizer, /--show-npages/);
-  assert.match(optimizer, /result\.stdout/);
-  assert.match(optimizer, /const pageCount = Number\(match\[1\]\)/);
+test("PDF optimization validates page count without unsupported qpdf inspection output", () => {
+  assert.match(optimizer, /import \{ PDFDocument \} from "pdf-lib"/);
+  assert.match(optimizer, /PDFDocument\.load/);
+  assert.match(optimizer, /pdf\.getPageCount\(\)/);
   assert.match(optimizer, /source\.pageCount/);
   assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
   assert.doesNotMatch(optimizer, /outputs: \[\]/);
+  assert.doesNotMatch(optimizer, /--show-npages/);
   assert.doesNotMatch(optimizer, /--json-key=pages/);
   assert.doesNotMatch(optimizer, /inspection\.json/);
-  assert.doesNotMatch(optimizer, /JSON\.parse/);
+  assert.doesNotMatch(optimizer, /--jpeg-quality/);
+  assert.doesNotMatch(optimizer, /JPEG_QUALITY_LEVELS/);
   assert.doesNotMatch(optimizer, /validatePdf/);
-  assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /throwOnInvalidObject/);
-  assert.doesNotMatch(optimizer, /header !== "%PDF-"/);
 });
-test("qpdf runner uses supported browser assets and is cleaned up", () => {
+test("qpdf runner uses supported browser assets and supported compression flags", () => {
   assert.match(optimizer, /new URL\("qpdf-run\/worker"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.js"/);
   assert.match(optimizer, /new URL\("qpdf-run\/qpdf\.wasm"/);
   assert.match(optimizer, /await qpdf\.destroy\(\)/);
   assert.match(optimizer, /--optimize-images/);
-  assert.match(optimizer, /--jpeg-quality=\$\{quality\}/);
-  assert.match(optimizer, /JPEG_QUALITY_LEVELS = \[60, 40\]/);
   assert.match(optimizer, /--object-streams=generate/);
   assert.match(optimizer, /--recompress-flate/);
+  assert.match(optimizer, /--compression-level=9/);
+  assert.doesNotMatch(optimizer, /--jpeg-quality/);
 });
 
-test("PDF optimization tries multiple quality levels and keeps only smaller candidates", () => {
-  assert.match(optimizer, /for \(const quality of JPEG_QUALITY_LEVELS\)/);
-  assert.match(optimizer, /optimized-\$\{quality\}\.pdf/);
-  assert.match(optimizer, /candidates/);
-  assert.match(optimizer, /candidate\.bytes\.byteLength/);
+test("PDF optimization keeps only a smaller, page-count-preserving candidate", () => {
+  assert.match(optimizer, /const candidateName = "optimized\.pdf"/);
+  assert.match(optimizer, /candidate\.byteLength/);
   assert.match(optimizer, /candidateSize >= input\.size/);
-  assert.doesNotMatch(optimizer, /structural\.pdf/);
-  assert.doesNotMatch(optimizer, /images\.pdf/);
+  assert.match(optimizer, /page-count validation/);
+  assert.doesNotMatch(optimizer, /for \(const quality/);
+  assert.doesNotMatch(optimizer, /optimized-\$\{quality\}\.pdf/);
 });
 
 test("PDF optimization reports processing, success and safe fallback states", () => {
