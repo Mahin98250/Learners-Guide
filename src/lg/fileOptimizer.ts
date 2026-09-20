@@ -92,90 +92,88 @@ async function optimizeWithQpdf(
   input: File,
   onProgress?: OptimizationProgress,
 ): Promise<{ bytes: Uint8Array; inspection: PdfInspection } | null> {
-  const qpdf = await createQpdfRunnerForFile(input.size);
-  try {
-    const bytes = new Uint8Array(await input.arrayBuffer());
-    const source = await inspectPdf(bytes, "Source PDF");
-    if (!source.valid) {
-      throw new Error(source.reason || "Source PDF could not be inspected safely");
-    }
+  const bytes = new Uint8Array(await input.arrayBuffer());
+  const source = await inspectPdf(bytes, "Source PDF");
+  if (!source.valid) {
+    throw new Error(source.reason || "Source PDF could not be inspected safely");
+  }
 
-    const strategies = [
-      {
-        label: "image-aware",
-        args: [
-          "--compress-streams=y",
-          "--decode-level=generalized",
-          "--recompress-flate",
-          "--compression-level=9",
-          "--object-streams=generate",
-          "--optimize-images",
-        ],
-      },
-      {
-        label: "conservative",
-        args: [
-          "--compress-streams=y",
-          "--decode-level=generalized",
-          "--recompress-flate",
-          "--compression-level=9",
-          "--object-streams=generate",
-        ],
-      },
-    ] as const;
+  const strategies = [
+    {
+      label: "image-aware",
+      args: [
+        "--compress-streams=y",
+        "--decode-level=generalized",
+        "--recompress-flate",
+        "--compression-level=9",
+        "--object-streams=generate",
+        "--optimize-images",
+      ],
+    },
+    {
+      label: "conservative",
+      args: [
+        "--compress-streams=y",
+        "--object-streams=generate",
+      ],
+    },
+  ] as const;
 
-    let lastError: unknown = null;
-    for (const strategy of strategies) {
+  let lastError: unknown = null;
+
+  for (const strategy of strategies) {
+    let qpdf: QpdfRunner | null = null;
+    try {
+      qpdf = await createQpdfRunnerForFile(input.size);
       onProgress?.(
         strategy.label === "image-aware"
           ? "Compressing PDF streams and images…"
           : "Retrying with a conservative PDF compression pass…",
       );
       const candidateName = `optimized-${strategy.label}.pdf`;
+      const candidate = await qpdf.runOne({
+        input: bytes,
+        inputName: "input.pdf",
+        outputName: candidateName,
+        args: [
+          ...strategy.args,
+          "--",
+          "input.pdf",
+          candidateName,
+        ],
+      });
 
-      try {
-        const candidate = await qpdf.runOne({
-          input: bytes,
-          inputName: "input.pdf",
-          outputName: candidateName,
-          args: [
-            ...strategy.args,
-            "--",
-            "input.pdf",
-            candidateName,
-          ],
-        });
+      if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
+        throw new Error(`qpdf produced an empty ${strategy.label} PDF`);
+      }
 
-        if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
-          throw new Error(`qpdf produced an empty ${strategy.label} PDF`);
-        }
-
-        const inspection = await inspectPdf(candidate, `Optimized PDF (${strategy.label})`);
-        if (!inspection.valid || inspection.pageCount !== source.pageCount) {
-          throw new Error(
-            inspection.reason ||
-              `Optimized PDF (${strategy.label}) failed page-count validation`,
-          );
-        }
-
-        if (candidate.byteLength < bytes.byteLength) {
-          return { bytes: candidate, inspection };
-        }
-
-        lastError = new Error(
-          `The ${strategy.label} compression pass was valid but did not reduce the file size`,
+      const inspection = await inspectPdf(candidate, `Optimized PDF (${strategy.label})`);
+      if (!inspection.valid || inspection.pageCount !== source.pageCount) {
+        throw new Error(
+          inspection.reason ||
+            `Optimized PDF (${strategy.label}) failed page-count validation`,
         );
-      } catch (error) {
-        lastError = error;
+      }
+
+      if (candidate.byteLength < bytes.byteLength) {
+        return { bytes: candidate, inspection };
+      }
+
+      lastError = new Error(
+        `The ${strategy.label} compression pass was valid but did not reduce the file size`,
+      );
+    } catch (error) {
+      lastError = error;
+    } finally {
+      if (qpdf) {
+        await qpdf.destroy().catch(() => undefined);
       }
     }
-
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("qpdf could not produce a safe smaller PDF");
-  } finally {
-    await qpdf.destroy();
   }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("qpdf could not produce a safe smaller PDF");
 }
 
 export async function optimizePdfFile(
