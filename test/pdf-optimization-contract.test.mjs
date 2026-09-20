@@ -78,6 +78,8 @@ test("global optimization overlay shows requested measurements and final status"
   assert.match(overlay, /original PDF is kept/i);
   assert.match(overlay, /optimization pipeline/i);
   assert.match(overlay, /validationReason/);
+  assert.match(overlay, /compressionProfile/);
+  assert.match(overlay, /Ghostscript WASM/);
   assert.match(main, /PdfOptimizationOverlay/);
 });
 

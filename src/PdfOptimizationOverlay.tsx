@@ -10,6 +10,8 @@ type OptimizationDetail = {
   progress?: number;
   message?: string;
   validationReason?: string;
+  engine?: "ghostscript-wasm" | "qpdf-wasm" | "original";
+  compressionProfile?: "extreme" | "recommended" | "less";
 };
 
 const mb = (bytes?: number | null) => bytes == null ? "—" : `${(bytes / 1048576).toFixed(1)} MB`;
@@ -62,8 +64,10 @@ export default function PdfOptimizationOverlay() {
           <Metric label="Compression" value={detail.savingsPercent == null ? "—" : `${detail.savingsPercent}%`} />
         </div>
 
+        {successful && (detail.compressionProfile || detail.engine) && <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}><span style={badge}>{detail.compressionProfile ? `${detail.compressionProfile} compression` : "advanced compression"}</span>{detail.engine && <span style={badge}>{detail.engine === "ghostscript-wasm" ? "Ghostscript WASM" : detail.engine === "qpdf-wasm" ? "qpdf WASM fallback" : "original"}</span>}</div>}
+
         <div style={{ marginTop: 16, fontSize: 12, lineHeight: 1.55, color: "#64748B" }}>
-          {successful && "The optimized PDF passed PDF validation and page-count checks, and the smaller file is being uploaded."}
+          {successful && `The optimized PDF passed PDF validation and page-count checks. ${detail.compressionProfile ? `${detail.compressionProfile.charAt(0).toUpperCase() + detail.compressionProfile.slice(1)} compression` : "Advanced compression"}${detail.engine ? ` via ${detail.engine === "ghostscript-wasm" ? "Ghostscript WASM" : detail.engine === "qpdf-wasm" ? "qpdf WASM" : "the original file"}` : ""} was selected, and the smaller file is being uploaded.`}
           {fallback && "No safe size reduction was found, so the original PDF is kept. No content is intentionally removed."}
           {failed && `The optimization pipeline could not safely apply compression. The original PDF is kept instead.${detail.validationReason ? ` Reason: ${detail.validationReason}` : ""}`}
           {processing && "The original file is not replaced until optimization and validation finish."}
@@ -87,4 +91,5 @@ const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repea
 const metric: React.CSSProperties = { border: "1px solid #E2E8F0", borderRadius: 14, padding: 13, background: "#F8FAFC" };
 const metricLabel: React.CSSProperties = { fontSize: 11, color: "#64748B", fontWeight: 700 };
 const metricValue: React.CSSProperties = { marginTop: 4, fontSize: 18, fontWeight: 850, color: "#0F1B3D" };
+const badge: React.CSSProperties = { border: "1px solid #D1FAE5", borderRadius: 999, padding: "5px 9px", background: "#F0FDF4", color: "#166534", fontWeight: 800, fontSize: 10, textTransform: "uppercase", letterSpacing: ".04em" };
 const doneButton: React.CSSProperties = { width: "100%", marginTop: 18, border: 0, borderRadius: 12, padding: "11px 14px", background: "#4361EE", color: "#fff", fontWeight: 800, cursor: "pointer" };
