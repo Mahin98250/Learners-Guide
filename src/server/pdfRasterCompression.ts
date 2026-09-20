@@ -61,7 +61,7 @@ const resolveObject = (pdfDoc: PDFDocument, value: unknown) => {
 
 const nameText = (value: unknown) => {
   if (!(value instanceof PDFName)) return null;
-  return value.toString().replace(/^\\/+/, "");
+  return value.toString().replace(/^\/+/, "");
 };
 
 function resolveSingleName(pdfDoc: PDFDocument, value: unknown): string | null {
