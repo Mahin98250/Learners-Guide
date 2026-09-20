@@ -13,7 +13,46 @@ export async function enqueuePdfCompressionJob(
     body: { bucket, path, profile },
   });
 
-  if (error) throw error;
+  if (error) {
+    window.dispatchEvent(
+      new CustomEvent("lg:pdf-optimization", {
+        detail: {
+          status: "failed",
+          fileName: path.split("/").pop() || "PDF file",
+          originalSize: null,
+          optimizedSize: null,
+          savingsBytes: 0,
+          savingsPercent: 0,
+          imageScannedCount: 0,
+          imageRecompressedCount: 0,
+          message: "PDF uploaded, but the server compression job could not be queued. The original file is safe.",
+          validationReason: error.message || "Compression queue unavailable",
+        },
+      }),
+    );
+    throw error;
+  }
+
+  if (!data?.id) {
+    const queueError = new Error("Compression job was not created.");
+    window.dispatchEvent(
+      new CustomEvent("lg:pdf-optimization", {
+        detail: {
+          status: "failed",
+          fileName: path.split("/").pop() || "PDF file",
+          originalSize: null,
+          optimizedSize: null,
+          savingsBytes: 0,
+          savingsPercent: 0,
+          imageScannedCount: 0,
+          imageRecompressedCount: 0,
+          message: "PDF uploaded, but no server compression job was created. The original file is safe.",
+          validationReason: "Missing compression job ID",
+        },
+      }),
+    );
+    throw queueError;
+  }
 
   window.dispatchEvent(
     new CustomEvent("lg:pdf-optimization", {
