@@ -11,17 +11,64 @@ export type OptimizationResult = {
   savingsPercent: number;
   optimized: boolean;
   status: OptimizationStatus;
-  engine: "qpdf-wasm" | "original";
+  engine: "ghostscript-wasm" | "qpdf-wasm" | "original";
+  compressionProfile?: "extreme" | "recommended" | "less";
 };
 
 const PDF_MIME = "application/pdf";
 const MIN_INPUT_BYTES = 256 * 1024;
+const EXTREME_FALLBACK_THRESHOLD = 0.1;
 
 type PdfInspection = {
   valid: boolean;
   pageCount: number;
   reason?: string;
 };
+
+type GhostscriptFile = {
+  name: string;
+  data: Uint8Array;
+};
+
+type GhostscriptResult = {
+  files?: GhostscriptFile[];
+};
+
+type GhostscriptRunner = {
+  exec: (
+    args: string[],
+    options: {
+      files: Array<{ name: string; data: Uint8Array }>;
+      dirs?: string[];
+      outputs?: string[];
+    },
+  ) => Promise<GhostscriptResult>;
+  dispose: () => void;
+};
+
+type CompressionProfile = {
+  label: "extreme" | "recommended" | "less";
+  pdfSettings: "/screen" | "/ebook" | "/printer";
+  description: string;
+};
+
+const COMPRESSION_PROFILES: CompressionProfile[] = [
+  {
+    label: "recommended",
+    pdfSettings: "/ebook",
+    description: "Good quality and strong compression",
+  },
+  {
+    label: "extreme",
+    pdfSettings: "/screen",
+    description: "Maximum practical compression with lower image quality",
+  },
+  {
+    label: "less",
+    pdfSettings: "/printer",
+    description: "High quality with lighter compression",
+  },
+];
 
 const percent = (saved: number, original: number) =>
   original > 0 ? Math.max(0, Math.round((saved / original) * 1000) / 10) : 0;
@@ -31,6 +78,48 @@ const emit = (detail: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent("lg:pdf-optimization", { detail }));
   }
 };
+
+async function inspectPdf(
+  bytes: Uint8Array,
+  label: string,
+): Promise<PdfInspection> {
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const pdf = await PDFDocument.load(bytes);
+    const pageCount = pdf.getPageCount();
+
+    if (!Number.isSafeInteger(pageCount) || pageCount <= 0) {
+      return {
+        valid: false,
+        pageCount: 0,
+        reason: `${label} returned an invalid page count: ${pageCount}`,
+      };
+    }
+
+    return { valid: true, pageCount };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      valid: false,
+      pageCount: 0,
+      reason: `${label} inspection failed: ${reason}`,
+    };
+  }
+}
+
+const originalResult = (
+  input: File,
+  status: "original-kept" | "failed",
+): OptimizationResult => ({
+  file: input,
+  originalSize: input.size,
+  optimizedSize: input.size,
+  savingsBytes: 0,
+  savingsPercent: 0,
+  optimized: false,
+  status,
+  engine: "original",
+});
 
 async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   const { createQpdfRunner } = await import("qpdf-run");
@@ -49,55 +138,98 @@ async function createQpdfRunnerForFile(inputSize: number): Promise<QpdfRunner> {
   });
 }
 
-async function inspectPdf(
+async function optimizeWithGhostscript(
   bytes: Uint8Array,
-  label: string,
-): Promise<PdfInspection> {
-  try {
-    // qpdf-run 0.2.1 requires a declared output file for every run, so stdout-only
-    // inspection cannot be used here. The already-installed pdf-lib dependency
-    // handles page-count validation; qpdf remains responsible for transformation.
-    const { PDFDocument } = await import("pdf-lib");
-    const pdf = await PDFDocument.load(bytes);
-    const pageCount = pdf.getPageCount();
-    if (!Number.isSafeInteger(pageCount) || pageCount <= 0) {
-      return {
-        valid: false,
-        pageCount: 0,
-        reason: `${label} returned an invalid page count: ${pageCount}`,
-      };
-    }
-    return { valid: true, pageCount };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    return { valid: false, pageCount: 0, reason: `${label} inspection failed: ${reason}` };
-  }
-}
+  source: PdfInspection,
+  onProgress?: OptimizationProgress,
+): Promise<{
+  bytes: Uint8Array;
+  inspection: PdfInspection;
+  profile: CompressionProfile;
+} | null> {
+  const { load } = await import("@wasm-zoo/ghostscript");
+  const gs = (await load()) as unknown as GhostscriptRunner;
+  const candidates: Array<{
+    bytes: Uint8Array;
+    inspection: PdfInspection;
+    profile: CompressionProfile;
+  }> = [];
 
-const originalResult = (
-  input: File,
-  status: "original-kept" | "failed",
-): OptimizationResult => ({
-  file: input,
-  originalSize: input.size,
-  optimizedSize: input.size,
-  savingsBytes: 0,
-  savingsPercent: 0,
-  optimized: false,
-  status,
-  engine: "original",
-});
+  try {
+    for (const profile of COMPRESSION_PROFILES) {
+      onProgress?.(
+        `Powerful PDF compression: ${profile.label} mode (${profile.description})…`,
+      );
+
+      const outputName = `/out/optimized-${profile.label}.pdf`;
+      const result = await gs.exec(
+        [
+          "-dSAFER",
+          "-dBATCH",
+          "-dNOPAUSE",
+          "-dQUIET",
+          "-sDEVICE=pdfwrite",
+          "-dCompatibilityLevel=1.4",
+          `-dPDFSETTINGS=${profile.pdfSettings}`,
+          "-dDetectDuplicateImages=true",
+          "-dCompressFonts=true",
+          "-dSubsetFonts=true",
+          "-dEmbedAllFonts=true",
+          "-dPreserveAnnots=true",
+          "-dPreserveMarkedContent=true",
+          "-sOutputFile=" + outputName,
+          "/input.pdf",
+        ],
+        {
+          files: [{ name: "/input.pdf", data: bytes }],
+          dirs: ["/out"],
+          outputs: [outputName],
+        },
+      );
+
+      const output = result.files?.find((file) => file.name === outputName)?.data;
+      if (!(output instanceof Uint8Array) || output.byteLength === 0) {
+        continue;
+      }
+
+      const inspection = await inspectPdf(
+        output,
+        `Ghostscript ${profile.label} PDF`,
+      );
+      if (!inspection.valid || inspection.pageCount !== source.pageCount) {
+        continue;
+      }
+
+      if (output.byteLength < bytes.byteLength) {
+        candidates.push({ bytes: output, inspection, profile });
+      }
+
+      if (
+        profile.label === "recommended" &&
+        output.byteLength <= bytes.byteLength * (1 - EXTREME_FALLBACK_THRESHOLD)
+      ) {
+        break;
+      }
+    }
+  } finally {
+    gs.dispose();
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates.reduce((smallest, candidate) =>
+    candidate.bytes.byteLength < smallest.bytes.byteLength ? candidate : smallest,
+  );
+}
 
 async function optimizeWithQpdf(
   input: File,
+  source: PdfInspection,
   onProgress?: OptimizationProgress,
 ): Promise<{ bytes: Uint8Array; inspection: PdfInspection } | null> {
   const bytes = new Uint8Array(await input.arrayBuffer());
-  const source = await inspectPdf(bytes, "Source PDF");
-  if (!source.valid) {
-    throw new Error(source.reason || "Source PDF could not be inspected safely");
-  }
-
   const strategies = [
     {
       label: "image-aware",
@@ -112,10 +244,7 @@ async function optimizeWithQpdf(
     },
     {
       label: "conservative",
-      args: [
-        "--compress-streams=y",
-        "--object-streams=generate",
-      ],
+      args: ["--compress-streams=y", "--object-streams=generate"],
     },
   ] as const;
 
@@ -123,13 +252,15 @@ async function optimizeWithQpdf(
 
   for (const strategy of strategies) {
     let qpdf: QpdfRunner | null = null;
+
     try {
       qpdf = await createQpdfRunnerForFile(input.size);
       onProgress?.(
         strategy.label === "image-aware"
-          ? "Compressing PDF streams and images…"
+          ? "Running structural PDF optimization fallback…"
           : "Retrying with a conservative PDF compression pass…",
       );
+
       const candidateName = `optimized-${strategy.label}.pdf`;
       const candidate = await qpdf.runOne({
         input: bytes,
@@ -147,7 +278,10 @@ async function optimizeWithQpdf(
         throw new Error(`qpdf produced an empty ${strategy.label} PDF`);
       }
 
-      const inspection = await inspectPdf(candidate, `Optimized PDF (${strategy.label})`);
+      const inspection = await inspectPdf(
+        candidate,
+        `Optimized PDF (${strategy.label})`,
+      );
       if (!inspection.valid || inspection.pageCount !== source.pageCount) {
         throw new Error(
           inspection.reason ||
@@ -174,6 +308,52 @@ async function optimizeWithQpdf(
   throw lastError instanceof Error
     ? lastError
     : new Error("qpdf could not produce a safe smaller PDF");
+}
+
+async function optimizePdfBytes(
+  input: File,
+  onProgress?: OptimizationProgress,
+): Promise<{
+  bytes: Uint8Array;
+  inspection: PdfInspection;
+  engine: "ghostscript-wasm" | "qpdf-wasm";
+  compressionProfile?: CompressionProfile["label"];
+}> {
+  const bytes = new Uint8Array(await input.arrayBuffer());
+  const source = await inspectPdf(bytes, "Source PDF");
+
+  if (!source.valid) {
+    throw new Error(source.reason || "Source PDF could not be inspected safely");
+  }
+
+  try {
+    const ghostscript = await optimizeWithGhostscript(
+      bytes,
+      source,
+      onProgress,
+    );
+
+    if (ghostscript) {
+      return {
+        bytes: ghostscript.bytes,
+        inspection: ghostscript.inspection,
+        engine: "ghostscript-wasm",
+        compressionProfile: ghostscript.profile.label,
+      };
+    }
+  } catch (error) {
+    console.warn("Ghostscript PDF compression failed; trying qpdf fallback.", error);
+  }
+
+  const qpdf = await optimizeWithQpdf(input, source, onProgress);
+  if (!qpdf) {
+    throw new Error("No safe smaller PDF candidate was produced");
+  }
+
+  return {
+    ...qpdf,
+    engine: "qpdf-wasm",
+  };
 }
 
 export async function optimizePdfFile(
@@ -209,12 +389,9 @@ export async function optimizePdfFile(
       message: "Analyzing PDF…",
     });
 
-    const optimized = await optimizeWithQpdf(input, onProgress);
-    if (!optimized) {
-      return originalResult(input, "original-kept");
-    }
-
+    const optimized = await optimizePdfBytes(input, onProgress);
     const candidateSize = optimized.bytes.byteLength;
+
     if (candidateSize <= 0 || candidateSize >= input.size) {
       const fallback = originalResult(input, "original-kept");
       emit({
@@ -227,6 +404,7 @@ export async function optimizePdfFile(
 
     const savingsBytes = input.size - candidateSize;
     const savingsPercent = percent(savingsBytes, input.size);
+
     emit({
       status: "processing",
       fileName: input.name,
@@ -234,12 +412,15 @@ export async function optimizePdfFile(
       optimizedSize: candidateSize,
       savingsBytes,
       savingsPercent,
-      message: "Optimized PDF verified — preparing upload…",
+      engine: optimized.engine,
+      compressionProfile: optimized.compressionProfile,
+      message: "Powerful PDF compression verified — preparing upload…",
     });
-    onProgress?.("Optimization verified. Preparing upload…");
+    onProgress?.("Compression verified. Preparing upload…");
 
     const optimizedBuffer = new ArrayBuffer(optimized.bytes.byteLength);
     new Uint8Array(optimizedBuffer).set(optimized.bytes);
+
     const optimizedFile = new File([optimizedBuffer], input.name, {
       type: PDF_MIME,
       lastModified: input.lastModified,
@@ -253,28 +434,35 @@ export async function optimizePdfFile(
       savingsPercent: percent(input.size - optimizedFile.size, input.size),
       optimized: true,
       status: "optimized",
-      engine: "qpdf-wasm",
+      engine: optimized.engine,
+      compressionProfile: optimized.compressionProfile,
     };
 
     emit({
       ...result,
       file: undefined,
       fileName: input.name,
-      message: "Optimization successful and verified.",
+      message: "Powerful compression successful and verified.",
     });
+
     return result;
   } catch (error) {
     console.warn("PDF optimization skipped; uploading original file.", error);
     const fallback = originalResult(input, "original-kept");
     const reason = error instanceof Error ? error.message : String(error);
-    onProgress?.("Optimization could not be applied; uploading the original PDF.");
+
+    onProgress?.(
+      "Advanced compression could not be applied; uploading the original PDF.",
+    );
     emit({
       ...fallback,
       file: undefined,
       fileName: input.name,
       validationReason: reason,
-      message: "Optimization could not be applied — the original PDF is kept safely.",
+      message:
+        "Advanced compression could not be applied — the original PDF is kept safely.",
     });
+
     return fallback;
   }
 }
