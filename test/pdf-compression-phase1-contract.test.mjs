@@ -37,9 +37,10 @@ test("Phase 1 reserves a private PDF staging bucket", () => {
   assert.match(migration, /application\/pdf/);
 });
 
-test("Job API requires explicit user/secret auth and tenant-source binding", () => {
-  assert.match(config, /\[functions\.pdf-compression-jobs\][\s\S]*verify_jwt = false/);
-  assert.match(functionSource, /withSupabase\(\{ auth: \["user", "secret"\] \}/);
+test("Job API requires JWT, tenant membership and explicit tenant-source binding", () => {
+  assert.match(config, /\[functions\.pdf-compression-jobs\][\s\S]*verify_jwt = true/);
+  assert.match(functionSource, /isTenantMember/);
+  assert.match(functionSource, /sourceIsBoundToTenant/);
   assert.match(functionSource, /compression_tenant_sources/);
   assert.match(functionSource, /return json\(job, 202\)/);
   assert.doesNotMatch(functionSource, /SUPABASE_SERVICE_ROLE_KEY.*browser/i);
