@@ -20,7 +20,7 @@ test("PDF upload enters the server-side queue instead of client compression", ()
   assert.match(jobs, /functions\.invoke\("pdf-compression-jobs"/);
   assert.match(jobs, /lg:pdf-optimization/);
   assert.match(jobs, /trackPdfCompressionJob/);
-  assert.match(worker, /withSupabase\(\{ auth: \["user", "secret"\] \}\)/);
+  assert.match(worker, /withSupabase\(\{ auth: \["user", "secret"\] \}\s*,/);
   assert.match(worker, /EdgeRuntime\.waitUntil\(processJob/);
 });
 

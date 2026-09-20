@@ -10,7 +10,7 @@ test("Phase 2 adds worker claim metadata and retry support", () => {
   assert.match(migration, /worker_id text/);
   assert.match(migration, /retry_pdf_compression_job/);
   assert.match(migration, /membership_role = 'owner'/);
-  assert.match(migration, /public\\.app_role\\(\\) = 'admin'/);
+  assert.match(migration, /public\.app_role\(\) = 'admin'/);
 });
 
 test("Worker has an explicit resource and validation boundary", () => {
