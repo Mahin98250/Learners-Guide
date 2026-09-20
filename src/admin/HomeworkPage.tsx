@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { delR, gdb, C, subjectsForClasses } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
 import { compressFile } from "@/lg/fileCompression";
+import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
 
 type Row = Record<string, any>;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
@@ -60,6 +61,11 @@ export default function HomeworkPage() {
       }
       const { error: insertError } = await supabase.from("homework").insert({ id, cls: String(selectedBatch.cls || ""), sec: String(selectedBatch.sec || ""), batch_id: selectedBatch.id, subject: form.subject, desc: form.desc.trim(), given: form.given, due: form.due, tid: form.teacherId || null, completedby: [], pdfname: form.pdfName || null, pdfdata: null, storage_path: storagePath || null, file_size: uploadFile?.size || null, mime_type: uploadFile ? "application/pdf" : null });
       if (insertError) throw insertError;
+      if (storagePath && /\.pdf$/i.test(storagePath)) {
+        void enqueuePdfCompressionJob("homework", storagePath).catch((queueError) =>
+          console.warn("PDF compression queue unavailable; original upload kept.", queueError),
+        );
+      }
       setFile(null); setForm({ batchId: "", teacherId: "", subject: "", desc: "", given: new Date().toISOString().slice(0, 10), due: "", pdfName: "" }); await load();
     } catch (e) {
       if (storagePath) await supabase.storage.from("homework").remove([storagePath]);
