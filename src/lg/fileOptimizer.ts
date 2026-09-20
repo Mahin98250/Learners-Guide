@@ -62,6 +62,7 @@ async function inspectPdf(
     const result = await qpdf.run({
       inputs: { "input.pdf": bytes },
       args: ["--show-npages", "input.pdf"],
+      outputs: [],
     });
 
     if (result.exitCode !== 0 && result.exitCode !== 3) {
@@ -230,7 +231,9 @@ export async function optimizePdfFile(
     });
     onProgress?.("Optimization verified. Preparing upload…");
 
-    const optimizedFile = new File([optimized.bytes], input.name, {
+    const optimizedBuffer = new ArrayBuffer(optimized.bytes.byteLength);
+    new Uint8Array(optimizedBuffer).set(optimized.bytes);
+    const optimizedFile = new File([optimizedBuffer], input.name, {
       type: PDF_MIME,
       lastModified: input.lastModified,
     });
