@@ -5,11 +5,24 @@ import { PDFDocument } from "npm:@cantoo/pdf-lib@2.11.0";
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
 const MIN_PDF_BYTES = 256 * 1024;
 const TMP_BUCKET = "pdf-compression-tmp";
-const ENGINE = "cantoo-pdf-lib-structural-v1";
+const STRUCTURAL_ENGINE = "cantoo-pdf-lib-structural-v1";
+const RASTER_ENGINE = "sharp-pdf-raster-v1";
+const DEFAULT_RASTER_WORKER_URL = "https://learners-guide.vercel.app/api/pdf-compression-worker";
 const allowedBuckets = new Set(["homework", "materials"]);
 const allowedProfiles = new Set(["recommended", "extreme", "less"]);
 
 type AdminClient = any;
+
+type RasterWorkerResult = {
+  status: "candidate" | "no-change" | "invalid-candidate";
+  bytes?: Uint8Array;
+  stats?: {
+    imagesScanned?: number;
+    imagesRecompressed?: number;
+    rasterOriginalBytes?: number;
+    rasterFinalBytes?: number;
+  };
+};
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -61,7 +74,6 @@ async function claimJob(admin: AdminClient, jobId: string) {
       status: "processing",
       started_at: new Date().toISOString(),
       worker_id: workerId,
-      attempt_count: 1,
     })
     .eq("id", jobId)
     .eq("status", "queued")
@@ -72,13 +84,123 @@ async function claimJob(admin: AdminClient, jobId: string) {
   return data;
 }
 
+async function runRasterWorker(
+  admin: AdminClient,
+  job: {
+    id: string;
+    profile: "recommended" | "extreme" | "less";
+  },
+  inputTempPath: string,
+  outputTempPath: string,
+): Promise<RasterWorkerResult | null> {
+  const workerUrl =
+    Deno.env.get("PDF_COMPRESSION_RASTER_WORKER_URL")?.trim() || DEFAULT_RASTER_WORKER_URL;
+
+  try {
+    const { data: signedInput, error: inputSignError } = await admin.storage
+      .from(TMP_BUCKET)
+      .createSignedUrl(inputTempPath, 300);
+    if (inputSignError || !signedInput?.signedUrl) {
+      console.warn("pdf-compression: unable to create raster input URL");
+      return null;
+    }
+
+    const { data: signedOutput, error: outputSignError } = await admin.storage
+      .from(TMP_BUCKET)
+      .createSignedUploadUrl(outputTempPath, { upsert: true });
+    if (outputSignError || !signedOutput?.signedUrl) {
+      console.warn("pdf-compression: unable to create raster output URL");
+      return null;
+    }
+
+    const response = await fetch(workerUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jobId: job.id,
+        profile: job.profile,
+        sourceUrl: signedInput.signedUrl,
+        uploadUrl: signedOutput.signedUrl,
+        outputPath: outputTempPath,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("pdf-compression: raster worker returned HTTP", response.status);
+      return null;
+    }
+
+    const result = await response.json().catch(() => null);
+    if (!result || typeof result !== "object") return null;
+
+    const stats = {
+      imagesScanned: Number(result.stats?.imagesScanned || 0),
+      imagesRecompressed: Number(result.stats?.imagesRecompressed || 0),
+      rasterOriginalBytes: Number(result.stats?.rasterOriginalBytes || 0),
+      rasterFinalBytes: Number(result.stats?.rasterFinalBytes || 0),
+    };
+
+    if (result.status === "no-change" || result.status === "invalid-candidate") {
+      return { status: result.status, stats };
+    }
+
+    if (result.status !== "candidate" || result.outputPath !== outputTempPath) {
+      console.warn("pdf-compression: raster worker returned an unexpected candidate");
+      return null;
+    }
+
+    const { data: blob, error: downloadError } = await admin.storage
+      .from(TMP_BUCKET)
+      .download(outputTempPath);
+
+    if (downloadError || !blob) {
+      console.warn("pdf-compression: raster candidate could not be downloaded");
+      return null;
+    }
+
+    return {
+      status: "candidate",
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+      stats,
+    };
+  } catch (error) {
+    console.warn(
+      "pdf-compression: raster worker unavailable; structural fallback will be used.",
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
+}
+
+async function validateCandidate(candidate: Uint8Array, expectedPageCount: number) {
+  try {
+    if (candidate.byteLength === 0 || candidate.byteLength > MAX_PDF_BYTES) return false;
+    const pdf = await PDFDocument.load(candidate, {
+      ignoreEncryption: false,
+      preserveXFA: true,
+      throwOnInvalidObject: true,
+      updateMetadata: false,
+    });
+    return pdf.getPageCount() === expectedPageCount;
+  } catch {
+    return false;
+  }
+}
+
 async function processJob(admin: AdminClient, jobId: string) {
   const job = await claimJob(admin, jobId);
   if (!job) return { status: "not-claimed", jobId };
 
-  const tempRoot = `${job.tenant_id}/${job.id}`;
-  const inputTempPath = `${tempRoot}/input.pdf`;
-  const outputTempPath = `${tempRoot}/output.pdf`;
+  const tempRoot = String(job.tenant_id) + "/" + String(job.id);
+  const inputTempPath = tempRoot + "/input.pdf";
+  const outputTempPath = tempRoot + "/output.pdf";
+
+  let rasterStats = {
+    imagesScanned: 0,
+    imagesRecompressed: 0,
+    rasterOriginalBytes: 0,
+    rasterFinalBytes: 0,
+  };
 
   try {
     if (!allowedBuckets.has(job.source_bucket) || !isPdfPath(job.source_path)) {
@@ -114,7 +236,7 @@ async function processJob(admin: AdminClient, jobId: string) {
     if (originalSize < MIN_PDF_BYTES) {
       await markJob(admin, job.id, {
         status: "original-kept",
-        engine: ENGINE,
+        engine: STRUCTURAL_ENGINE,
         original_size: originalSize,
         final_size: originalSize,
         completed_at: new Date().toISOString(),
@@ -154,47 +276,87 @@ async function processJob(admin: AdminClient, jobId: string) {
       throw Object.assign(new Error("Source PDF has an invalid page count"), { code: "SOURCE_VALIDATION_FAILED" });
     }
 
-    const candidate = await sourcePdf.save({
-      useObjectStreams: true,
-      addDefaultPage: false,
-      updateFieldAppearances: false,
-      objectsPerTick: 25,
-    });
+    let candidate: Uint8Array | null = null;
+    let engine = STRUCTURAL_ENGINE;
+
+    const rasterResult = await runRasterWorker(
+      admin,
+      { id: String(job.id), profile: job.profile },
+      inputTempPath,
+      outputTempPath,
+    );
+
+    if (rasterResult?.stats) {
+      rasterStats = {
+        imagesScanned: Math.max(0, rasterResult.stats.imagesScanned || 0),
+        imagesRecompressed: Math.max(0, rasterResult.stats.imagesRecompressed || 0),
+        rasterOriginalBytes: Math.max(0, rasterResult.stats.rasterOriginalBytes || 0),
+        rasterFinalBytes: Math.max(0, rasterResult.stats.rasterFinalBytes || 0),
+      };
+    }
+
+    if (rasterResult?.status === "candidate" && rasterResult.bytes) {
+      const rasterCandidateIsValid =
+        rasterResult.bytes.byteLength < originalSize &&
+        (await validateCandidate(rasterResult.bytes, pageCount));
+
+      if (rasterCandidateIsValid) {
+        candidate = rasterResult.bytes;
+        engine = RASTER_ENGINE;
+      } else {
+        console.warn("pdf-compression: raster candidate rejected; structural fallback will run");
+      }
+    }
+
+    if (!candidate) {
+      candidate = await sourcePdf.save({
+        useObjectStreams: true,
+        addDefaultPage: false,
+        updateFieldAppearances: false,
+        objectsPerTick: 25,
+      });
+
+      if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
+        throw Object.assign(new Error("Compression engine returned an empty PDF"), { code: "ENGINE_EMPTY_OUTPUT" });
+      }
+
+      const { error: tempOutputError } = await admin.storage.from(TMP_BUCKET).upload(
+        outputTempPath,
+        candidate,
+        {
+          upsert: true,
+          contentType: "application/pdf",
+          cacheControl: "no-store",
+        },
+      );
+      if (tempOutputError) {
+        throw Object.assign(new Error("Unable to stage optimized PDF"), { code: "STAGING_OUTPUT_FAILED" });
+      }
+
+      engine = STRUCTURAL_ENGINE;
+    }
 
     if (!(candidate instanceof Uint8Array) || candidate.byteLength === 0) {
-      throw Object.assign(new Error("Compression engine returned an empty PDF"), { code: "ENGINE_EMPTY_OUTPUT" });
+      throw Object.assign(new Error("Compression produced an empty PDF"), { code: "ENGINE_EMPTY_OUTPUT" });
     }
 
-    const { error: tempOutputError } = await admin.storage
-      .from(TMP_BUCKET)
-      .upload(outputTempPath, candidate, {
-        upsert: true,
-        contentType: "application/pdf",
-        cacheControl: "no-store",
-      });
-    if (tempOutputError) {
-      throw Object.assign(new Error("Unable to stage optimized PDF"), { code: "STAGING_OUTPUT_FAILED" });
-    }
-
-    const optimizedPdf = await PDFDocument.load(candidate, {
-      ignoreEncryption: false,
-      preserveXFA: true,
-      throwOnInvalidObject: true,
-      updateMetadata: false,
-    });
-    const optimizedPageCount = optimizedPdf.getPageCount();
-    if (optimizedPageCount !== pageCount) {
-      throw Object.assign(new Error("Optimized PDF changed page count"), { code: "PAGE_COUNT_MISMATCH" });
+    const candidateIsValid = await validateCandidate(candidate, pageCount);
+    if (!candidateIsValid) {
+      throw Object.assign(new Error("Optimized PDF failed validation"), { code: "OUTPUT_VALIDATION_FAILED" });
     }
 
     const optimizedSize = candidate.byteLength;
     if (optimizedSize >= originalSize) {
       await markJob(admin, job.id, {
         status: "original-kept",
-        engine: ENGINE,
+        engine,
         original_size: originalSize,
         final_size: originalSize,
         page_count: pageCount,
+        image_count: rasterStats.imagesScanned,
+        image_recompressed_count: rasterStats.imagesRecompressed,
+        raster_original_bytes: rasterStats.rasterOriginalBytes,
+        raster_final_bytes: rasterStats.rasterFinalBytes,
         completed_at: new Date().toISOString(),
       });
       return { status: "original-kept", jobId: job.id, pageCount };
@@ -204,10 +366,14 @@ async function processJob(admin: AdminClient, jobId: string) {
     if (!latestSourceObject || latestSourceObject.updated_at !== sourceObject.updated_at) {
       await markJob(admin, job.id, {
         status: "original-kept",
-        engine: ENGINE,
+        engine,
         original_size: originalSize,
         final_size: originalSize,
         page_count: pageCount,
+        image_count: rasterStats.imagesScanned,
+        image_recompressed_count: rasterStats.imagesRecompressed,
+        raster_original_bytes: rasterStats.rasterOriginalBytes,
+        raster_final_bytes: rasterStats.rasterFinalBytes,
         error_code: "SOURCE_CHANGED",
         error_message: "Source changed while compression was running; original was not replaced.",
         completed_at: new Date().toISOString(),
@@ -230,12 +396,16 @@ async function processJob(admin: AdminClient, jobId: string) {
     await updateMetadata(admin, job.source_bucket, job.source_path, optimizedSize);
     await markJob(admin, job.id, {
       status: "optimized",
-      engine: ENGINE,
+      engine,
       original_size: originalSize,
       final_size: optimizedSize,
       page_count: pageCount,
       error_code: null,
       error_message: null,
+      image_count: rasterStats.imagesScanned,
+      image_recompressed_count: rasterStats.imagesRecompressed,
+      raster_original_bytes: rasterStats.rasterOriginalBytes,
+      raster_final_bytes: rasterStats.rasterFinalBytes,
       completed_at: new Date().toISOString(),
     });
 
@@ -247,6 +417,8 @@ async function processJob(admin: AdminClient, jobId: string) {
       optimizedSize,
       savingsBytes: originalSize - optimizedSize,
       savingsPercent: Number((((originalSize - optimizedSize) / originalSize) * 100).toFixed(2)),
+      imageCount: rasterStats.imagesScanned,
+      imageRecompressedCount: rasterStats.imagesRecompressed,
     };
   } catch (error) {
     const code = error && typeof error === "object" && "code" in error ? String(error.code) : "COMPRESSION_FAILED";
@@ -254,12 +426,16 @@ async function processJob(admin: AdminClient, jobId: string) {
     console.error("pdf-compression job failed:", job.id, code, message);
     await markJob(admin, job.id, {
       status: "failed",
-      engine: ENGINE,
+      engine: STRUCTURAL_ENGINE,
+      image_count: rasterStats.imagesScanned,
+      image_recompressed_count: rasterStats.imagesRecompressed,
+      raster_original_bytes: rasterStats.rasterOriginalBytes,
+      raster_final_bytes: rasterStats.rasterFinalBytes,
       error_code: code,
       error_message: message.slice(0, 1000),
       completed_at: new Date().toISOString(),
     }).catch((markError) => console.error("pdf-compression failed-state update:", markError));
-    return { status: "failed", jobId: job.id, errorCode: code };
+    return { status: "failed", jobId, errorCode: code };
   } finally {
     await admin.storage.from(TMP_BUCKET).remove([inputTempPath, outputTempPath]).catch(() => undefined);
   }
@@ -398,7 +574,7 @@ async function enqueueJob(admin: AdminClient, userId: string, role: string, body
       source_path: path,
       profile,
       status: "queued",
-      attempt_count: 0,
+      attempt_count: 1,
     })
     .select("id,tenant_id,status,profile,created_at")
     .single();
