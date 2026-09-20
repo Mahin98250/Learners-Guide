@@ -23,18 +23,17 @@ test("PDF optimizer uses qpdf WASM and safe fallback", () => {
   assert.doesNotMatch(optimizer, /@fileslim\/compress/);
 });
 
-test("PDF inspection declares an output name and preserves the original page count", () => {
+test("PDF inspection uses qpdf stdout and preserves the original page count", () => {
   assert.match(optimizer, /async function inspectPdf/);
-  assert.match(optimizer, /--json/);
-  assert.match(optimizer, /--json-key=pages/);
-  assert.match(optimizer, /const inspectionName = "inspection\.json"/);
-  assert.match(optimizer, /outputs: \[inspectionName\]/);
-  assert.match(optimizer, /result\.outputs\[inspectionName\]/);
-  assert.match(optimizer, /JSON\.parse/);
-  assert.match(optimizer, /Array\.isArray\(pages\)/);
+  assert.match(optimizer, /--show-npages/);
+  assert.match(optimizer, /result\.stdout/);
+  assert.match(optimizer, /Number\(rawPageCount\)/);
   assert.match(optimizer, /source\.pageCount/);
   assert.match(optimizer, /inspection\.pageCount === source\.pageCount/);
-  assert.doesNotMatch(optimizer, /--show-npages/);
+  assert.doesNotMatch(optimizer, /outputs: \[\]/);
+  assert.doesNotMatch(optimizer, /--json-key=pages/);
+  assert.doesNotMatch(optimizer, /inspection\.json/);
+  assert.doesNotMatch(optimizer, /JSON\.parse/);
   assert.doesNotMatch(optimizer, /validatePdf/);
   assert.doesNotMatch(optimizer, /PDFDocument\.load/);
   assert.doesNotMatch(optimizer, /throwOnInvalidObject/);
