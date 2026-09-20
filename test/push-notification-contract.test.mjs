@@ -4,7 +4,7 @@ import fs from "node:fs";
 const sw = fs.readFileSync("public/sw.js", "utf8");
 const push = fs.readFileSync("supabase/functions/web-push/index.ts", "utf8");
 
-assert.match(sw, /const CACHE = "learners-guide-v35"/);
+assert.match(sw, /const CACHE = "learners-guide-v37"/);
 assert.match(sw, /tag\s*=\s*payload\.notificationId/);
 assert.match(sw, /getNotifications\(\{ tag \}\)/);
 assert.match(sw, /renotify:\s*false/);

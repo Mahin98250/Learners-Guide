@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { C, uid } from "@/lg/data";
+import { C, uid } from "@/lg/data/constants";
 import { supabase } from "@/lg/supabase";
-import { optimizePdfFile } from "@/lg/fileOptimizer";
+import { compressFile } from "@/lg/fileCompression";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
 import { NotifPanel } from "@/lg/panels";
 import { THHome, THSchedule, THAttendance } from "@/lg/teacher";
@@ -141,13 +141,10 @@ export function T5HomeworkWithFiles({ teacher }) {
       };
 
       let uploadFile = form.file;
-      if (uploadFile?.type === "application/pdf" || uploadFile?.name.toLowerCase().endsWith(".pdf")) {
-        const optimized = await optimizePdfFile(uploadFile, setProcessing);
+      if (uploadFile) {
+        const optimized = await compressFile(uploadFile, setProcessing);
         uploadFile = optimized.file;
         if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
-      }
-
-      if (uploadFile) {
         const safe = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         path = `teacher/${teacher.id}/${selected.id}/${crypto.randomUUID()}-${safe}`;
         const { error: insertError } = await supabase.from("homework").insert({
@@ -236,7 +233,7 @@ export function T5HomeworkWithFiles({ teacher }) {
             <textarea value={form.desc} onChange={(event) => setForm({ ...form, desc: event.target.value })} placeholder="Homework description" rows={3} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9, resize: "vertical" }} />
             <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} style={{ width: "100%", padding: 11, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 9 }} />
             <input type="file" accept={ACCEPT} disabled={saving} onChange={chooseFile} style={{ width: "100%", padding: 8, borderRadius: 10, border: `1px dashed ${C.border}`, marginBottom: 6 }} />
-            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{form.file ? `📎 ${fileLabel(form.file)}` : "Optional attachment · PDF, PPT/PPTX, DOC/DOCX, PNG/JPG · max 50 MB"}{form.file?.type === "application/pdf" ? " · PDF optimized automatically" : ""}</div>
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{form.file ? `📎 ${fileLabel(form.file)}` : "Optional attachment · PDF, PPT/PPTX, DOC/DOCX, PNG/JPG · max 50 MB"}{form.file ? " · files optimized automatically when safe" : ""}</div>
             <GBtn ch={saving ? (processing || "Saving…") : "Assign Homework ✓"} onClick={save} />
           </>
         )}
@@ -291,7 +288,7 @@ export function TeacherAppWithHomeworkFiles({ user, onLogout }) {
         : tab === "homework"
           ? <T5HomeworkWithFiles teacher={teacher} />
           : tab === "tests"
-            ? <TTests teacher={teacher} />
+            ? <><TTests teacher={teacher} /><TTestResults teacher={teacher} /></>
             : tab === "materials"
               ? <T6Materials teacher={teacher} />
               : <TeacherAnnouncements teacher={teacher} />;

@@ -59,14 +59,22 @@ jobs:
             fi
           fi
 
-          mapfile -t FILES < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- \
+          mapfile -t CHANGED_FILES < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- \
             '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.css' '*.md' '*.yml' '*.yaml' \
             ':!package-lock.json' ':!.github/workflows/*')
+          FILES=()
+          for file in "${CHANGED_FILES[@]}"; do
+            if [[ -f "$file" ]]; then
+              FILES+=("$file")
+            else
+              echo "Skipping deleted file: $file"
+            fi
+          done
 
           if (( ${#FILES[@]} == 0 )); then
-            echo "No changed files require Prettier formatting."
+            echo "No existing changed files require Prettier formatting."
           else
-            printf 'Formatting %s changed file(s) with Prettier:\n' "${#FILES[@]}"
+            printf 'Formatting %s existing changed file(s) with Prettier:\n' "${#FILES[@]}"
             printf ' - %s\n' "${FILES[@]}"
             npx prettier --write "${FILES[@]}"
           fi

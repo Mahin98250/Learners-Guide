@@ -1,0 +1,54 @@
+import { gdb } from "@/lg/data";
+import { supabase } from "@/lg/supabase";
+import type { ProvisionRole, Kind, Row } from "./AdminRecordsConstants";
+
+export async function ensureAdminSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error(`Unable to read administrator session: ${error.message}`);
+  let session = data.session;
+  const expiresAt = Number(session?.expires_at || 0);
+  if (!session || (expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000) + 60)) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error || !refreshed.data.session) {
+      await supabase.auth.signOut({ scope: "local" });
+      throw new Error("Your administrator session has expired. Please sign in again.");
+    }
+    session = refreshed.data.session;
+  }
+  if (session.user.app_metadata?.role !== "admin") throw new Error("Administrator access is required to manage student accounts.");
+  return session;
+}
+
+export async function provision(role: ProvisionRole, loginId: string, name: string, ref: string, action: "create" | "update" | "delete", authId?: string | null, password?: string) {
+  await ensureAdminSession();
+  const body: Record<string, unknown> = { action, role, loginId, name, ref };
+  if (authId) body.authId = authId;
+  if (password) body.password = password;
+  let result = await supabase.functions.invoke("admin-provision-user", { body });
+  if (result.error && /401|unauthorized|jwt|token|authorization/i.test(result.error.message || "")) {
+    await ensureAdminSession();
+    result = await supabase.functions.invoke("admin-provision-user", { body });
+  }
+  if (result.error) throw new Error(result.error.message || "Authentication service failed.");
+  if (result.data?.error) throw new Error(String(result.data.error));
+  return result.data as { authId?: string; email?: string; deleted?: boolean; repaired?: boolean; created?: boolean; updated?: boolean };
+}
+
+export const normalizePhone = (value: string): string => value.replace(/\s+/g, "").trim();
+export const validatePassword = (password: string, label: string): void => { if (password.length < 8) throw new Error(`${label} must be at least 8 characters.`); };
+export const authRowId = (authId?: string): string => authId || crypto.randomUUID();
+
+export async function nextId(kind: Kind): Promise<string> {
+  const rows = (await gdb(kind)) as Row[];
+  const field = kind === "students" ? "sid" : "tid";
+  const prefix = kind === "students" ? "LG-" : "LGT";
+  const width = kind === "students" ? 3 : 2;
+  const used = new Set(rows.map((r) => String(r[field] ?? "").trim().toUpperCase()));
+  const re = kind === "students" ? /^LG-?(\d+)$/i : /^LGT-?(\d+)$/i;
+  let max = 0;
+  for (const row of rows) { const match = String(row[field] ?? "").match(re); if (match) max = Math.max(max, Number(match[1])); }
+  let n = max + 1;
+  let value = `${prefix}${String(n).padStart(width, "0")}`;
+  while (used.has(value.toUpperCase())) { n += 1; value = `${prefix}${String(n).padStart(width, "0")}`; }
+  return value;
+}

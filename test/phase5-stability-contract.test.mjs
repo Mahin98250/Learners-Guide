@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const read = (file) => fs.readFileSync(file, "utf8");
+const dataSource = [
+  read("src/lg/data.js"),
+  read("src/lg/data/index.ts"),
+  read("src/lg/data/constants.ts"),
+  read("src/lg/data/cache.ts"),
+  read("src/lg/data/storage.ts"),
+  read("src/lg/data/queries.js"),
+  read("src/lg/data/mutations.js"),
+].join("\n");
 
 test("Phase 5: app shell has startup recovery and role-specific portal routing", () => {
   const main = read("src/main.tsx");
@@ -25,7 +34,7 @@ test("Phase 5: auth validates server-managed role and linked/institute profile s
 });
 
 test("Phase 5: shared data layer keeps explicit projections and scoped timetable reads", () => {
-  const data = read("src/lg/data.js");
+  const data = dataSource;
   assert.match(data, /TABLE_SELECTS/);
   assert.match(data, /selectForTable\(t\)/);
   assert.doesNotMatch(data, /from\(t\)\.select\(["']\*["']\)/);

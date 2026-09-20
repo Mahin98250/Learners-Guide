@@ -8,6 +8,15 @@ const root = process.cwd();
 
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const compact = (value) => value.replace(/[\s\uFEFF\u200B-\u200D]+/g, "");
+const dataSource = [
+  read("src/lg/data.js"),
+  read("src/lg/data/index.ts"),
+  read("src/lg/data/constants.ts"),
+  read("src/lg/data/cache.ts"),
+  read("src/lg/data/storage.ts"),
+  read("src/lg/data/queries.js"),
+  read("src/lg/data/mutations.js"),
+].join("\n");
 
 test("production contract check passes", () => {
   const result = spawnSync(process.execPath, ["scripts/production-contract-check.mjs"], {
@@ -18,7 +27,7 @@ test("production contract check passes", () => {
 });
 
 test("shared data layer keeps verified timetable projection and role scoping", () => {
-  const data = compact(read("src/lg/data.js"));
+  const data = compact(dataSource);
   assert.match(data, /constselect=\"id,batch_id,teacher_id,subject_id,subject_name,day_of_week,start_time,end_time,status\"/);
   assert.match(data, /query=query\.eq\(\"teacher_id\",ref\)/);
   assert.match(data, /from\(\"batch_students\"\)\.select\(\"batch_id\"\)/);

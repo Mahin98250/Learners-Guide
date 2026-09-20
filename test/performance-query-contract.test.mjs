@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const read = (file) => fs.readFileSync(file, "utf8");
+const dataSource = [
+  read("src/lg/data.js"),
+  read("src/lg/data/index.ts"),
+  read("src/lg/data/constants.ts"),
+  read("src/lg/data/cache.ts"),
+  read("src/lg/data/storage.ts"),
+  read("src/lg/data/queries.js"),
+  read("src/lg/data/mutations.js"),
+].join("\n");
 
 test("Performance: admin analytics keeps bounded explicit projections", () => {
   const source = read("src/admin/AdminAnalytics.tsx");
@@ -15,7 +24,7 @@ test("Performance: admin analytics keeps bounded explicit projections", () => {
 });
 
 test("Performance: shared data layer coalesces concurrent table reads", () => {
-  const source = read("src/lg/data.js");
+  const source = dataSource;
   assert.match(source, /const inflight=new Map/);
   assert.match(source, /inflight\.has\(t\)/);
   assert.match(source, /inflight\.set\(t,request\)/);
@@ -23,10 +32,10 @@ test("Performance: shared data layer coalesces concurrent table reads", () => {
 });
 
 test("Performance: shared memory cache has a bounded TTL and is reset on auth session changes", () => {
-  const source = read("src/lg/data.js");
+  const source = dataSource;
   assert.match(source, /const MEMORY_CACHE_TTL_MS=15_000/);
   assert.match(source, /expiresAt:Date\.now\(\)\+MEMORY_CACHE_TTL_MS/);
-  assert.match(source, /supabase\.auth\.onAuthStateChange\(event=>\{if\(event===\"SIGNED_IN\"\|\|event===\"SIGNED_OUT\"\)clearCache\(\)\}\)/);
+  assert.match(source, /onAuthStateChange\(\(event\)\s*=>\s*\{[^}]*SIGNED_IN[^}]*SIGNED_OUT[^}]*clearCache\(\)/s);
 });
 
 test("Performance: student timetable relies on the shared cache path", () => {
@@ -51,10 +60,17 @@ test("Performance: authenticated portal bundles are lazy-loaded after session di
   assert.doesNotMatch(source, /import \{ ParentApp \} from/);
 });
 
-test("Performance: admin bundles are lazy-loaded only on the admin route", () => {
+test("Performance: admin entry keeps login separate from the legacy panel tree", () => {
   const source = read("src/routes/admin.tsx");
-  assert.match(source, /const AdminLogin\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/ReferenceAdminPanel["']\s*\)/);
+  assert.match(source, /const AdminLogin\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/AdminLogin["']\s*\)/);
   assert.match(source, /const AdminWithDrive\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/admin\/AdminWithDrive["']\s*\)/);
   assert.doesNotMatch(source, /import \{ AdminLogin \} from/);
   assert.doesNotMatch(source, /import \{ AdminWithDrive \} from/);
+  assert.doesNotMatch(source, /ReferenceAdminPanel/);
+  const login = read("src/admin/AdminLogin.tsx");
+  assert.match(login, /from ["']@\/lg\/ui\/branding["']/);
+  assert.match(login, /from ["']@\/lg\/ui\/styles["']/);
+  assert.match(login, /from ["']@\/lg\/data\/constants["']/);
+  assert.doesNotMatch(login, /from ["']@\/lg\/ui["']/);
+  assert.doesNotMatch(login, /from ["']@\/lg\/data["']/);
 });

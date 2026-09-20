@@ -4,11 +4,20 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const dataSource = fs.readFileSync(path.join(root, "src/lg/data.js"), "utf8");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const dataSource = [
+  read("src/lg/data.js"),
+  read("src/lg/data/index.ts"),
+  read("src/lg/data/constants.ts"),
+  read("src/lg/data/cache.ts"),
+  read("src/lg/data/storage.ts"),
+  read("src/lg/data/queries.js"),
+  read("src/lg/data/mutations.js"),
+].join("\n");
 
 test("shared data loader has a bounded in-memory cache", () => {
   assert.match(dataSource, /MEMORY_CACHE_TTL_MS=15_000/);
-  assert.match(dataSource, /const memoryCache=new Map\(\)/);
+  assert.match(dataSource, /const memoryCache=new Map/);
   assert.match(dataSource, /getMemoryCache\(t\)/);
   assert.match(dataSource, /setMemoryCache\(t,rows\)/);
 });
