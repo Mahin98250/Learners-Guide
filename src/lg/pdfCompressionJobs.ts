@@ -25,6 +25,8 @@ export async function enqueuePdfCompressionJob(
         optimizedSize: null,
         savingsBytes: null,
         savingsPercent: null,
+        imageScannedCount: null,
+        imageRecompressedCount: null,
       },
     }),
   );
@@ -44,7 +46,9 @@ async function trackPdfCompressionJob(jobId: string, path: string) {
 
     const { data: job, error } = await supabase
       .from("pdf_compression_jobs")
-      .select("status,original_size,final_size,savings_bytes,page_count,error_code,error_message")
+      .select(
+        "status,engine,original_size,final_size,savings_bytes,page_count,image_count,image_recompressed_count,raster_original_bytes,raster_final_bytes,error_code,error_message",
+      )
       .eq("id", jobId)
       .maybeSingle();
 
@@ -59,17 +63,27 @@ async function trackPdfCompressionJob(jobId: string, path: string) {
         ? Number(((savedBytes / originalSize) * 100).toFixed(2))
         : 0;
 
+    const detail = {
+      fileName: path.split("/").pop() || "PDF file",
+      originalSize,
+      optimizedSize: finalSize,
+      savingsBytes: savedBytes,
+      savingsPercent,
+      imageScannedCount: Number(job.image_count || 0),
+      imageRecompressedCount: Number(job.image_recompressed_count || 0),
+      engine: job.engine || null,
+    };
+
     if (job.status === "optimized") {
       window.dispatchEvent(
         new CustomEvent("lg:pdf-optimization", {
           detail: {
+            ...detail,
             status: "optimized",
-            fileName: path.split("/").pop() || "PDF file",
-            originalSize,
-            optimizedSize: finalSize,
-            savingsBytes: savedBytes,
-            savingsPercent,
-            message: "Server-side PDF compression completed and the smaller PDF replaced the original safely.",
+            message:
+              Number(job.image_recompressed_count || 0) > 0
+                ? "PDF images were recompressed, the result was validated, and the smaller server-generated PDF replaced the original safely."
+                : "Server-side PDF compression completed and the smaller PDF replaced the original safely.",
           },
         }),
       );
@@ -77,10 +91,8 @@ async function trackPdfCompressionJob(jobId: string, path: string) {
       window.dispatchEvent(
         new CustomEvent("lg:pdf-optimization", {
           detail: {
+            ...detail,
             status: "original-kept",
-            fileName: path.split("/").pop() || "PDF file",
-            originalSize,
-            optimizedSize: finalSize,
             savingsBytes: 0,
             savingsPercent: 0,
             validationReason: job.error_message || undefined,
@@ -92,14 +104,15 @@ async function trackPdfCompressionJob(jobId: string, path: string) {
       window.dispatchEvent(
         new CustomEvent("lg:pdf-optimization", {
           detail: {
+            ...detail,
             status: "failed",
-            fileName: path.split("/").pop() || "PDF file",
-            originalSize,
             optimizedSize: originalSize,
             savingsBytes: 0,
             savingsPercent: 0,
-            validationReason: job.error_message || job.error_code || "Unknown compression failure",
-            message: "Server-side PDF compression failed safely. The original file was kept.",
+            validationReason:
+              job.error_message || job.error_code || "Unknown compression failure",
+            message:
+              "Server-side PDF compression failed safely. The original file was kept.",
           },
         }),
       );
