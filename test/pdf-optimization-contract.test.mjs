@@ -66,7 +66,7 @@ test("PDF optimization reports processing, success and safe fallback states", ()
   assert.match(optimizer, /status: "processing"/);
   assert.match(optimizer, /status: "optimized"/);
   assert.match(optimizer, /status: "original-kept"/);
-  assert.match(optimizer, /originalResult\(input, "failed"\)/);
+  assert.match(optimizer, /const fallback = originalResult\(input, "failed"\)/);
   assert.match(optimizer, /savingsBytes/);
   assert.match(optimizer, /savingsPercent/);
 });
