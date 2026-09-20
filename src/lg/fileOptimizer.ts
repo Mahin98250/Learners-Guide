@@ -54,9 +54,9 @@ async function inspectPdf(
   label: string,
 ): Promise<PdfInspection> {
   try {
-    // qpdf-run 0.2.1 does not reliably support stdout-only inspection in all
-    // builds, so page-count validation is handled by the already-installed
-    // pdf-lib dependency. qpdf itself remains responsible for transformation.
+    // qpdf-run 0.2.1 requires a declared output file for every run, so stdout-only
+    // inspection cannot be used here. The already-installed pdf-lib dependency
+    // handles page-count validation; qpdf remains responsible for transformation.
     const { PDFDocument } = await import("pdf-lib");
     const pdf = await PDFDocument.load(bytes);
     const pageCount = pdf.getPageCount();
