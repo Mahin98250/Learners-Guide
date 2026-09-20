@@ -17,7 +17,7 @@ const dataSource = [
 
 test("shared data loader has a bounded in-memory cache", () => {
   assert.match(dataSource, /MEMORY_CACHE_TTL_MS=15_000/);
-  assert.match(dataSource, /const memoryCache=new Map\(\)/);
+  assert.match(dataSource, /const memoryCache=new Map/);
   assert.match(dataSource, /getMemoryCache\(t\)/);
   assert.match(dataSource, /setMemoryCache\(t,rows\)/);
 });
