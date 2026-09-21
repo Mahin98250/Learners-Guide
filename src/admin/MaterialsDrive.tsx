@@ -269,7 +269,7 @@ export function MaterialsDrive() {
 
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-    const path = `${crypto.randomUUID()}.${ext}`;
+    const path = `institute/${instituteId}/materials/${crypto.randomUUID()}.${ext}`;
     setBusy(true);
     setError("");
     try {
