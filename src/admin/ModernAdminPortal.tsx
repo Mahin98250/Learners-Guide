@@ -95,9 +95,10 @@ function PageFallback() {
 }
 
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
-  const { tenant, membership } = useInstituteWorkspace();
+  const { tenant, membership, memberships, selectInstitute } = useInstituteWorkspace();
   const workspaceName = tenant?.display_name || tenant?.name || "Learner's Guide";
   const workspaceColor = tenant?.primary_color || "#4357e8";
+  const workspaceOptions = memberships.length > 1 && !tenant ? memberships : [];
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
@@ -134,7 +135,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
         </div>
       </aside>
       <main className="modern-admin-main">
-        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">{workspaceName} <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
+        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">{workspaceName} <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div>{workspaceOptions.length > 1 && <select aria-label="Switch institute workspace" value={membership?.institute_id || ""} onChange={(event) => { void selectInstitute(event.target.value); }} style={{ border: "1px solid #d7ddea", borderRadius: 10, padding: "8px 10px", background: "#fff", color: "#24324a", fontWeight: 700, maxWidth: 240 }}>{workspaceOptions.map((option) => <option key={option.institute_id} value={option.institute_id}>{option.display_name || option.institute_name || option.slug || option.institute_id} · {option.role}</option>)}</select>}<button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
         <section className="modern-admin-content"><Suspense fallback={<PageFallback />}>{renderPage()}</Suspense></section>
       </main>
     </div>
