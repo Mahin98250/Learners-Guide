@@ -23,6 +23,6 @@ test("admin provisioning does not use app_metadata admin role as the caller gate
 });
 
 test("global account deletion is blocked across active institute memberships", () => {
-  assert.match(source, /active in another institute/);
+  assert.match(source, /Remove this account from every institute/);
   assert.match(source, /targetMemberships/);
 });
