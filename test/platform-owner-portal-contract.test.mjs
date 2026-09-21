@@ -24,5 +24,5 @@ test("platform owner control center exposes protected operational controls",()=>
   assert.match(portal,/platform_disable_domain/);
   assert.match(portal,/platform_update_settings/);
   assert.match(portal,/Edit platform settings/);
-  assert.match(portal,/Audit trail/);
+  assert.match(portal,/AUDIT TRAIL/);
 });
