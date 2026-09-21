@@ -95,23 +95,10 @@ function CreateAdminPage() {
     const { data, error: invokeError } = await supabase.functions.invoke("admin-provision-user", { body: { action: "create", role: "admin", loginId: loginEmail.trim(), password, name: name.trim(), instituteId } });
     if (invokeError) setError(invokeError.message || "Unable to create administrator account.");
     else if (data?.error) setError(data.error);
-    else if (!data?.authId) setError("Administrator authentication account was created, but no account ID was returned for institute linking.");
+    else if (!data?.authId) setError("Administrator authentication account was created, but no account ID was returned.");
     else {
-      const { error: membershipError } = await supabase.rpc("sync_institute_account_membership", {
-        p_institute_id: instituteId,
-        p_auth_id: data.authId,
-        p_role_key: "admin",
-        p_name: name.trim(),
-        p_email: String(data.email || loginEmail.trim()),
-        p_phone: loginEmail.trim(),
-        p_ref: null,
-      });
-      if (membershipError) {
-        setError(`Administrator account was created but institute access could not be linked: ${membershipError.message}`);
-      } else {
-        setSuccess(`Administrator account created successfully. Login: ${data?.email || loginEmail.trim()}`);
-        setName(""); setLoginEmail(""); setPassword(""); setConfirm("");
-      }
+      setSuccess(`Administrator account created successfully. Login: ${data?.email || loginEmail.trim()}`);
+      setName(""); setLoginEmail(""); setPassword(""); setConfirm("");
     }
     setLoading(false);
   };
