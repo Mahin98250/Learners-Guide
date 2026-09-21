@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { PlatformMembershipPanel } from "@/platform/PlatformMembershipPanel";
 
 type Institute = {
   id: string;
@@ -250,6 +251,8 @@ export default function PlatformOwnerPortal() {
             <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: "#475569" }}>AUDIT</div>
             <h2 style={{ margin: "4px 0", fontSize: 22 }}>Recent platform activity</h2>
           </div>
+<PlatformMembershipPanel institutes={institutes.map(({ id, name, slug }) => ({ id, name, slug }))} />
+
           {audit.map((item) => (
             <div key={item.id} style={{ padding: 14, borderBottom: "1px solid #eef1f6", display: "grid", gridTemplateColumns: "160px 190px 1fr", gap: 12 }}>
               <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(item.created_at)}</div>
