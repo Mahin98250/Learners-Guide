@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
+import { InstituteWorkspaceGate, InstituteWorkspaceProvider } from "@/lg/tenant-context";
 
 const AdminLogin = lazy(() =>
   import("@/admin/AdminLogin").then((module) => ({ default: module.AdminLogin })),
@@ -69,8 +70,12 @@ function AdminRoute() {
     );
   }
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>}>
-      <AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />
-    </Suspense>
+    <InstituteWorkspaceProvider>
+      <InstituteWorkspaceGate>
+        <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>}>
+          <AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />
+        </Suspense>
+      </InstituteWorkspaceGate>
+    </InstituteWorkspaceProvider>
   );
 }
