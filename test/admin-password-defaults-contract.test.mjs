@@ -12,15 +12,12 @@ test("active admin credential defaults are centralized and legacy admin tree is 
   const teachers = read("src/admin/records/TeacherRecordsPage.tsx");
   const teacherRecords = read("src/admin/records/AdminRecordsPage.tsx");
 
-  assert.match(constants, /DEFAULT_STUDENT_PASSWORD\s*=\s*"Student@1234"/);
-  assert.match(constants, /DEFAULT_PARENT_PASSWORD\s*=\s*"Parent@1234"/);
-  assert.match(constants, /DEFAULT_TEACHER_PASSWORD\s*=\s*"Teacher@1234"/);
-  assert.match(records, /DEFAULT_STUDENT_PASSWORD/);
-  assert.match(records, /DEFAULT_PARENT_PASSWORD/);
-  assert.match(records, /Default password: Student@1234/);
-  assert.match(records, /Default password: Parent@1234/);
-  assert.match(teacherRecords, /DEFAULT_TEACHER_PASSWORD/);
-  assert.match(teacherRecords, /Default password: Teacher@1234/);
+  assert.doesNotMatch(constants, /DEFAULT_(?:STUDENT|PARENT|TEACHER)_PASSWORD/);
+  assert.doesNotMatch(records, /Student@1234|Parent@1234|Teacher@1234/);
+  assert.match(records, /label="Student Password"/);
+  assert.match(records, /label="Parent Password"/);
+  assert.match(records, /label="Teacher Password"/);
+  assert.doesNotMatch(teacherRecords, /DEFAULT_TEACHER_PASSWORD/);
   assert.doesNotMatch(teachers, /const DEFAULT_PASSWORD = "1234"/);
 
   for (const legacy of [
