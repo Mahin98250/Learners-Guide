@@ -2,7 +2,12 @@
 -- The tenant-boundary policies already restrict access to active institute members.
 -- These additional RESTRICTIVE policies require the canonical permission for each
 -- institute-owned domain, so direct PostgREST table access cannot bypass the UI.
--- Platform members remain allowed because platform control-plane access is separate.
+--
+-- IMPORTANT: public.users is a legacy/global compatibility table and does not have
+-- institute_id. It is intentionally excluded from these tenant-row policies.
+-- Account provisioning/credential operations must use the hardened Edge Function
+-- and the tenant-scoped membership/account checks rather than treating public.users
+-- as an institute-owned CRUD table.
 
 do $$
 declare
@@ -10,7 +15,6 @@ declare
   read_tables text[][] := array[
     array['students','students.read'],
     array['teachers','teachers.read'],
-    array['users','people.read'],
     array['academic_years','academics.read'],
     array['announcements','announcements.read'],
     array['attendance','attendance.read'],
@@ -24,18 +28,17 @@ declare
     array['marks','assessments.read'],
     array['material_folders','materials.read'],
     array['materials','materials.read'],
+    array['parent_student_links','guardians.read'],
     array['rooms','academics.read'],
-    array['subjects','academics.read'],
+    array['subjects','subjects.read'],
     array['test_results','assessments.read'],
     array['tests','assessments.read'],
     array['timetable','timetable.read'],
-    array['timetable_entries','timetable.read'],
-    array['parent_student_links','guardians.read']
+    array['timetable_entries','timetable.read']
   ];
   write_tables text[][] := array[
     array['students','students.manage'],
     array['teachers','teachers.manage'],
-    array['users','people.manage'],
     array['academic_years','academics.manage'],
     array['announcements','announcements.manage'],
     array['attendance','attendance.manage'],
@@ -49,16 +52,26 @@ declare
     array['marks','assessments.manage'],
     array['material_folders','materials.manage'],
     array['materials','materials.manage'],
+    array['parent_student_links','guardians.manage'],
     array['rooms','academics.manage'],
-    array['subjects','academics.manage'],
+    array['subjects','subjects.manage'],
     array['test_results','assessments.manage'],
     array['tests','assessments.manage'],
     array['timetable','timetable.manage'],
-    array['timetable_entries','timetable.manage'],
-    array['parent_student_links','guardians.manage']
+    array['timetable_entries','timetable.manage']
   ];
 begin
   foreach item slice 1 in array read_tables loop
+    if not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = item[1]
+        and column_name = 'institute_id'
+    ) then
+      raise exception 'Admin 10X migration requires public.%.institute_id', item[1];
+    end if;
+
     execute format(
       'drop policy if exists %I on public.%I',
       'admin_permission_read_' || item[1],
@@ -73,6 +86,16 @@ begin
   end loop;
 
   foreach item slice 1 in array write_tables loop
+    if not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = item[1]
+        and column_name = 'institute_id'
+    ) then
+      raise exception 'Admin 10X migration requires public.%.institute_id', item[1];
+    end if;
+
     execute format(
       'drop policy if exists %I on public.%I',
       'admin_permission_insert_' || item[1],
