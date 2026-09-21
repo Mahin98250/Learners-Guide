@@ -20,7 +20,7 @@ test("owner mutation RPCs require an authenticated platform membership",()=>{
 test("new platform SECURITY DEFINER RPCs pin search_path",()=>{
   for(const name of ["platform_update_settings","platform_set_institute_status","platform_set_primary_domain","platform_disable_domain"]){
     const block=migrations.slice(migrations.indexOf(`create or replace function public.${name}`),migrations.indexOf(`revoke all on function public.platform_update_settings`));
-    assert.match(block,/set search_path=''/i);
+    assert.match(block,/set\\s+search_path\\s*=\\s*''/i);
   }
 });
 
