@@ -75,7 +75,6 @@ export default function TeacherBatchAssignmentPage() {
         const { error: assignmentError } = await supabase.from("batch_teachers").upsert(
           {
             institute_id: instituteId,
-            institute_id: instituteId,
             batch_id: batchId,
             teacher_id: teacherId,
             subject_id: String(subject.id),
@@ -90,6 +89,7 @@ export default function TeacherBatchAssignmentPage() {
           const dayNo = DAYS.indexOf(day) + 1;
           const { error: timetableError } = await supabase.from("timetable_entries").insert({
             id: `tt-${Date.now()}-${dayNo}-${String(subject.id)}-${Math.random().toString(36).slice(2, 7)}`,
+            institute_id: instituteId,
             batch_id: batchId,
             teacher_id: teacherId,
             subject_name: subjectName,
