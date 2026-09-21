@@ -6,6 +6,8 @@ Phase 4 starts the migration of the existing administration/data layer from impl
 
 - A reusable `InstituteWorkspaceProvider` and `useInstituteWorkspace()` hook.
 - Persistent active-institute selection for users who belong to multiple institutes.
+- A workspace switcher in the admin shell for multi-institute accounts.
+- Tenant cache invalidation when the active institute changes, preventing stale cross-tenant browser data.
 - An admin workspace gate that blocks the legacy admin portal until an active institute membership is resolved.
 - Admin shell branding from the active institute.
 - Centralized tenant scoping in the legacy query layer.
