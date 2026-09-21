@@ -107,7 +107,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
   const renderPage = () => {
     if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
     if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
-    if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage /></div>;
+    if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage kind="teachers" /></div>;
     if (activeItem.special === "batches") return <div className="modern-admin-native-page"><BatchesTimetablePage /></div>;
     if (activeItem.special === "tests") return <div className="modern-admin-native-page"><TestManagementPage /></div>;
     if (activeItem.special === "homework") return <div className="modern-admin-native-page"><HomeworkPage /></div>;
