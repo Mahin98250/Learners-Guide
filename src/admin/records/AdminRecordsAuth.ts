@@ -25,23 +25,33 @@ export async function provision(role: ProvisionRole, loginId: string, name: stri
   const context = await getCurrentInstituteContext();
   const instituteId = context.membership?.institute_id;
   if (!instituteId) throw new Error("An active institute workspace must be selected before provisioning an account.");
+  let resolvedAuthId = authId || null;
+  if (action === "delete" && !resolvedAuthId) {
+    const users = (await gdb("users")) as Array<Record<string, unknown>>;
+    const match = users.find((row) =>
+      String(row.ref ?? "") === String(ref ?? "") &&
+      String(row.role ?? "") === role &&
+      row.auth_id
+    );
+    resolvedAuthId = match?.auth_id ? String(match.auth_id) : null;
+  }
   const body: Record<string, unknown> = { action, role, loginId, name, ref, instituteId };
-  if (authId) body.authId = authId;
+  if (resolvedAuthId) body.authId = resolvedAuthId;
   if (password) body.password = password;
 
   if (action === "delete") {
     const scoped = await supabase.rpc("remove_institute_account_membership", {
       p_institute_id: instituteId,
-      p_auth_id: authId || "",
+      p_auth_id: resolvedAuthId || "",
       p_role_key: role,
     });
     if (scoped.error) throw scoped.error;
     const scopedRow = Array.isArray(scoped.data) ? scoped.data[0] : scoped.data;
     if (!scopedRow?.membership_removed) {
-      return { authId: authId || undefined, deleted: false, membershipRemoved: false, remainingMemberships: Number(scopedRow?.remaining_memberships || 0) };
+      return { authId: resolvedAuthId || undefined, deleted: false, membershipRemoved: false, remainingMemberships: Number(scopedRow?.remaining_memberships || 0) };
     }
     if (scopedRow.remaining_memberships > 0) {
-      return { authId: authId || undefined, deleted: false, membershipRemoved: true, remainingMemberships: Number(scopedRow.remaining_memberships) };
+      return { authId: resolvedAuthId || undefined, deleted: false, membershipRemoved: true, remainingMemberships: Number(scopedRow.remaining_memberships) };
     }
   }
 
