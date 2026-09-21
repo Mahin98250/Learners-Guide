@@ -51,7 +51,7 @@ test("owner enrollment supports a TOTP authenticator", () => {
 });
 
 test("database owner guard requires the authorized identity, role, and AAL2", () => {
-  const start = migrations.indexOf(
+  const start = migrations.lastIndexOf(
     "create or replace function public.platform_owner_access_ok()",
   );
   assert.ok(start >= 0, "owner access helper is missing");
@@ -62,19 +62,27 @@ test("database owner guard requires the authorized identity, role, and AAL2", ()
   assert.match(block, /=\s*'aal2'/i);
   assert.match(block, /pm\.role\s*=\s*'platform_owner'/i);
   assert.match(block, /pm\.status\s*=\s*'active'/i);
-  assert.match(block, /revoke all on function public\.platform_owner_access_ok\(\) from public, anon, authenticated/i);
+  assert.match(
+    block,
+    /revoke all on function public\.platform_owner_access_ok\(\) from public, anon, authenticated/i,
+  );
 });
 
 test("every privileged platform mutation calls the owner guard", () => {
   for (const name of ownerRpc) {
-    const start = migrations.indexOf(\`create or replace function public.\${name}\`);
-    assert.ok(start >= 0, \`missing owner RPC: \${name}\`);
-    const next = migrations.indexOf("create or replace function public.", start + 1);
+    const start = migrations.lastIndexOf(
+      "create or replace function public." + name,
+    );
+    assert.ok(start >= 0, "missing owner RPC: " + name);
+    const next = migrations.indexOf(
+      "create or replace function public.",
+      start + 1,
+    );
     const block = migrations.slice(start, next < 0 ? migrations.length : next);
     assert.match(
       block,
       /platform_owner_access_ok\(\)[\s\S]{0,180}Platform owner MFA verification required/i,
-      \`\${name} must enforce owner MFA and role authorization\`,
+      name + " must enforce owner MFA and role authorization",
     );
   }
 });
