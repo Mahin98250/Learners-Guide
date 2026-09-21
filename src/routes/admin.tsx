@@ -73,7 +73,7 @@ function AdminRoute() {
         </div>
       ) : !user ? (
         <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin sign-in…</div>}>
-          <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void load(); }} />
+          <AdminLogin onSuccess={() => { void load(); }} />
         </Suspense>
       ) : (
         <InstituteWorkspaceProvider>
