@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 import { Card } from "@/lg/ui";
 
 type Row = Record<string, any>;
@@ -28,8 +29,11 @@ export function AdminProfilePage({ onBack }: { onBack?: () => void }) {
       setLoading(true);
       setError("");
       try {
+        const context = await getCurrentInstituteContext();
+        const instituteId = context.membership?.institute_id;
+        if (!instituteId) throw new Error("An active institute workspace must be selected.");
         const table = type === "student" ? "students" : type === "teacher" ? "teachers" : "users";
-        let q = supabase.from(table).select(PROFILE_SELECT[type]).order("name");
+        let q = supabase.from(table).select(PROFILE_SELECT[type]).eq("institute_id", instituteId).order("name");
         if (type === "parent") q = q.eq("role", "parent");
         const { data, error: e } = await q;
         if (e) throw e;
@@ -77,11 +81,14 @@ function ProfileDetail({ type, profile, onBack }: { type: ProfileType; profile: 
     (async () => {
       try {
         if (type === "parent") return;
+        const context = await getCurrentInstituteContext();
+        const instituteId = context.membership?.institute_id;
+        if (!instituteId) throw new Error("An active institute workspace must be selected.");
         const id = clean(profile.id);
         const [a, r, f] = await Promise.all([
-          supabase.from("attendance").select("id,sid,date,status").eq("sid", id),
-          supabase.from("test_results").select("id,test_id,student_id,marks,remarks").eq("student_id", id),
-          supabase.from("fees").select("id,sid,amount,status,due").eq("sid", id),
+          supabase.from("attendance").select("id,sid,date,status").eq("institute_id", instituteId).eq("sid", id),
+          supabase.from("test_results").select("id,test_id,student_id,marks,remarks").eq("institute_id", instituteId).eq("student_id", id),
+          supabase.from("fees").select("id,sid,amount,status,due").eq("institute_id", instituteId).eq("sid", id),
         ]);
         if (live) { setAttendance(a.data || []); setResults(r.data || []); setFees(f.data || []); }
       } catch { /* keep profile visible even if detail reads fail */ }
