@@ -64,7 +64,7 @@ export default function HomeworkPage() {
         if (optimized.optimized) setProcessing(`Optimized ${optimized.savingsPercent}% smaller (${(optimized.originalSize / 1048576).toFixed(1)} → ${(optimized.optimizedSize / 1048576).toFixed(1)} MB)`);
       }
       if (uploadFile) {
-        storagePath = `admin/${selectedBatch.id}/${id}-${uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        storagePath = `institute/${instituteId}/homework/${selectedBatch.id}/${id}-${uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { error: uploadError } = await supabase.storage.from("homework").upload(storagePath, uploadFile, { upsert: false, contentType: "application/pdf" });
         if (uploadError) throw uploadError;
       }
