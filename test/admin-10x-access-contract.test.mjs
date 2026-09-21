@@ -13,7 +13,7 @@ test("admin route uses centralized verified workspace authorization", () => {
 });
 
 test("successful admin login cannot bypass workspace authorization", () => {
-  assert.match(route, /onSuccess=\{\(admin: AdminRouteUser\) => \{ setUser\(admin\); void load\(\); \}\}/);
+  assert.match(route, /onSuccess=\{\(\) => \{ void load\(\); \}\}/);
 });
 
 test("legacy admin portal uses the same authorization helper", () => {
