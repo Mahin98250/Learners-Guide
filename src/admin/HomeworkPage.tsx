@@ -3,6 +3,7 @@ import { delR, gdb, C, subjectsForClasses } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
 import { compressFile } from "@/lg/fileCompression";
 import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 
 type Row = Record<string, any>;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
@@ -21,8 +22,11 @@ export default function HomeworkPage() {
   const load = async () => {
     setLoading(true); setError("");
     try {
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       const [hw, bs, ts] = await Promise.all([
-        supabase.from("homework").select("id,tid,cls,sec,batch_id,subject,desc,given,due,completedby,pdfname,storage_path,file_size,mime_type,created_at").order("created_at", { ascending: false }),
+        supabase.from("homework").select("id,tid,cls,sec,batch_id,subject,desc,given,due,completedby,pdfname,storage_path,file_size,mime_type,created_at").eq("institute_id", instituteId).order("created_at", { ascending: false }),
         gdb("batches"),
         gdb("teachers"),
       ]);
@@ -48,6 +52,9 @@ export default function HomeworkPage() {
     setSaving(true); setProcessing(""); let storagePath = "";
     const id = `hw_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     try {
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       let uploadFile = file;
       if (file) {
         const optimized = await compressFile(file, setProcessing);
@@ -59,7 +66,7 @@ export default function HomeworkPage() {
         const { error: uploadError } = await supabase.storage.from("homework").upload(storagePath, uploadFile, { upsert: false, contentType: "application/pdf" });
         if (uploadError) throw uploadError;
       }
-      const { error: insertError } = await supabase.from("homework").insert({ id, cls: String(selectedBatch.cls || ""), sec: String(selectedBatch.sec || ""), batch_id: selectedBatch.id, subject: form.subject, desc: form.desc.trim(), given: form.given, due: form.due, tid: form.teacherId || null, completedby: [], pdfname: form.pdfName || null, pdfdata: null, storage_path: storagePath || null, file_size: uploadFile?.size || null, mime_type: uploadFile ? "application/pdf" : null });
+      const { error: insertError } = await supabase.from("homework").insert({ institute_id: instituteId, id, cls: String(selectedBatch.cls || ""), sec: String(selectedBatch.sec || ""), batch_id: selectedBatch.id, subject: form.subject, desc: form.desc.trim(), given: form.given, due: form.due, tid: form.teacherId || null, completedby: [], pdfname: form.pdfName || null, pdfdata: null, storage_path: storagePath || null, file_size: uploadFile?.size || null, mime_type: uploadFile ? "application/pdf" : null });
       if (insertError) throw insertError;
       if (storagePath && /\.pdf$/i.test(storagePath)) {
         void enqueuePdfCompressionJob("homework", storagePath).catch((queueError) =>
