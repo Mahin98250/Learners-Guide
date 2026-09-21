@@ -6,6 +6,8 @@ name: Deploy to GitHub Pages
 # repository integration, so do not fail every normal push because the Pages site
 # has not been enabled in repository settings.
 on:
+  push:
+    branches: [feat/multi-tenant-foundation, main]
   workflow_dispatch:
 
 permissions:
