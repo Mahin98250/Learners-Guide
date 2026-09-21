@@ -3,6 +3,7 @@ import { C, uid } from "@/lg/data";
 import { compressFile } from "@/lg/fileCompression";
 import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 import { Card, Sec } from "@/lg/ui";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -21,9 +22,13 @@ const sortByName = (items) => [...items].sort((a, b) => clean(a?.name).localeCom
 
 async function loadTeacherBatches(teacherId) {
   if (!teacherId) return [];
+  const context = await getCurrentInstituteContext();
+  const instituteId = context.membership?.institute_id;
+  if (!instituteId) throw new Error("An active institute workspace must be selected.");
   const { data: entries, error: entriesError } = await supabase
     .from("timetable_entries")
     .select("batch_id,subject_name")
+    .eq("institute_id", instituteId)
     .eq("teacher_id", teacherId)
     .eq("status", "active");
   if (entriesError) throw entriesError;
@@ -34,6 +39,7 @@ async function loadTeacherBatches(teacherId) {
   const { data: batches, error: batchError } = await supabase
     .from("batches")
     .select("id,name,cls,sec,status")
+    .eq("institute_id", instituteId)
     .in("id", ids);
   if (batchError) throw batchError;
 
@@ -115,16 +121,21 @@ export function T6Materials({ teacher }) {
       const userResult = await supabase.auth.getUser();
       if (userResult.error) throw userResult.error;
       if (!userResult.data?.user) throw new Error("Your session has expired. Please log in again.");
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
 
       const [teacherBatches, folderResult, materialResult] = await Promise.all([
         loadTeacherBatches(teacher.id),
         supabase
           .from("material_folders")
           .select("id,name,parent_id,created_by,created_at,access_standards")
+          .eq("institute_id", instituteId)
           .order("created_at", { ascending: true }),
         supabase
           .from("materials")
           .select("id,title,name,folder_id,batch_id,subject,desc,date,tid,storage_path,file_size,mime_type,created_at")
+          .eq("institute_id", instituteId)
           .order("created_at", { ascending: false }),
       ]);
 
@@ -227,11 +238,15 @@ export function T6Materials({ teacher }) {
     setBusy(true);
     setError("");
     try {
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       const { error: insertError } = await supabase.from("material_folders").insert({
         name,
         parent_id: currentId || null,
         created_by: authId,
         access_standards: currentId ? [] : [standard],
+        institute_id: instituteId,
       });
       if (insertError) throw insertError;
       setNewFolderName("");
@@ -276,6 +291,9 @@ export function T6Materials({ teacher }) {
     setProcessing("");
     let storagePath = "";
     try {
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       let uploadFile = selectedFile;
       const optimized = await compressFile(selectedFile, setProcessing);
       uploadFile = optimized.file;
@@ -304,6 +322,7 @@ export function T6Materials({ teacher }) {
         desc: null,
         date: new Date().toISOString().slice(0, 10),
         tid: teacher.id,
+        institute_id: instituteId,
         storage_path: storagePath,
         file_size: uploadFile.size,
         mime_type: uploadFile.type || "application/octet-stream",
@@ -355,9 +374,13 @@ export function T6Materials({ teacher }) {
         const { error: storageError } = await supabase.storage.from("materials").remove([material.storage_path]);
         if (storageError) throw storageError;
       }
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       const { error: deleteError } = await supabase
         .from("materials")
         .delete()
+        .eq("institute_id", instituteId)
         .eq("id", material.id)
         .eq("tid", teacher.id);
       if (deleteError) throw deleteError;
@@ -379,9 +402,13 @@ export function T6Materials({ teacher }) {
     setBusy(true);
     setError("");
     try {
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       const { error: deleteError } = await supabase
         .from("material_folders")
         .delete()
+        .eq("institute_id", instituteId)
         .eq("id", folder.id);
       if (deleteError) throw deleteError;
       if (String(currentId) === String(folder.id)) setCurrentId(folder.parent_id || null);
