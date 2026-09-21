@@ -59,6 +59,18 @@ export function setPreferredInstituteId(instituteId: string) {
   }
 }
 
+export async function hasInstitutePermission(instituteId: string, permissionCode: string): Promise<boolean> {
+  const id = String(instituteId || "").trim();
+  const code = String(permissionCode || "").trim();
+  if (!id || !code) return false;
+  const { data, error } = await supabase.rpc("user_has_institute_permission", {
+    p_institute_id: id,
+    p_permission_code: code,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 /**
  * Public branding/routing lookup performed before authentication.
  * This does not grant institute data access.
