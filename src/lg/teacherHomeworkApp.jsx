@@ -10,6 +10,7 @@ import { loadTeacherBatches } from "@/lg/teacherScope";
 import { T6Materials } from "@/lg/teacherWorkflows";
 import { TTests, TTestResults } from "@/lg/teacherTests";
 import { TeacherAnnouncements } from "@/lg/TeacherAnnouncements";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const errText = (e) => e instanceof Error ? e.message : (e?.message || "Something went wrong. Please try again.");
@@ -18,6 +19,7 @@ async function loadTeacherProfile(teacherId) {
   const { data, error } = await supabase
     .from("teachers")
     .select("id,name,tid,subject,phone,classes,status")
+    .eq("institute_id", (await getCurrentInstituteContext()).membership?.institute_id || "")
     .eq("id", teacherId)
     .maybeSingle();
   if (error) throw error;
@@ -54,11 +56,15 @@ export function T5HomeworkWithFiles({ teacher }) {
     setLoading(true);
     setError("");
     try {
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
       const [bs, hw] = await Promise.all([
         loadTeacherBatches(teacher?.id),
         supabase
           .from("homework")
           .select("id,batch_id,cls,sec,subject,desc,given,due,tid,pdfname,storage_path,file_size,mime_type,created_at")
+          .eq("institute_id", instituteId)
           .eq("tid", teacher?.id)
           .order("created_at", { ascending: false }),
       ]);
@@ -139,6 +145,7 @@ export function T5HomeworkWithFiles({ teacher }) {
         given: todayISO(),
         due: form.due,
         tid: teacher.id,
+        institute_id: (await getCurrentInstituteContext()).membership?.institute_id || null,
       };
 
       let uploadFile = form.file;
@@ -163,7 +170,8 @@ export function T5HomeworkWithFiles({ teacher }) {
           .upload(path, uploadFile, { upsert: false, contentType: uploadFile.type || "application/octet-stream" });
         if (uploadError) {
           await supabase.storage.from("homework").remove([path]).catch(() => {});
-          await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
+          const cleanupContext = await getCurrentInstituteContext();
+          await supabase.from("homework").delete().eq("institute_id", cleanupContext.membership?.institute_id || "").eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
           inserted = false;
           throw uploadError;
         }
@@ -187,7 +195,8 @@ export function T5HomeworkWithFiles({ teacher }) {
       // Compensation is limited to an incomplete operation.
       if (!completed && storageUploaded && path && inserted) {
         await supabase.storage.from("homework").remove([path]).catch(() => {});
-        await supabase.from("homework").delete().eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
+        const cleanupContext = await getCurrentInstituteContext();
+        await supabase.from("homework").delete().eq("institute_id", cleanupContext.membership?.institute_id || "").eq("id", homeworkId).eq("tid", teacher.id).catch(() => {});
       }
       setError(errText(e));
     } finally {
@@ -206,7 +215,8 @@ export function T5HomeworkWithFiles({ teacher }) {
         return;
       }
     }
-    const { error: deleteError } = await supabase.from("homework").delete().eq("id", row.id).eq("tid", teacher.id);
+    const cleanupContext = await getCurrentInstituteContext();
+    const { error: deleteError } = await supabase.from("homework").delete().eq("institute_id", cleanupContext.membership?.institute_id || "").eq("id", row.id).eq("tid", teacher.id);
     if (deleteError) {
       setError(errText(deleteError));
       return;
