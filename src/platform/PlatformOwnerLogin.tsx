@@ -116,7 +116,7 @@ export default function PlatformOwnerLogin({
       if (email !== OWNER_EMAIL) {
         await supabase.auth.signOut({ scope: "local" });
         setError(
-          \`Only the authorized owner account (\${OWNER_EMAIL}) can access this panel.\`,
+          `Only the authorized owner account (${OWNER_EMAIL}) can access this panel.`,
         );
         return;
       }
@@ -166,7 +166,7 @@ export default function PlatformOwnerLogin({
     setError("");
 
     const redirectTo = new URL(
-      \`\${import.meta.env.BASE_URL}owner\`,
+      `${import.meta.env.BASE_URL}owner`,
       window.location.origin,
     ).toString();
 
@@ -292,7 +292,7 @@ export default function PlatformOwnerLogin({
           <p style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>
             {enrollment
               ? "Protect the Owner Panel with an authenticator app. Scan the QR code, then enter the 6-digit code it generates."
-              : \`Enter the 6-digit code from \${challenge?.label || "your MFA factor"} to unlock the Owner Panel.\`}
+              : `Enter the 6-digit code from ${challenge?.label || "your MFA factor"} to unlock the Owner Panel.`}
           </p>
 
           {enrollment && (
