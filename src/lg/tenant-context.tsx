@@ -89,7 +89,6 @@ export function InstituteWorkspaceGate({ children }: PropsWithChildren) {
           <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, color: "#b42318" }}>WORKSPACE ERROR</div>
           <h1 style={{ margin: "7px 0 8px", fontSize: 26 }}>Institute context could not be verified</h1>
           <p style={{ color: "#64748b", lineHeight: 1.65 }}>{error}</p>
-          <button type="button" onClick={() => void useInstituteWorkspace} style={{ display: "none" }} aria-hidden="true" />
           <button type="button" onClick={() => window.location.reload()} style={{ marginTop: 8, border: 0, borderRadius: 10, padding: "10px 14px", background: "#4f46e5", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Retry</button>
         </section>
       </main>
