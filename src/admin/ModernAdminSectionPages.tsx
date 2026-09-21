@@ -11,29 +11,68 @@ const lower = (v: any) => clean(v).toLowerCase();
 const amount = (v: any) => Number(v || 0);
 const pct = (n: number, d: number) => d ? Math.round((n / d) * 100) : null;
 const fmtDate = (v: any) => { const s = clean(v); if (!s) return "—"; const d = new Date(s); return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); };
-function useInstituteData(): InstituteData { const initial: InstituteData = { students: [], teachers: [], batches: [], attendance: [], fees: [], homework: [], announcements: [], tests: [], results: [], loading: true, error: "" }; const [data, setData] = useState<InstituteData>(initial); useEffect(() => { let live = true; (async () => { const queries = await Promise.all([
-      gdb("students"),
-      gdb("teachers"),
-      gdb("batches"),
-      gdb("attendance"),
-      gdb("fees"),
-      gdb("homework"),
-      gdb("announcements"),
-      gdb("tests"),
-      gdb("test_results"),
-    ]); if (!live) return; const error = queries.find(q => q.error)?.error?.message || ""; setData({
-      students: (queries[0] as Row[]) || [],
-      teachers: (queries[1] as Row[]) || [],
-      batches: (queries[2] as Row[]) || [],
-      attendance: (queries[3] as Row[]) || [],
-      fees: (queries[4] as Row[]) || [],
-      homework: (queries[5] as Row[]) || [],
-      announcements: (queries[6] as Row[]) || [],
-      tests: (queries[7] as Row[]) || [],
-      results: (queries[8] as Row[]) || [],
-      loading: false,
-      error,
-    }); })(); return () => { live = false; }; }, []); return data; }
+function useInstituteData(): InstituteData {
+  const initial: InstituteData = {
+    students: [],
+    teachers: [],
+    batches: [],
+    attendance: [],
+    fees: [],
+    homework: [],
+    announcements: [],
+    tests: [],
+    results: [],
+    loading: true,
+    error: "",
+  };
+  const [data, setData] = useState<InstituteData>(initial);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const queries = await Promise.all([
+          gdb("students"),
+          gdb("teachers"),
+          gdb("batches"),
+          gdb("attendance"),
+          gdb("fees"),
+          gdb("homework"),
+          gdb("announcements"),
+          gdb("tests"),
+          gdb("test_results"),
+        ]);
+        if (!live) return;
+        setData({
+          students: (queries[0] as Row[]) || [],
+          teachers: (queries[1] as Row[]) || [],
+          batches: (queries[2] as Row[]) || [],
+          attendance: (queries[3] as Row[]) || [],
+          fees: (queries[4] as Row[]) || [],
+          homework: (queries[5] as Row[]) || [],
+          announcements: (queries[6] as Row[]) || [],
+          tests: (queries[7] as Row[]) || [],
+          results: (queries[8] as Row[]) || [],
+          loading: false,
+          error: "",
+        });
+      } catch (e) {
+        if (!live) return;
+        setData((previous) => ({
+          ...previous,
+          loading: false,
+          error: e instanceof Error ? e.message : "Unable to load institute data.",
+        }));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return data;
+}
+
 function Header({ eyebrow, title, description, onBack }: { eyebrow: string; title: string; description: string; onBack?: () => void }) { return <div className="mas-header"><div><span className="mas-eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>{onBack && <button className="mas-secondary" onClick={onBack}>← Dashboard</button>}</div>; }
 function Metric({ label, value, hint, tone = "blue" }: { label: string; value: React.ReactNode; hint?: string; tone?: string }) { return <div className={`mas-metric ${tone}`}><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</div>; }
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) { return <section className="mas-panel"><div className="mas-panel-head"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div></div>{children}</section>; }
