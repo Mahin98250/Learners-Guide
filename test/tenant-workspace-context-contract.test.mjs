@@ -20,7 +20,7 @@ test("admin workspace is gated until an active institute membership is selected"
   assert.match(context, /InstituteWorkspaceGate/);
   assert.match(context, /Choose an institute/);
   assert.match(context, /No active institute membership/);
-  assert.match(context, /clearCache();/);
+  assert.match(context, /clearCache\(\);/);
 });
 
 test("legacy reads are explicitly scoped to the active institute", () => {
