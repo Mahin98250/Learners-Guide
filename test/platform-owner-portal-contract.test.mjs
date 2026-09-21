@@ -6,7 +6,7 @@ const portal = fs.readFileSync("src/platform/PlatformOwnerPortal.tsx","utf8");
 const route = fs.readFileSync("src/routes/owner.tsx","utf8");
 
 test("platform owner UI is separated from institute portals",()=>{
-  assert.match(route,/createFileRoute\("/owner"\)/);
+  assert.ok(route.includes('createFileRoute("/owner")'));
   assert.match(portal,/current_platform_roles/);
   assert.match(portal,/PLATFORM OWNER/);
 });
