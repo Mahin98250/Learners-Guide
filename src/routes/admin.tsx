@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { getCurrentUser, signOut } from "@/lg/auth";
+import { signOut } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { DesktopOnlyGate } from "@/admin/DesktopOnlyGate";
 import { InstituteWorkspaceGate, InstituteWorkspaceProvider } from "@/lg/tenant-context";
-import { getCurrentInstituteContext, hasInstitutePermission } from "@/lg/tenant";
+import { getVerifiedAdminAccess } from "@/lg/admin-access";
 
 const AdminLogin = lazy(() =>
   import("@/admin/AdminLogin").then((module) => ({ default: module.AdminLogin })),
@@ -34,24 +34,17 @@ function AdminRoute() {
   const load = useCallback(async () => {
     setChecking(true);
     try {
-      const current = (await getCurrentUser()) as AdminRouteUser | null;
-      if (!current || current.role !== "admin") {
+      const access = await getVerifiedAdminAccess("people.manage");
+      if (!access) {
         clearCache();
         setUser(null);
         setChecking(false);
         return;
       }
-      const context = await getCurrentInstituteContext();
-      const instituteId = context.membership?.institute_id;
-      const allowed = instituteId ? await hasInstitutePermission(instituteId, "people.manage") : false;
-      if (!allowed) {
-        clearCache();
-        setUser(null);
-        setChecking(false);
-        return;
-      }
-      await syncAdmin(current);
+      await syncAdmin(access.user as AdminRouteUser);
     } catch {
+      clearCache();
+      setUser(null);
       setChecking(false);
     }
   }, [syncAdmin]);
@@ -80,7 +73,7 @@ function AdminRoute() {
         </div>
       ) : !user ? (
         <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin sign-in…</div>}>
-          <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void syncAdmin(admin); }} />
+          <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void load(); }} />
         </Suspense>
       ) : (
         <InstituteWorkspaceProvider>
