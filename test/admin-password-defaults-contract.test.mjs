@@ -10,6 +10,7 @@ test("active admin credential defaults are centralized and legacy admin tree is 
   const constants = read("src/admin/records/AdminRecordsConstants.ts");
   const records = read("src/admin/records/AdminRecordsPage.tsx");
   const teachers = read("src/admin/records/TeacherRecordsPage.tsx");
+  const teacherRecords = read("src/admin/records/AdminRecordsPage.tsx");
 
   assert.match(constants, /DEFAULT_STUDENT_PASSWORD\s*=\s*"Student@1234"/);
   assert.match(constants, /DEFAULT_PARENT_PASSWORD\s*=\s*"Parent@1234"/);
@@ -18,8 +19,8 @@ test("active admin credential defaults are centralized and legacy admin tree is 
   assert.match(records, /DEFAULT_PARENT_PASSWORD/);
   assert.match(records, /Default password: Student@1234/);
   assert.match(records, /Default password: Parent@1234/);
-  assert.match(teachers, /DEFAULT_TEACHER_PASSWORD/);
-  assert.match(teachers, /Default: Teacher@1234/);
+  assert.match(teacherRecords, /DEFAULT_TEACHER_PASSWORD/);
+  assert.match(teacherRecords, /Default password: Teacher@1234/);
   assert.doesNotMatch(teachers, /const DEFAULT_PASSWORD = "1234"/);
 
   for (const legacy of [
