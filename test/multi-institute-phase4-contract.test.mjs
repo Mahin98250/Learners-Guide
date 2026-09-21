@@ -22,3 +22,9 @@ test("phase 4 parent links carry the institute boundary", () => {
   assert.match(source, /parent_student_links/);
   assert.match(source, /institute_id/);
 });
+
+test("phase 4 account RPCs reject self-targeting", () => {
+  assert.match(source, /p_auth_id = auth\.uid\(\)/);
+  assert.match(source, /cannot provision or change your own institute account/i);
+  assert.match(source, /cannot remove your own institute membership/i);
+});
