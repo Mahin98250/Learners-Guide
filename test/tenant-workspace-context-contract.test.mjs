@@ -6,6 +6,7 @@ const tenant = fs.readFileSync("src/lg/tenant.ts", "utf8");
 const context = fs.readFileSync("src/lg/tenant-context.tsx", "utf8");
 const queries = fs.readFileSync("src/lg/data/queries.js", "utf8");
 const mutations = fs.readFileSync("src/lg/data/mutations.js", "utf8");
+const recordsAuth = fs.readFileSync("src/admin/records/AdminRecordsAuth.ts", "utf8");
 
 test("tenant context persists and restores an explicit active institute", () => {
   assert.match(tenant, /ACTIVE_INSTITUTE_STORAGE_KEY/);
@@ -31,6 +32,6 @@ test("legacy writes are explicitly scoped to the active institute", () => {
   assert.match(mutations, /withTenantScope/);
   assert.match(mutations, /An active institute workspace must be selected before saving this record/);
   assert.match(mutations, /\.eq\("institute_id",payload\.institute_id\)/);
-  assert.match(mutations, /sync_institute_account_membership/);
-  assert.match(mutations, /remove_institute_account_membership/);
+  assert.match(recordsAuth, /sync_institute_account_membership/);
+  assert.match(recordsAuth, /remove_institute_account_membership/);
 });
