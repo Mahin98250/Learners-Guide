@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { clearCache } from "@/lg/data";
-import { getCurrentUser, signOut } from "@/lg/auth";
+import { signOut } from "@/lg/auth";
 import { supabase } from "@/lg/supabase";
+import { getVerifiedAdminAccess } from "@/lg/admin-access";
 import { AdminWithDrive } from "./AdminWithDrive";
 import AdminLogin from "./auth/AdminLogin";
 
@@ -13,16 +14,25 @@ export default function AdminPortal() {
   const [checking, setChecking] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const current = await getCurrentUser();
-    setUser(current?.role === "admin" ? current : null);
-    setChecking(false);
+    try {
+      const access = await getVerifiedAdminAccess("people.manage");
+      setUser(access?.user ? (access.user as AdminUser) : null);
+    } catch {
+      setUser(null);
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
   useEffect(() => {
     let mounted = true;
-    getCurrentUser().then((current) => {
+    getVerifiedAdminAccess("people.manage").then((access) => {
       if (!mounted) return;
-      setUser(current?.role === "admin" ? current : null);
+      setUser(access?.user ? (access.user as AdminUser) : null);
+      setChecking(false);
+    }).catch(() => {
+      if (!mounted) return;
+      setUser(null);
       setChecking(false);
     });
     return () => { mounted = false; };
