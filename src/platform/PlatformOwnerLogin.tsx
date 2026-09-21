@@ -309,7 +309,7 @@ export default function PlatformOwnerLogin({
                   }}
                 >
                   <img
-                    src={enrollment.qrCode}
+                    src={`data:image/svg+xml,${encodeURIComponent(enrollment.qrCode)}`}
                     alt="Owner MFA QR code"
                     width={220}
                     height={220}
