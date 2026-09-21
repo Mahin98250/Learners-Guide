@@ -5,7 +5,7 @@ name: Deploy to GitHub Pages
 # and deploys the static artifact.
 on:
   push:
-    branches: [feat/multi-tenant-foundation, main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
