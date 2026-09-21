@@ -96,7 +96,7 @@ export async function getCurrentInstituteContext() {
     const ids = memberships.map((item) => item.institute_id);
     const [{ data: institutes, error: instituteError }, { data: settings, error: settingsError }] = await Promise.all([
       supabase.from("institutes").select("id,name,slug,status").in("id", ids),
-      supabase.from("institute_settings").select("institute_id,display_name,timezone,locale").in("institute_id", ids),
+      supabase.from("institute_settings").select("institute_id,display_name,logo_url,favicon_url,primary_color,secondary_color,login_title,powered_by_enabled,timezone,locale").in("institute_id", ids),
     ]);
     if (instituteError) throw instituteError;
     if (settingsError) throw settingsError;
@@ -123,6 +123,7 @@ export async function getCurrentInstituteContext() {
   if (preferredId) {
     const preferred = memberships.find((item) => item.institute_id === preferredId) || null;
     if (preferred) {
+      const preferredSetting = settingsMap.get(preferred.institute_id);
       const preferredTenant = preferred.institute_name
         ? {
             institute_id: preferred.institute_id,
@@ -130,14 +131,14 @@ export async function getCurrentInstituteContext() {
             name: preferred.institute_name,
             status: preferred.status,
             display_name: preferred.display_name || preferred.institute_name,
-            logo_url: null,
-            favicon_url: null,
-            primary_color: null,
-            secondary_color: null,
-            login_title: null,
-            powered_by_enabled: true,
-            timezone: "Asia/Kolkata",
-            locale: "en-IN",
+            logo_url: preferredSetting?.logo_url ?? null,
+            favicon_url: preferredSetting?.favicon_url ?? null,
+            primary_color: preferredSetting?.primary_color ?? null,
+            secondary_color: preferredSetting?.secondary_color ?? null,
+            login_title: preferredSetting?.login_title ?? null,
+            powered_by_enabled: preferredSetting?.powered_by_enabled ?? true,
+            timezone: preferredSetting?.timezone ?? "UTC",
+            locale: preferredSetting?.locale ?? "en-IN",
           }
         : null;
       return { tenant: preferredTenant, membership: preferred, memberships };
@@ -146,6 +147,7 @@ export async function getCurrentInstituteContext() {
 
   if (memberships.length === 1) {
     const only = memberships[0];
+    const onlySetting = settingsMap.get(only.institute_id);
     const onlyTenant = only.institute_name
       ? {
           institute_id: only.institute_id,
@@ -153,14 +155,14 @@ export async function getCurrentInstituteContext() {
           name: only.institute_name,
           status: only.status,
           display_name: only.display_name || only.institute_name,
-          logo_url: null,
-          favicon_url: null,
-          primary_color: null,
-          secondary_color: null,
-          login_title: null,
-          powered_by_enabled: true,
-          timezone: "Asia/Kolkata",
-          locale: "en-IN",
+          logo_url: onlySetting?.logo_url ?? null,
+          favicon_url: onlySetting?.favicon_url ?? null,
+          primary_color: onlySetting?.primary_color ?? null,
+          secondary_color: onlySetting?.secondary_color ?? null,
+          login_title: onlySetting?.login_title ?? null,
+          powered_by_enabled: onlySetting?.powered_by_enabled ?? true,
+          timezone: onlySetting?.timezone ?? "UTC",
+          locale: onlySetting?.locale ?? "en-IN",
         }
       : null;
     return { tenant: onlyTenant, membership: only, memberships };
