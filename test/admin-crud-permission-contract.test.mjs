@@ -8,7 +8,6 @@ const migration = readFileSync("supabase/migrations/20260921175000_admin_crud_pe
 const readPermissions = [
   ["students", "students.read"],
   ["teachers", "teachers.read"],
-  ["users", "people.read"],
   ["batches", "academics.read"],
   ["attendance", "attendance.read"],
   ["homework", "homework.read"],
@@ -18,6 +17,7 @@ const readPermissions = [
   ["tests", "assessments.read"],
   ["test_results", "assessments.read"],
   ["timetable_entries", "timetable.read"],
+  ["parent_student_links", "guardians.read"],
 ];
 
 for (const [table, permission] of readPermissions) {
@@ -36,6 +36,7 @@ const writePermissions = [
   ["tests", "assessments.manage"],
   ["test_results", "assessments.manage"],
   ["timetable_entries", "timetable.manage"],
+  ["parent_student_links", "guardians.manage"],
 ];
 
 for (const [table, permission] of writePermissions) {
@@ -51,5 +52,8 @@ assert.match(migration, /as restrictive for update to authenticated/);
 assert.match(migration, /as restrictive for delete to authenticated/);
 assert.match(migration, /public\.user_has_institute_permission\(institute_id/);
 assert.match(migration, /public\.is_platform_member\(\)/);
+assert.match(migration, /public\.users is a legacy\/global compatibility table/);
+assert.doesNotMatch(migration, /array\['users','people\.(read|manage)'\]/);
+assert.match(migration, /Admin 10X migration requires public\.%\.institute_id/);
 
 console.log("Admin CRUD/read permission contract passed.");
