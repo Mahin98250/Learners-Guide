@@ -20,7 +20,7 @@ export function PlatformMembershipPanel({ institutes }: { institutes: Institute[
   const load = useCallback(async () => {
     setError("");
     const [peopleResult, membershipsResult, rolesResult] = await Promise.all([
-      supabase.from("people").select("id,display_name,email,phone,status").eq("status", "active").order("display_name"),
+      supabase.from("people").select("id,display_name,email,phone,status").eq("status", "active").order("name"),
       supabase.from("institute_memberships").select("id,institute_id,person_id,role,status").order("created_at", { ascending: false }),
       supabase.from("institute_roles").select("institute_id,role_key,name").eq("status", "active").order("display_name"),
     ]);
