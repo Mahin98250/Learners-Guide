@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { clearCache } from "@/lg/data";
 import {
   getCurrentInstituteContext,
   setPreferredInstituteId,
@@ -51,6 +52,7 @@ export function InstituteWorkspaceProvider({ children }: PropsWithChildren) {
   const selectInstitute = useCallback(async (instituteId: string) => {
     const valid = memberships.some((item) => item.institute_id === instituteId);
     if (!valid) throw new Error("You do not belong to that institute.");
+    clearCache();
     setPreferredInstituteId(instituteId);
     await refresh();
   }, [memberships, refresh]);
