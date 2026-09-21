@@ -295,3 +295,68 @@ comment on policy admin_permission_materials_storage_insert on storage.objects i
   'Admin 100X: new material uploads must use institute/<institute_id>/... and materials.manage.';
 comment on policy admin_permission_homework_storage_insert on storage.objects is
   'Admin 100X: new homework uploads must use institute/<institute_id>/... and homework.manage.';
+
+
+-- Replace legacy global-admin storage readability with institute permission checks.
+create or replace function public.homework_storage_readable(p_path text)
+returns boolean
+language plpgsql
+stable security definer
+set search_path = public, pg_temp
+as $function$
+declare h record;
+begin
+  select id,batch_id,cls,sec,tid,institute_id into h
+  from public.homework
+  where storage_path=p_path
+  limit 1;
+  if not found then return false; end if;
+  if public.app_role()='admin' then
+    return public.user_has_institute_permission(h.institute_id,'homework.read');
+  end if;
+  if public.app_role()='teacher' then
+    return h.tid=public.current_ref() or (h.batch_id is not null and public.teacher_can_access_batch(h.batch_id,public.current_ref()));
+  end if;
+  if public.app_role()='student' then
+    return public.student_can_access_batch(h.batch_id,public.current_ref());
+  end if;
+  if public.app_role()='parent' then
+    return exists(select 1 from public.parent_student_links psl join public.batch_students bs on bs.student_id=psl.student_id and bs.batch_id=h.batch_id where psl.parent_auth_id=auth.uid() and psl.status='active' and bs.status='active' and bs.left_at is null);
+  end if;
+  return false;
+end;
+$function$;
+
+create or replace function public.material_storage_object_readable(object_name text)
+returns boolean
+language sql
+stable security definer
+set search_path = public, pg_temp
+as $function$
+  select case
+    when public.app_role() not in ('student','parent','teacher','admin') then false
+    when public.app_role() = 'admin' then exists (
+      select 1
+      from public.materials m
+      where m.storage_path = object_name
+        and public.user_has_institute_permission(m.institute_id,'materials.read')
+    )
+    when exists (
+      select 1
+      from public.materials m
+      where m.storage_path = object_name
+        and (
+          (public.app_role() = 'teacher' and (
+            m.tid = public.current_ref()
+            or (m.folder_id is not null and public.teacher_material_folder_accessible(m.folder_id, public.current_ref()))
+            or (m.folder_id is null and m.batch_id is not null and public.teacher_can_access_batch(m.batch_id, public.current_ref()))
+          ))
+          or (public.app_role() in ('student','parent') and (
+            (m.folder_id is not null and public.material_folder_standard_accessible(m.folder_id, public.current_ref()))
+            or (m.folder_id is null and public.material_row_readable(m.batch_id, m.cls, m.sec))
+          ))
+        )
+    ) then true
+    else false
+  end;
+$function$;
