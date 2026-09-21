@@ -21,6 +21,9 @@ export type InstituteMembershipContext = {
   role: string;
   role_id: string | null;
   status: string;
+  institute_name?: string | null;
+  display_name?: string | null;
+  slug?: string | null;
 };
 
 export function normalizeHostname(value: unknown) {
@@ -88,7 +91,29 @@ export async function getCurrentInstituteContext() {
 
   if (error) throw error;
 
-  const memberships = (data || []) as InstituteMembershipContext[];
+  let memberships = (data || []) as InstituteMembershipContext[];
+  if (memberships.length) {
+    const ids = memberships.map((item) => item.institute_id);
+    const [{ data: institutes, error: instituteError }, { data: settings, error: settingsError }] = await Promise.all([
+      supabase.from("institutes").select("id,name,slug,status").in("id", ids),
+      supabase.from("institute_settings").select("institute_id,display_name,timezone,locale").in("institute_id", ids),
+    ]);
+    if (instituteError) throw instituteError;
+    if (settingsError) throw settingsError;
+    const instituteMap = new Map((institutes || []).map((item: any) => [String(item.id), item]));
+    const settingsMap = new Map((settings || []).map((item: any) => [String(item.institute_id), item]));
+    memberships = memberships.map((item) => {
+      const institute = instituteMap.get(item.institute_id);
+      const setting = settingsMap.get(item.institute_id);
+      return {
+        ...item,
+        institute_name: institute?.name ?? null,
+        display_name: setting?.display_name ?? null,
+        slug: institute?.slug ?? null,
+      };
+    });
+  }
+
   if (tenant) {
     const membership = memberships.find((item) => item.institute_id === tenant.institute_id) || null;
     return { tenant, membership, memberships };
@@ -97,11 +122,48 @@ export async function getCurrentInstituteContext() {
   const preferredId = getPreferredInstituteId();
   if (preferredId) {
     const preferred = memberships.find((item) => item.institute_id === preferredId) || null;
-    if (preferred) return { tenant: null, membership: preferred, memberships };
+    if (preferred) {
+      const preferredTenant = preferred.institute_name
+        ? {
+            institute_id: preferred.institute_id,
+            slug: preferred.slug || "",
+            name: preferred.institute_name,
+            status: preferred.status,
+            display_name: preferred.display_name || preferred.institute_name,
+            logo_url: null,
+            favicon_url: null,
+            primary_color: null,
+            secondary_color: null,
+            login_title: null,
+            powered_by_enabled: true,
+            timezone: "Asia/Kolkata",
+            locale: "en-IN",
+          }
+        : null;
+      return { tenant: preferredTenant, membership: preferred, memberships };
+    }
   }
 
   if (memberships.length === 1) {
-    return { tenant: null, membership: memberships[0], memberships };
+    const only = memberships[0];
+    const onlyTenant = only.institute_name
+      ? {
+          institute_id: only.institute_id,
+          slug: only.slug || "",
+          name: only.institute_name,
+          status: only.status,
+          display_name: only.display_name || only.institute_name,
+          logo_url: null,
+          favicon_url: null,
+          primary_color: null,
+          secondary_color: null,
+          login_title: null,
+          powered_by_enabled: true,
+          timezone: "Asia/Kolkata",
+          locale: "en-IN",
+        }
+      : null;
+    return { tenant: onlyTenant, membership: only, memberships };
   }
 
   return { tenant: null, membership: null, memberships };
