@@ -65,4 +65,24 @@ assert.match(migration, /public\.users is a legacy\/global compatibility table/)
 assert.doesNotMatch(migration, /array\['users','people\.(read|manage)'\]/);
 assert.match(migration, /Admin 10X migration requires public\.%\.institute_id/);
 
+assert.match(migration, /admin_permission_materials_storage_insert/);
+assert.match(migration, /admin_permission_materials_storage_delete/);
+assert.match(migration, /admin_permission_homework_storage_insert/);
+assert.match(migration, /admin_permission_homework_storage_delete/);
+assert.match(migration, /user_has_institute_permission\\(split_part\\(name/);
+assert.match(migration, /user_has_institute_permission\\(h\\.institute_id,'homework\\.read'/);
+assert.match(migration, /user_has_institute_permission\\(m\\.institute_id,'materials\\.read'/);
+
+for (const [path, source] of directAdminFiles) {
+  assert.match(source, /hasInstitutePermission/, `${path} must use canonical tenant permission checks`);
+}
+assert.match(directAdminFiles.find(([path]) => path.endsWith("HomeworkPage.tsx"))[1], /homework\\.manage/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("MaterialsDriveV2.tsx"))[1], /materials\\.manage/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("BatchesTimetablePage.tsx"))[1], /timetable\\.manage/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("TeacherBatchAssignmentPage.tsx"))[1], /academics\\.manage/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("AdminAnalytics.tsx"))[1], /people\\.read/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("HomeworkPage.tsx"))[1], /institute\\/\\$\\{instituteId\\}\\/homework/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("MaterialsDriveV2.tsx"))[1], /institute\\/\\$\\{instituteId\\}\\/materials/);
+assert.match(directAdminFiles.find(([path]) => path.endsWith("MaterialsDrive.tsx"))[1], /institute\\/\\$\\{instituteId\\}\\/materials/);
+
 console.log("Admin CRUD/read permission contract passed.");
