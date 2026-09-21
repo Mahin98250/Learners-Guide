@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import PlatformOwnerLogin from "@/platform/PlatformOwnerLogin";
 import { PlatformMembershipPanel } from "@/platform/PlatformMembershipPanel";
 
 type Institute = {
@@ -53,6 +54,7 @@ const button = (primary = true) => ({
 
 export default function PlatformOwnerPortal() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -76,8 +78,23 @@ export default function PlatformOwnerPortal() {
     setLoading(true);
     setError("");
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setAuthenticated(true);
       const { data: roleData, error: roleError } = await supabase.rpc("current_platform_roles");
-      if (roleError) throw roleError;
+      if (roleError) {
+        if (Number((roleError as { status?: number }).status) === 401) {
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+          setAuthenticated(false);
+          setAllowed(false);
+          return;
+        }
+        throw roleError;
+      }
       const nextRoles = (roleData || []).map((row: { role?: string }) => String(row.role || "")).filter(Boolean);
       setRoles(nextRoles);
       const isAllowed = nextRoles.length > 0;
@@ -103,8 +120,28 @@ export default function PlatformOwnerPortal() {
   }, []);
 
   useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setAuthenticated(false);
+        setAllowed(false);
+      }
+    });
     void load();
+    return () => data.subscription.unsubscribe();
   }, [load]);
+
+  const handleAuthenticated = (nextRoles: string[]) => {
+    setRoles(nextRoles);
+    setAuthenticated(true);
+    void load();
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    setAuthenticated(false);
+    setAllowed(false);
+    setRoles([]);
+  };
 
   const createInstitute = async () => {
     setWorking("create");
@@ -150,6 +187,8 @@ export default function PlatformOwnerPortal() {
     }
   };
 
+  if (authenticated === false) return <PlatformOwnerLogin onAuthenticated={handleAuthenticated} />;
+
   if (allowed === false) {
     return (
       <main style={{ ...shell, display: "grid", placeItems: "center", padding: 24 }}>
@@ -184,7 +223,7 @@ export default function PlatformOwnerPortal() {
             <h1 style={{ margin: "5px 0 4px", fontSize: "clamp(26px,4vw,38px)" }}>Control Center</h1>
             <div style={{ opacity: 0.72 }}>Multi-institute SaaS operations, tenants, domains and audit.</div>
           </div>
-          <div style={{ fontSize: 12, opacity: 0.72 }}>Role{roles.length === 1 ? "" : "s"}: {roles.join(", ")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ fontSize: 12, opacity: 0.72 }}>Role{roles.length === 1 ? "" : "s"}: {roles.join(", ")}</div><button type="button" onClick={() => void signOut()} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Sign out</button></div>
         </div>
       </header>
 
