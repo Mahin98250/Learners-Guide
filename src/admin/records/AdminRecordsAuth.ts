@@ -37,8 +37,11 @@ export async function provision(role: ProvisionRole, loginId: string, name: stri
     });
     if (scoped.error) throw scoped.error;
     const scopedRow = Array.isArray(scoped.data) ? scoped.data[0] : scoped.data;
-    if (scopedRow?.remaining_memberships > 0) {
-      return { authId: authId || undefined, deleted: false, membershipRemoved: Boolean(scopedRow.membership_removed), remainingMemberships: Number(scopedRow.remaining_memberships) };
+    if (!scopedRow?.membership_removed) {
+      return { authId: authId || undefined, deleted: false, membershipRemoved: false, remainingMemberships: Number(scopedRow?.remaining_memberships || 0) };
+    }
+    if (scopedRow.remaining_memberships > 0) {
+      return { authId: authId || undefined, deleted: false, membershipRemoved: true, remainingMemberships: Number(scopedRow.remaining_memberships) };
     }
   }
 
