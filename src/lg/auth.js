@@ -1,4 +1,5 @@
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 
 /**
  * Production authentication for Learner's Guide.
@@ -119,6 +120,17 @@ export async function signIn(loginId, password, role) {
   if (!appRole) { await supabase.auth.signOut({ scope: "local" }).catch(() => {}); return { user: null, error: "Your account has not been approved by the institute administrator yet." }; }
   if (appRole !== role) { await supabase.auth.signOut({ scope: "local" }).catch(() => {}); return { user: null, error: `That account is registered as a ${appRole}.` }; }
   const user = toUser(authResult.user, role);
+  try {
+    const context = await getCurrentInstituteContext();
+    if (context.tenant && !context.membership) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      return { user: null, error: "This account does not belong to this institute portal." };
+    }
+  } catch (tenantError) {
+    console.warn("Unable to resolve institute membership during sign-in:", tenantError);
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    return { user: null, error: "We could not verify this institute portal. Please try again." };
+  }
   const profileCheck = await validateProfile(user, role);
   if (!profileCheck.ok) { await supabase.auth.signOut({ scope: "local" }).catch(() => {}); return { user: null, error: profileCheck.error }; }
   saveOfflineIdentity(cleanLogin, role, user.id);
@@ -141,6 +153,17 @@ export async function getCurrentUser() {
   const user = toUser(authUser);
   if (!user.role) return null;
   if (isOffline()) return user;
+  try {
+    const context = await getCurrentInstituteContext();
+    if (context.tenant && !context.membership) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      return null;
+    }
+  } catch (tenantError) {
+    console.warn("Unable to resolve institute membership:", tenantError);
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    return null;
+  }
   const profileCheck = await validateProfile(user, user.role);
   if (!profileCheck.ok) { await supabase.auth.signOut({ scope: "local" }).catch(() => {}); return null; }
   return user;

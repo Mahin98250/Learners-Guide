@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 
 type Row = Record<string, any>;
@@ -24,6 +25,7 @@ const fmtMonth = (v: any) => {
 const grade = (v: number | null) => v == null ? "—" : v >= 90 ? "A+" : v >= 80 ? "A" : v >= 70 ? "B+" : v >= 60 ? "B" : v >= 50 ? "C" : v >= 40 ? "D" : "F";
 
 export function StudentReportCardPrint({ student, onReady, onError }: Props) {
+  const { instituteId } = useInstituteWorkspace();
   const [state, setState] = useState<{ loading: boolean; error: string; data: any | null }>({ loading: true, error: "", data: null });
 
   useEffect(() => {
@@ -32,19 +34,19 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
       try {
         const id = text(student.id);
         const [attendance, results, marks, homework, leaves, memberships, years] = await Promise.all([
-          supabase.from("attendance").select("id,sid,date,status").eq("sid", id).order("date", { ascending: true }),
-          supabase.from("test_results").select("id,test_id,student_id,marks,remarks,created_at").eq("student_id", id).order("created_at", { ascending: true }),
-          supabase.from("marks").select("id,sid,subject,exam,marks,total,totalMarks,score,date").eq("sid", id).order("date", { ascending: true }),
-          supabase.from("homework").select("id,subject,given,due,completedby,batch_id").order("given", { ascending: true }),
-          supabase.from("leave_requests").select("id,from_date,to_date,status,reason").eq("student_id", id).order("from_date", { ascending: true }),
-          supabase.from("batch_students").select("batch_id,status").eq("student_id", id),
-          supabase.from("academic_years").select("id,name,start_date,end_date,status").order("start_date", { ascending: false }).limit(1),
+          supabase.from("attendance").select("id,sid,date,status").eq("institute_id", instituteId).eq("sid", id).order("date", { ascending: true }),
+          supabase.from("test_results").select("id,test_id,student_id,marks,remarks,created_at").eq("institute_id", instituteId).eq("student_id", id).order("created_at", { ascending: true }),
+          supabase.from("marks").select("id,sid,subject,exam,marks,total,totalMarks,score,date").eq("institute_id", instituteId).eq("sid", id).order("date", { ascending: true }),
+          supabase.from("homework").select("id,subject,given,due,completedby,batch_id").eq("institute_id", instituteId).order("given", { ascending: true }),
+          supabase.from("leave_requests").select("id,from_date,to_date,status,reason").eq("institute_id", instituteId).eq("student_id", id).order("from_date", { ascending: true }),
+          supabase.from("batch_students").select("batch_id,status").eq("institute_id", instituteId).eq("student_id", id),
+          supabase.from("academic_years").select("id,name,start_date,end_date,status").eq("institute_id", instituteId).order("start_date", { ascending: false }).limit(1),
         ]);
         for (const q of [attendance, results, marks, homework, leaves, memberships, years]) if (q.error) throw q.error;
 
         const testIds = [...new Set((results.data || []).map((r: Row) => text(r.test_id)).filter(Boolean))];
         const tests = testIds.length
-          ? await supabase.from("tests").select("id,title,subject,test_date,total_marks,batch_id,status").in("id", testIds)
+          ? await supabase.from("tests").select("id,title,subject,test_date,total_marks,batch_id,status").eq("institute_id", instituteId).in("id", testIds)
           : { data: [], error: null } as any;
         if (tests.error) throw tests.error;
         const testMap = new Map((tests.data || []).map((r: Row) => [text(r.id), r]));
@@ -56,7 +58,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
         const batchId = [...batchIds][0] || "";
         let batch: Row | null = null;
         if (batchId) {
-          const b = await supabase.from("batches").select("id,name,cls,sec,status").eq("id", batchId).maybeSingle();
+          const b = await supabase.from("batches").select("id,name,cls,sec,status").eq("institute_id", instituteId).eq("id", batchId).maybeSingle();
           if (b.error) throw b.error;
           batch = b.data;
         }
@@ -70,7 +72,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
       }
     })();
     return () => { live = false; };
-  }, [student.id, onError]);
+  }, [student.id, onError, instituteId]);
 
   useEffect(() => {
     if (!state.loading && state.data && !state.error) onReady?.();

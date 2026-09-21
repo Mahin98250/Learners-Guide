@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { C, addR, delR, gdb, updR } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { Button, Field, Modal } from "./BatchesTimetableControls";
 import { CLASSES, DAYS, SECTIONS, SUBJECTS, css, emptySchedule, type Row, type Option } from "./BatchesTimetableConstants";
 
 export default function BatchesTimetablePage() {
+  const { instituteId } = useInstituteWorkspace();
   const [tab, setTab] = useState<"batches" | "timetable">("batches");
   const [batches, setBatches] = useState<Row[]>([]);
   const [students, setStudents] = useState<Row[]>([]);
@@ -28,6 +30,11 @@ export default function BatchesTimetablePage() {
   const [scheduleForm, setScheduleForm] = useState(emptySchedule);
 
   const load = useCallback(async () => {
+    if (!instituteId) {
+      setError("An active institute workspace must be selected.");
+      setLoading(false);
+      return;
+    }
     setLoading(true); setError("");
     try {
       const [b, s, m, t, tt] = await Promise.all([
@@ -35,13 +42,13 @@ export default function BatchesTimetablePage() {
         gdb("students"),
         gdb("batch_students"),
         gdb("teachers"),
-        supabase.from("timetable_entries").select("id,batch_id,teacher_id,subject_id,subject_name,subject_names,day_of_week,start_time,end_time,room_id,status,academic_year_id,notes,created_at,updated_at").eq("status", "active").order("day_of_week").order("start_time"),
+        supabase.from("timetable_entries").select("id,batch_id,teacher_id,subject_id,subject_name,subject_names,day_of_week,start_time,end_time,room_id,status,academic_year_id,notes,created_at,updated_at").eq("institute_id", instituteId).eq("status", "active").order("day_of_week").order("start_time"),
       ]);
       if (tt.error) throw tt.error;
       setBatches(b as Row[]); setStudents(s as Row[]); setMemberships(m as Row[]); setTeachers(t as Row[]); setTimetable((tt.data || []) as Row[]);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load batches and timetable."); }
     finally { setLoading(false); }
-  }, []);
+  }, [instituteId]);
   useEffect(() => { void load(); }, [load]);
 
   const activeMemberships = useMemo(() => memberships.filter(m => String(m.status ?? "active") === "active"), [memberships]);
@@ -87,7 +94,7 @@ export default function BatchesTimetablePage() {
     if (capacity !== null && selectedStudents.length > capacity) { setError(`Capacity is ${capacity}; you selected ${selectedStudents.length}.`); return; }
     setSaving(true); setError("");
     try {
-      for (const m of removals) { const { error: e } = await supabase.from("batch_students").delete().eq("batch_id", batchId).eq("student_id", String(m.student_id)); if (e) throw e; }
+      for (const m of removals) { const { error: e } = await supabase.from("batch_students").delete().eq("institute_id", instituteId).eq("batch_id", batchId).eq("student_id", String(m.student_id)); if (e) throw e; }
       for (const id of additions) await addR("batch_students", { batch_id: batchId, student_id: id, status: "active" });
       setStudentModal(null); await load(); setSuccess("Batch students updated successfully.");
     } catch (e) { await load(); setError(e instanceof Error ? e.message : "Unable to update students. A student may already belong to another active batch."); }
@@ -118,13 +125,13 @@ export default function BatchesTimetablePage() {
       const base = { batch_id: scheduleForm.batchId, teacher_id: scheduleForm.teacherId, subject_names: subjects, subject_name: subjects.join(" + "), start_time: scheduleForm.start, end_time: scheduleForm.end, room_id: scheduleForm.room || null, status: "active" };
       if (editingSchedule) {
         const dayNo = DAYS.indexOf(scheduleForm.days[0]) + 1;
-        const { error: e } = await supabase.from("timetable_entries").update({ ...base, day_of_week: dayNo }).eq("id", editingSchedule.id);
+        const { error: e } = await supabase.from("timetable_entries").update({ ...base, day_of_week: dayNo, institute_id: instituteId }).eq("institute_id", instituteId).eq("id", editingSchedule.id);
         if (e) throw e;
       } else {
         for (const day of scheduleForm.days) {
           const dayNo = DAYS.indexOf(day) + 1;
           const id = `tt-${Date.now()}-${dayNo}-${Math.random().toString(36).slice(2, 8)}`;
-          const { error: e } = await supabase.from("timetable_entries").insert({ id, ...base, day_of_week: dayNo });
+          const { error: e } = await supabase.from("timetable_entries").insert({ id, ...base, day_of_week: dayNo, institute_id: instituteId });
           if (e) throw e;
         }
       }
@@ -137,7 +144,7 @@ export default function BatchesTimetablePage() {
     if (!deleteSchedule) return;
     setSaving(true); setError("");
     try {
-      const { error: e } = await supabase.from("timetable_entries").delete().eq("id", String(deleteSchedule.id));
+      const { error: e } = await supabase.from("timetable_entries").delete().eq("institute_id", instituteId).eq("id", String(deleteSchedule.id));
       if (e) throw e;
       setDeleteSchedule(null); await load(); setSuccess("Timetable lecture deleted successfully.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to delete timetable lecture. Please try again."); }

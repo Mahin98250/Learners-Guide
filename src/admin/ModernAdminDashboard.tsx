@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import "@/admin/modern-admin-dashboard.css";
 
 type AdminUser = { name: string };
@@ -18,13 +19,15 @@ type Counts = {
 
 const EMPTY: Counts = { students: 0, teachers: 0, batches: 0, homework: 0, tests: 0, attendance: 0, fees: 0, announcements: 0 };
 
-async function count(table: string) {
-  const { count: value, error } = await supabase.from(table).select("id", { count: "exact", head: true });
+async function count(table: string, instituteId: string) {
+  const { count: value, error } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("institute_id", instituteId);
   if (error) throw error;
   return value || 0;
 }
 
 export function ModernAdminDashboard({ user, onNavigate }: Props) {
+  const { instituteId, tenant } = useInstituteWorkspace();
+  const workspaceName = tenant?.display_name || tenant?.name || "Institute";
   const [counts, setCounts] = useState<Counts>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,9 +37,14 @@ export function ModernAdminDashboard({ user, onNavigate }: Props) {
     (async () => {
       setLoading(true);
       setError("");
+      if (!instituteId) {
+        setError("An active institute workspace must be selected.");
+        setLoading(false);
+        return;
+      }
       const keys: Array<keyof Counts> = ["students", "teachers", "batches", "homework", "tests", "attendance", "fees", "announcements"];
       const tables = ["students", "teachers", "batches", "homework", "tests", "attendance", "fees", "announcements"];
-      const results = await Promise.allSettled(tables.map((table) => count(table)));
+      const results = await Promise.allSettled(tables.map((table) => count(table, instituteId)));
       if (!live) return;
       const next = { ...EMPTY };
       const failed: string[] = [];
@@ -49,7 +57,7 @@ export function ModernAdminDashboard({ user, onNavigate }: Props) {
       setLoading(false);
     })();
     return () => { live = false; };
-  }, []);
+  }, [instituteId]);
 
   const cards = [
     ["Students", "🎓", counts.students, "People enrolled"],
@@ -75,7 +83,7 @@ export function ModernAdminDashboard({ user, onNavigate }: Props) {
     <div className="modern-dashboard">
       <section className="modern-dashboard-hero">
         <div className="modern-dashboard-hero-copy">
-          <span className="modern-dashboard-eyebrow">LEARNER'S GUIDE · ADMIN CONTROL CENTER</span>
+          <span className="modern-dashboard-eyebrow">{workspaceName.toUpperCase()} · ADMIN CONTROL CENTER</span>
           <h2>Good to see you, {user.name || "Admin"}. 👋</h2>
           <p>Everything important about your institute, in one simple control center.</p>
         </div>

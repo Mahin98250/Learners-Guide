@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { getCurrentUser, signOut, onAuthStateChange } from "@/lg/auth";
+import { getCurrentUser, signOut } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
+import { DesktopOnlyGate } from "@/admin/DesktopOnlyGate";
+import { InstituteWorkspaceGate, InstituteWorkspaceProvider } from "@/lg/tenant-context";
 
 const AdminLogin = lazy(() =>
   import("@/admin/AdminLogin").then((module) => ({ default: module.AdminLogin })),
@@ -60,17 +62,25 @@ function AdminRoute() {
     };
   }, [user, load]);
 
-  if (checking && !user) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>;
-  if (!user) {
-    return (
-      <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin sign-in…</div>}>
-        <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void syncAdmin(admin); }} />
-      </Suspense>
-    );
-  }
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>}>
-      <AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />
-    </Suspense>
+    <DesktopOnlyGate>
+      {checking && !user ? (
+        <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>
+          Loading admin portal…
+        </div>
+      ) : !user ? (
+        <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin sign-in…</div>}>
+          <AdminLogin onSuccess={(admin: AdminRouteUser) => { setUser(admin); void syncAdmin(admin); }} />
+        </Suspense>
+      ) : (
+        <InstituteWorkspaceProvider>
+          <InstituteWorkspaceGate>
+            <Suspense fallback={<div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>Loading admin portal…</div>}>
+              <AdminWithDrive user={user} onLogout={async () => { clearCache(); await signOut(); setUser(null); window.location.assign("/"); }} />
+            </Suspense>
+          </InstituteWorkspaceGate>
+        </InstituteWorkspaceProvider>
+      )}
+    </DesktopOnlyGate>
   );
 }

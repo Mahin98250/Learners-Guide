@@ -2,12 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { C, ROLES } from "@/lg/data";
 import { LGLogo, GLOBAL_CSS, Bubbles, BackBtn } from "@/lg/ui";
+import type { InstituteTenant } from "@/lg/tenant";
 
 export type Role = "teacher" | "student" | "parent";
 
-export function RoleSelect({ onNext }: { onNext: (role: Role) => void }) {
+export function RoleSelect({ onNext, tenant }: { onNext: (role: Role) => void; tenant?: InstituteTenant | null }) {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Role | "">("");
+  const brandName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const primaryColor = tenant?.primary_color || "#FFFFFF";
 
   const choose = (role: Role) => {
     setSelected(role);
@@ -51,13 +54,21 @@ export function RoleSelect({ onNext }: { onNext: (role: Role) => void }) {
               justifyContent: "center",
               border: "1px solid rgba(255,255,255,.14)",
               boxShadow: "0 18px 45px rgba(0,0,0,.2)",
+              overflow: "hidden",
             }}
           >
-            <LGLogo size={62} showText={false} light />
+            {tenant?.logo_url ? (
+              <img src={tenant.logo_url} alt="" style={{ width: 62, height: 62, objectFit: "contain" }} />
+            ) : (
+              <LGLogo size={62} showText={false} light />
+            )}
           </div>
           <h1 style={{ margin: "20px 0 7px", fontSize: 28, fontWeight: 900, letterSpacing: -0.5 }}>
-            Learner's Guide
+            {brandName}
           </h1>
+          {tenant?.primary_color && (
+            <div style={{ width: 42, height: 4, borderRadius: 999, background: primaryColor, margin: "0 auto 8px" }} />
+          )}
           <p style={{ margin: 0, color: "rgba(255,255,255,.62)", fontSize: 14 }}>
             Choose how you want to sign in.
           </p>
@@ -106,14 +117,7 @@ export function RoleSelect({ onNext }: { onNext: (role: Role) => void }) {
                 </span>
                 <span style={{ flex: 1 }}>
                   <strong style={{ display: "block", fontSize: 17 }}>{role.label}</strong>
-                  <span
-                    style={{
-                      display: "block",
-                      marginTop: 4,
-                      fontSize: 12,
-                      color: "rgba(255,255,255,.55)",
-                    }}
-                  >
+                  <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "rgba(255,255,255,.55)" }}>
                     {role.sub}
                   </span>
                 </span>
@@ -123,14 +127,7 @@ export function RoleSelect({ onNext }: { onNext: (role: Role) => void }) {
           })}
         </section>
 
-        <p
-          style={{
-            textAlign: "center",
-            margin: "24px 0 0",
-            color: "rgba(255,255,255,.35)",
-            fontSize: 11,
-          }}
-        >
+        <p style={{ textAlign: "center", margin: "24px 0 0", color: "rgba(255,255,255,.35)", fontSize: 11 }}>
           Login credentials are provided by your institute administrator.
         </p>
       </div>

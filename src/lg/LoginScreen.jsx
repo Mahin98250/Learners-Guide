@@ -3,7 +3,7 @@ import { C, ROLES } from "@/lg/data";
 import { signIn } from "@/lg/auth";
 import { LGLogo, GLOBAL_CSS, Bubbles, Inp, WBtn, EyeBtn, BackBtn } from "@/lg/ui";
 
-export function LoginScreen({ role, onBack, onLogin, onForgotPassword }) {
+export function LoginScreen({ role, onBack, onLogin, onForgotPassword, tenant }) {
   const [loginId, setLoginId] = useState("");
   const [pass, setPass] = useState("");
   const [showP, setShowP] = useState(false);
@@ -11,6 +11,8 @@ export function LoginScreen({ role, onBack, onLogin, onForgotPassword }) {
   const [loading, setLoading] = useState(false);
   const rc = ROLES.find((r) => r.key === role) || ROLES[0];
   const roleEmojis = { teacher: "👨‍🏫", student: "🎓", parent: "👨‍👩‍👧" };
+  const brandName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const primaryColor = tenant?.primary_color || "#4357e8";
 
   const handle = async () => {
     if (!loginId || !pass) { setErr("Fill all fields."); return; }
@@ -27,8 +29,14 @@ export function LoginScreen({ role, onBack, onLogin, onForgotPassword }) {
       <div style={{ position: "absolute", top: 18, left: 18, zIndex: 10 }}><BackBtn onClick={onBack} /></div>
       <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "76px 22px 40px" }}>
         <div className="fu" style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
-          <div className="logo-float"><LGLogo size={70} showText={false} light /></div>
-          <div style={{ marginTop: 10, fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: 1.2 }}>LEARNER'S GUIDE</div>
+          <div className="logo-float" style={{ border: `2px solid ${primaryColor}55`, borderRadius: 18, padding: 4 }}>
+            {tenant?.logo_url ? (
+              <img src={tenant.logo_url} alt="" style={{ width: 62, height: 62, objectFit: "contain", display: "block" }} />
+            ) : (
+              <LGLogo size={70} showText={false} light />
+            )}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: 1.2 }}>{brandName}</div>
           <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 48, height: 48, borderRadius: 15, background: rc.grad, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: `0 8px 22px ${rc.color}44` }}>{roleEmojis[role] || "🔐"}</div>
             <div><div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Welcome back!</div><div style={{ fontSize: 12, color: "rgba(255,255,255,.5)" }}>Login as {rc.label}</div></div>

@@ -1,11 +1,11 @@
 name: Deploy to GitHub Pages
 
-# GitHub Pages is an optional manual deployment for this private project.
-# Automatic production verification/deployment is handled by the production-check
-# workflow and the hosted application. Pages cannot be auto-enabled by the current
-# repository integration, so do not fail every normal push because the Pages site
-# has not been enabled in repository settings.
+# Deploy the built application when GitHub Pages is configured for this repository.
+# The Pages settings are managed in GitHub; this workflow only builds, packages,
+# and deploys the static artifact.
 on:
+  push:
+    branches: [feat/multi-tenant-foundation, main]
   workflow_dispatch:
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
           test -f dist/index.html
-          for route in admin auth app; do
+          for route in admin auth app owner; do
             mkdir -p "dist/$route"
             cp dist/index.html "dist/$route/index.html"
           done
@@ -45,15 +45,13 @@ jobs:
           test -f dist/admin/index.html
           test -f dist/auth/index.html
           test -f dist/app/index.html
+          test -f dist/owner/index.html
           test -f dist/manifest.webmanifest
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-        with:
-          enablement: false
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
+
   deploy:
     needs: build
     runs-on: ubuntu-latest

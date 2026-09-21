@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { LGLogo } from "@/lg/ui";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
@@ -8,8 +9,8 @@ type Metric = { label: string; value: number; icon: string; note: string; tone: 
 
 const A = { bg: "#F4F7FB", ink: "#0F1B3D", sub: "#64748B", border: "#E2E8F0", accent: "#4361EE", green: "#16A34A", red: "#DC2626" };
 
-const countRows = async (table: string) => {
-  const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true });
+const countRows = async (table: string, instituteId: string) => {
+  const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("institute_id", instituteId);
   if (error) throw error;
   return count || 0;
 };
@@ -23,6 +24,7 @@ function Action({ icon, title, text, tone, onClick }: { icon: string; title: str
 }
 
 export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
+  const { instituteId } = useInstituteWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [metrics, setMetrics] = useState<Metric[]>([]);
@@ -35,7 +37,12 @@ export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
     setLoading(true);
     setError("");
     const problems: string[] = [];
-    const safeCount = async (table: string, label: string) => { try { return await countRows(table); } catch { problems.push(label); return 0; } };
+    if (!instituteId) {
+      setError("An active institute workspace must be selected.");
+      setLoading(false);
+      return;
+    }
+    const safeCount = async (table: string, label: string) => { try { return await countRows(table, instituteId); } catch { problems.push(label); return 0; } };
     try {
       const [students, teachers, batches, homework, tests] = await Promise.all([
         safeCount("students", "students"), safeCount("teachers", "teachers"), safeCount("batches", "batches"),
@@ -51,10 +58,10 @@ export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
       ]);
 
       const [attendance, fees, testsUpcoming, announcements] = await Promise.all([
-        supabase.from("attendance").select("status"),
-        supabase.from("fees").select("status,amount"),
-        supabase.from("tests").select("id").gte("test_date", today).order("test_date", { ascending: true }),
-        supabase.from("announcements").select("id,title,date,target").order("date", { ascending: false }).limit(4),
+        supabase.from("attendance").select("status").eq("institute_id", instituteId),
+        supabase.from("fees").select("status,amount").eq("institute_id", instituteId),
+        supabase.from("tests").select("id").eq("institute_id", instituteId).gte("test_date", today).order("test_date", { ascending: true }),
+        supabase.from("announcements").select("id,title,date,target").eq("institute_id", instituteId).order("date", { ascending: false }).limit(4),
       ]);
       if (attendance.error) problems.push("attendance");
       if (fees.error) problems.push("fees");
@@ -75,7 +82,7 @@ export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [instituteId]);
 
   const goBack = () => {
     if (window.history.length > 1) window.history.back();

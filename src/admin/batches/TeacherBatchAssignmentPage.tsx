@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { gdb } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 
 type Row = Record<string, any> & { id?: string | number };
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -51,6 +52,9 @@ export default function TeacherBatchAssignmentPage() {
   };
 
   const save = async () => {
+    const context = await getCurrentInstituteContext();
+    const instituteId = context.membership?.institute_id;
+    if (!instituteId) throw new Error("An active institute workspace must be selected.");
     setError("");
     setMessage("");
     if (!batchId || !teacherId || !subjectIds.length || !days.length || !start || !end) {
@@ -70,6 +74,7 @@ export default function TeacherBatchAssignmentPage() {
         const subjectName = String(subject.name ?? subject.subject_name ?? subject.title ?? subject.id);
         const { error: assignmentError } = await supabase.from("batch_teachers").upsert(
           {
+            institute_id: instituteId,
             batch_id: batchId,
             teacher_id: teacherId,
             subject_id: String(subject.id),
@@ -84,6 +89,7 @@ export default function TeacherBatchAssignmentPage() {
           const dayNo = DAYS.indexOf(day) + 1;
           const { error: timetableError } = await supabase.from("timetable_entries").insert({
             id: `tt-${Date.now()}-${dayNo}-${String(subject.id)}-${Math.random().toString(36).slice(2, 7)}`,
+            institute_id: instituteId,
             batch_id: batchId,
             teacher_id: teacherId,
             subject_name: subjectName,
