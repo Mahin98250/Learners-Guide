@@ -10,12 +10,14 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as OwnerRouteImport } from './routes/owner'
+import { Route as OwnerRouteImport } from './routes/owner'
 
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const AppRoute = AppRouteImport.update({ id: '/app', path: '/app', getParentRoute: () => rootRouteImport } as any)
 const AuthRoute = AuthRouteImport.update({ id: '/auth', path: '/auth', getParentRoute: () => rootRouteImport } as any)
 const AdminRoute = AdminRouteImport.update({ id: '/admin', path: '/admin', getParentRoute: () => rootRouteImport } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({ id: '/reset-password', path: '/reset-password', getParentRoute: () => rootRouteImport } as any)
+const OwnerRoute = OwnerRouteImport.update({ id: '/owner', path: '/owner', getParentRoute: () => rootRouteImport } as any)
 const OwnerRoute = OwnerRouteImport.update({ id: '/owner', path: '/owner', getParentRoute: () => rootRouteImport } as any)
 
 export interface FileRoutesByFullPath { '/': typeof IndexRoute; '/app': typeof AppRoute; '/auth': typeof AuthRoute; '/admin': typeof AdminRoute; '/reset-password': typeof ResetPasswordRoute; '/owner': typeof OwnerRoute }
@@ -38,6 +40,7 @@ declare module '@tanstack/react-router' {
     '/auth': { id: '/auth'; path: '/auth'; fullPath: '/auth'; preLoaderRoute: typeof AuthRouteImport; parentRoute: typeof rootRouteImport }
     '/admin': { id: '/admin'; path: '/admin'; fullPath: '/admin'; preLoaderRoute: typeof AdminRouteImport; parentRoute: typeof rootRouteImport }
     '/reset-password': { id: '/reset-password'; path: '/reset-password'; fullPath: '/reset-password'; preLoaderRoute: typeof ResetPasswordRouteImport; parentRoute: typeof rootRouteImport }
+    '/owner': { id: '/owner'; path: '/owner'; fullPath: '/owner'; preLoaderRoute: typeof OwnerRouteImport; parentRoute: typeof rootRouteImport }
     '/owner': { id: '/owner'; path: '/owner'; fullPath: '/owner'; preLoaderRoute: typeof OwnerRouteImport; parentRoute: typeof rootRouteImport }
   }
 }
