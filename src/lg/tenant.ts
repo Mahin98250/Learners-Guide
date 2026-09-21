@@ -36,6 +36,26 @@ export function getCurrentHostname() {
   return normalizeHostname(window.location.hostname);
 }
 
+const ACTIVE_INSTITUTE_STORAGE_KEY = "lg-active-institute-id";
+
+export function getPreferredInstituteId() {
+  if (typeof window === "undefined") return "";
+  try {
+    return String(window.localStorage.getItem(ACTIVE_INSTITUTE_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function setPreferredInstituteId(instituteId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(ACTIVE_INSTITUTE_STORAGE_KEY, instituteId);
+  } catch {
+    // Storage can be unavailable in hardened/private browser contexts.
+  }
+}
+
 /**
  * Public branding/routing lookup performed before authentication.
  * This does not grant institute data access.
@@ -72,6 +92,12 @@ export async function getCurrentInstituteContext() {
   if (tenant) {
     const membership = memberships.find((item) => item.institute_id === tenant.institute_id) || null;
     return { tenant, membership, memberships };
+  }
+
+  const preferredId = getPreferredInstituteId();
+  if (preferredId) {
+    const preferred = memberships.find((item) => item.institute_id === preferredId) || null;
+    if (preferred) return { tenant: null, membership: preferred, memberships };
   }
 
   if (memberships.length === 1) {
