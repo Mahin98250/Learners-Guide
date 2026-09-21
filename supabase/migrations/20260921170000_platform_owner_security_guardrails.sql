@@ -1,0 +1,6 @@
+-- Platform owner 10x security guardrails.
+-- These are intentionally kept executable by authenticated callers because the browser invokes
+-- them through PostgREST. Each function performs its own active platform-membership check.
+-- The new functions also pin search_path to trusted schemas.
+-- Public domain resolution remains executable by anon intentionally for pre-login tenant discovery.
+-- Do not revoke authenticated execution from RLS helper functions: policies depend on it.
