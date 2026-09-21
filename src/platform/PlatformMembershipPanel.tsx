@@ -4,7 +4,7 @@ import { supabase } from "@/lg/supabase";
 type Institute = { id: string; name: string; slug: string };
 type Person = { id: string; display_name: string | null; email: string | null; phone: string | null; status: string };
 type Membership = { id: string; institute_id: string; person_id: string; role: string; status: string };
-type Role = { institute_id: string; role_key: string; display_name: string };
+type Role = { institute_id: string; role_key: string; name: string };
 
 export function PlatformMembershipPanel({ institutes }: { institutes: Institute[] }) {
   const [people, setPeople] = useState<Person[]>([]);
@@ -22,7 +22,7 @@ export function PlatformMembershipPanel({ institutes }: { institutes: Institute[
     const [peopleResult, membershipsResult, rolesResult] = await Promise.all([
       supabase.from("people").select("id,display_name,email,phone,status").eq("status", "active").order("display_name"),
       supabase.from("institute_memberships").select("id,institute_id,person_id,role,status").order("created_at", { ascending: false }),
-      supabase.from("institute_roles").select("institute_id,role_key,display_name").eq("status", "active").order("display_name"),
+      supabase.from("institute_roles").select("institute_id,role_key,name").eq("status", "active").order("display_name"),
     ]);
     if (peopleResult.error) throw peopleResult.error;
     if (membershipsResult.error) throw membershipsResult.error;
@@ -92,7 +92,7 @@ export function PlatformMembershipPanel({ institutes }: { institutes: Institute[
           {filteredPeople.map((person) => <option key={person.id} value={person.id}>{person.display_name || person.email || person.phone || person.id}</option>)}
         </select>
         <select value={roleKey} onChange={(e) => setRoleKey(e.target.value)} disabled={!selectedRoles.length} style={{ padding: 11, borderRadius: 10, border: "1px solid #d8dee9" }}>
-          {selectedRoles.length ? selectedRoles.map((role) => <option key={role.role_key} value={role.role_key}>{role.display_name} · {role.role_key}</option>) : <option value="">Choose institute first</option>}
+          {selectedRoles.length ? selectedRoles.map((role) => <option key={role.role_key} value={role.role_key}>{role.name} · {role.role_key}</option>) : <option value="">Choose institute first</option>}
         </select>
         <button type="button" disabled={busy || !instituteId || !personId || !roleKey} onClick={() => void assign()} style={{ border: 0, borderRadius: 10, background: "#4f46e5", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: busy || !instituteId || !personId || !roleKey ? .55 : 1 }}>Assign / update</button>
       </div>
