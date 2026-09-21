@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 
 type Row = Record<string, any>;
@@ -21,13 +22,13 @@ export function StudentReportCardPrintV2({ student, onReady, onError }: Props) {
   useEffect(() => { let live = true; (async () => { try {
     const id = clean(student.id);
     const [attendance, resultRows, legacyMarks, homework, leaves, batches, academicYears] = await Promise.all([
-      supabase.from("attendance").select("id,sid,date,status").eq("sid", id).order("date", { ascending: true }),
-      supabase.from("test_results").select("id,test_id,student_id,marks,remarks,created_at").eq("student_id", id).order("created_at", { ascending: true }),
-      supabase.from("marks").select("id,sid,subject,exam,marks,total,totalMarks,score,date").eq("sid", id).order("date", { ascending: true }),
-      supabase.from("homework").select("id,subject,given,due,completedby,batch_id").order("given", { ascending: true }),
-      supabase.from("leave_requests").select("id,from_date,to_date,status,reason").eq("student_id", id).order("from_date", { ascending: true }),
-      supabase.from("batch_students").select("batch_id,status").eq("student_id", id),
-      supabase.from("academic_years").select("id,name,start_date,end_date,status").order("start_date", { ascending: false }).limit(1),
+      supabase.from("attendance").select("id,sid,date,status").eq("institute_id", instituteId).eq("sid", id).order("date", { ascending: true }),
+      supabase.from("test_results").select("id,test_id,student_id,marks,remarks,created_at").eq("institute_id", instituteId).eq("student_id", id).order("created_at", { ascending: true }),
+      supabase.from("marks").select("id,sid,subject,exam,marks,total,totalMarks,score,date").eq("institute_id", instituteId).eq("sid", id).order("date", { ascending: true }),
+      supabase.from("homework").select("id,subject,given,due,completedby,batch_id").eq("institute_id", instituteId).order("given", { ascending: true }),
+      supabase.from("leave_requests").select("id,from_date,to_date,status,reason").eq("institute_id", instituteId).eq("student_id", id).order("from_date", { ascending: true }),
+      supabase.from("batch_students").select("batch_id,status").eq("institute_id", instituteId).eq("student_id", id),
+      supabase.from("academic_years").select("id,name,start_date,end_date,status").eq("institute_id", instituteId).order("start_date", { ascending: false }).limit(1),
     ]);
     for (const q of [attendance, resultRows, legacyMarks, homework, leaves, batches, academicYears]) if (q.error) throw q.error;
     const testIds = [...new Set((resultRows.data || []).map((r: Row) => clean(r.test_id)).filter(Boolean))];
