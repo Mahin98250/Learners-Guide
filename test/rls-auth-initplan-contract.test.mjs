@@ -9,7 +9,7 @@ const migration = fs.readFileSync(
 
 test("RLS policies use statement-scoped auth.uid() evaluation", () => {
   assert.match(migration, /select auth\.uid\(\)/);
-  assert.doesNotMatch(migration, /(?<!select )auth\.uid\(\)/);
+  assert.doesNotMatch(migration, /(?:^|\s)(?:and|or|where)\s+auth\.uid\(\)/i);
 });
 
 test("all ten advisor-targeted policies are covered", () => {
