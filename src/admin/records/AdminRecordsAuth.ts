@@ -1,6 +1,6 @@
 import { gdb } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
-import { getCurrentInstituteContext } from "@/lg/tenant";
+import { getCurrentInstituteContext, hasInstitutePermission } from "@/lg/tenant";
 import type { ProvisionRole, Kind, Row } from "./AdminRecordsConstants";
 
 export async function ensureAdminSession() {
@@ -16,7 +16,12 @@ export async function ensureAdminSession() {
     }
     session = refreshed.data.session;
   }
-  if (session.user.app_metadata?.role !== "admin") throw new Error("Administrator access is required to manage student accounts.");
+  const context = await getCurrentInstituteContext();
+  const instituteId = context.membership?.institute_id;
+  if (!instituteId) throw new Error("An active institute workspace must be selected before managing accounts.");
+  if (!(await hasInstitutePermission(instituteId, "people.manage"))) {
+    throw new Error("You do not have permission to manage institute accounts.");
+  }
   return session;
 }
 

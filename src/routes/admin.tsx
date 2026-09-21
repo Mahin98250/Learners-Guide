@@ -4,6 +4,7 @@ import { getCurrentUser, signOut } from "@/lg/auth";
 import { clearCache } from "@/lg/data";
 import { DesktopOnlyGate } from "@/admin/DesktopOnlyGate";
 import { InstituteWorkspaceGate, InstituteWorkspaceProvider } from "@/lg/tenant-context";
+import { getCurrentInstituteContext, hasInstitutePermission } from "@/lg/tenant";
 
 const AdminLogin = lazy(() =>
   import("@/admin/AdminLogin").then((module) => ({ default: module.AdminLogin })),
@@ -35,6 +36,15 @@ function AdminRoute() {
     try {
       const current = (await getCurrentUser()) as AdminRouteUser | null;
       if (!current || current.role !== "admin") {
+        clearCache();
+        setUser(null);
+        setChecking(false);
+        return;
+      }
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      const allowed = instituteId ? await hasInstitutePermission(instituteId, "people.manage") : false;
+      if (!allowed) {
         clearCache();
         setUser(null);
         setChecking(false);
