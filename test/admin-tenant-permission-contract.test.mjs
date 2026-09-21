@@ -13,8 +13,7 @@ test("tenant helper exposes server-side permission checks", () => {
 });
 
 test("admin route requires an active tenant permission", () => {
-  assert.match(adminRoute, /getCurrentInstituteContext/);
-  assert.match(adminRoute, /hasInstitutePermission/);
+  assert.match(adminRoute, /getVerifiedAdminAccess/);
   assert.match(adminRoute, /people\.manage/);
 });
 
