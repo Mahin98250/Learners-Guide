@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-const source = fs.readFileSync("supabase/migrations/20260921214000_institute_membership_provisioning_rpc.sql", "utf8").toLowerCase();
+const source = [
+  fs.readFileSync("supabase/migrations/20260921214000_institute_membership_provisioning_rpc.sql", "utf8"),
+  fs.readFileSync("supabase/migrations/20260921220000_harden_account_membership_self_targeting.sql", "utf8"),
+].join("\n").toLowerCase();
 
 test("phase 4 membership synchronization is security-definer and tenant scoped", () => {
   assert.match(source, /sync_institute_account_membership/);
