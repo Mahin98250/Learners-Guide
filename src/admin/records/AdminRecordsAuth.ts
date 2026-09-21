@@ -1,5 +1,6 @@
 import { gdb } from "@/lg/data";
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 import type { ProvisionRole, Kind, Row } from "./AdminRecordsConstants";
 
 export async function ensureAdminSession() {
@@ -21,9 +22,26 @@ export async function ensureAdminSession() {
 
 export async function provision(role: ProvisionRole, loginId: string, name: string, ref: string, action: "create" | "update" | "delete", authId?: string | null, password?: string) {
   await ensureAdminSession();
-  const body: Record<string, unknown> = { action, role, loginId, name, ref };
+  const context = await getCurrentInstituteContext();
+  const instituteId = context.membership?.institute_id;
+  if (!instituteId) throw new Error("An active institute workspace must be selected before provisioning an account.");
+  const body: Record<string, unknown> = { action, role, loginId, name, ref, instituteId };
   if (authId) body.authId = authId;
   if (password) body.password = password;
+
+  if (action === "delete") {
+    const scoped = await supabase.rpc("remove_institute_account_membership", {
+      p_institute_id: instituteId,
+      p_auth_id: authId || "",
+      p_role_key: role,
+    });
+    if (scoped.error) throw scoped.error;
+    const scopedRow = Array.isArray(scoped.data) ? scoped.data[0] : scoped.data;
+    if (scopedRow?.remaining_memberships > 0) {
+      return { authId: authId || undefined, deleted: false, membershipRemoved: Boolean(scopedRow.membership_removed), remainingMemberships: Number(scopedRow.remaining_memberships) };
+    }
+  }
+
   let result = await supabase.functions.invoke("admin-provision-user", { body });
   if (result.error && /401|unauthorized|jwt|token|authorization/i.test(result.error.message || "")) {
     await ensureAdminSession();
@@ -31,7 +49,21 @@ export async function provision(role: ProvisionRole, loginId: string, name: stri
   }
   if (result.error) throw new Error(result.error.message || "Authentication service failed.");
   if (result.data?.error) throw new Error(String(result.data.error));
-  return result.data as { authId?: string; email?: string; deleted?: boolean; repaired?: boolean; created?: boolean; updated?: boolean };
+
+  if (action !== "delete") {
+    const synced = await supabase.rpc("sync_institute_account_membership", {
+      p_institute_id: instituteId,
+      p_auth_id: String(result.data?.authId || authId || ""),
+      p_role_key: role,
+      p_name: name,
+      p_email: String(result.data?.email || ""),
+      p_phone: loginId,
+      p_ref: ref,
+    });
+    if (synced.error) throw synced.error;
+  }
+
+  return result.data as { authId?: string; email?: string; deleted?: boolean; repaired?: boolean; created?: boolean; updated?: boolean; membershipRemoved?: boolean; remainingMemberships?: number };
 }
 
 export const normalizePhone = (value: string): string => value.replace(/\s+/g, "").trim();
