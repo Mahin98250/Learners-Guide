@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
-import { getCurrentInstituteContext } from "@/lg/tenant";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 
 type Row = Record<string, any>;
@@ -25,6 +25,7 @@ const fmtMonth = (v: any) => {
 const grade = (v: number | null) => v == null ? "—" : v >= 90 ? "A+" : v >= 80 ? "A" : v >= 70 ? "B+" : v >= 60 ? "B" : v >= 50 ? "C" : v >= 40 ? "D" : "F";
 
 export function StudentReportCardPrint({ student, onReady, onError }: Props) {
+  const { instituteId } = useInstituteWorkspace();
   const [state, setState] = useState<{ loading: boolean; error: string; data: any | null }>({ loading: true, error: "", data: null });
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function StudentReportCardPrint({ student, onReady, onError }: Props) {
       }
     })();
     return () => { live = false; };
-  }, [student.id, onError]);
+  }, [student.id, onError, instituteId]);
 
   useEffect(() => {
     if (!state.loading && state.data && !state.error) onReady?.();
