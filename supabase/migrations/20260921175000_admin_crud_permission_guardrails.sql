@@ -140,3 +140,158 @@ comment on policy admin_permission_read_students on public.students is
   'Admin 10X: student reads require students.read; platform members remain allowed.';
 comment on policy admin_permission_update_students on public.students is
   'Admin 10X: student writes require students.manage; platform members remain allowed.';
+
+
+-- Storage 100X guardrails:
+-- Database-row RLS does not protect the Storage API. Existing storage policies
+-- historically treated every admin as a global bucket administrator. Keep
+-- non-admin behavior unchanged, but require the canonical institute permission
+-- for admin access and bind new uploads to an institute-prefixed path.
+do $$
+begin
+  execute $sql$
+    create policy admin_permission_materials_storage_read
+      on storage.objects as restrictive
+      for select to authenticated
+      using (
+        bucket_id <> 'materials'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.materials m
+          where m.storage_path = storage.objects.name
+            and public.user_has_institute_permission(m.institute_id, 'materials.read')
+        )
+      )
+  $sql$;
+  execute $sql$
+    create policy admin_permission_materials_storage_insert
+      on storage.objects as restrictive
+      for insert to authenticated
+      with check (
+        bucket_id <> 'materials'
+        or public.app_role() <> 'admin'
+        or (
+          split_part(name, '/', 1) = 'institute'
+          and split_part(name, '/', 2) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          and public.user_has_institute_permission(split_part(name, '/', 2)::uuid, 'materials.manage')
+        )
+      )
+  $sql$;
+  execute $sql$
+    create policy admin_permission_materials_storage_update
+      on storage.objects as restrictive
+      for update to authenticated
+      using (
+        bucket_id <> 'materials'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.materials m
+          where m.storage_path = storage.objects.name
+            and public.user_has_institute_permission(m.institute_id, 'materials.manage')
+        )
+      )
+      with check (
+        bucket_id <> 'materials'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.materials m
+          where m.storage_path = storage.objects.name
+            and public.user_has_institute_permission(m.institute_id, 'materials.manage')
+        )
+      )
+  $sql$;
+  execute $sql$
+    create policy admin_permission_materials_storage_delete
+      on storage.objects as restrictive
+      for delete to authenticated
+      using (
+        bucket_id <> 'materials'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.materials m
+          where m.storage_path = storage.objects.name
+            and public.user_has_institute_permission(m.institute_id, 'materials.manage')
+        )
+      )
+  $sql$;
+
+  execute $sql$
+    create policy admin_permission_homework_storage_read
+      on storage.objects as restrictive
+      for select to authenticated
+      using (
+        bucket_id <> 'homework'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.homework h
+          where h.storage_path = storage.objects.name
+            and public.user_has_institute_permission(h.institute_id, 'homework.read')
+        )
+      )
+  $sql$;
+  execute $sql$
+    create policy admin_permission_homework_storage_insert
+      on storage.objects as restrictive
+      for insert to authenticated
+      with check (
+        bucket_id <> 'homework'
+        or public.app_role() <> 'admin'
+        or (
+          split_part(name, '/', 1) = 'institute'
+          and split_part(name, '/', 2) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          and public.user_has_institute_permission(split_part(name, '/', 2)::uuid, 'homework.manage')
+        )
+      )
+  $sql$;
+  execute $sql$
+    create policy admin_permission_homework_storage_update
+      on storage.objects as restrictive
+      for update to authenticated
+      using (
+        bucket_id <> 'homework'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.homework h
+          where h.storage_path = storage.objects.name
+            and public.user_has_institute_permission(h.institute_id, 'homework.manage')
+        )
+      )
+      with check (
+        bucket_id <> 'homework'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.homework h
+          where h.storage_path = storage.objects.name
+            and public.user_has_institute_permission(h.institute_id, 'homework.manage')
+        )
+      )
+  $sql$;
+  execute $sql$
+    create policy admin_permission_homework_storage_delete
+      on storage.objects as restrictive
+      for delete to authenticated
+      using (
+        bucket_id <> 'homework'
+        or public.app_role() <> 'admin'
+        or exists (
+          select 1
+          from public.homework h
+          where h.storage_path = storage.objects.name
+            and public.user_has_institute_permission(h.institute_id, 'homework.manage')
+        )
+      )
+  $sql$;
+end
+$$;
+
+comment on policy admin_permission_materials_storage_insert on storage.objects is
+  'Admin 100X: new material uploads must use institute/<institute_id>/... and materials.manage.';
+comment on policy admin_permission_homework_storage_insert on storage.objects is
+  'Admin 100X: new homework uploads must use institute/<institute_id>/... and homework.manage.';
