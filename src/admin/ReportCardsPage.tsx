@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lg/supabase";
+import { gdb } from "@/lg/data";
 import { PeopleAnalyticsReportBridge } from "@/admin/PeopleAnalyticsReportBridge";
 
 type Row = Record<string, any> & { id: string };
@@ -23,22 +23,21 @@ export default function ReportCardsPage() {
       setLoading(true);
       setError("");
       try {
-        const [studentResult, batchResult, membershipResult] = await Promise.all([
-          supabase.from("students").select("id,name,sid,cls,sec,status,parentname,parentphone").order("name", { ascending: true }),
-          supabase.from("batches").select("id,name,status").order("name", { ascending: true }),
-          supabase.from("batch_students").select("student_id,batch_id,status"),
+        const [studentRows, batchRows, membershipRows] = await Promise.all([
+          gdb("students"),
+          gdb("batches"),
+          gdb("batch_students"),
         ]);
-        for (const result of [studentResult, batchResult, membershipResult]) if (result.error) throw result.error;
-        const memberships = membershipResult.data || [];
-        const batchMap = new Map((batchResult.data || []).map((row: any) => [clean(row.id), row]));
-        const enriched = (studentResult.data || []).map((student: any) => {
-          const membership = memberships.find((row: any) => clean(row.student_id) === clean(student.id));
+        const memberships = membershipRows as Row[];
+        const batchMap = new Map((batchRows as Row[]).map((row) => [clean(row.id), row]));
+        const enriched = (studentRows as Row[]).map((student) => {
+          const membership = memberships.find((row) => clean(row.student_id) === clean(student.id));
           const linkedBatch = membership ? batchMap.get(clean(membership.batch_id)) : null;
           return { ...student, batch_id: membership?.batch_id || "", batch_name: linkedBatch?.name || "", batch_status: linkedBatch?.status || "" };
         });
         if (!live) return;
         setStudents(enriched);
-        setBatches((batchResult.data || []) as Batch[]);
+        setBatches((batchRows as Row[]) as Batch[]);
       } catch (err) {
         if (live) setError(err instanceof Error ? err.message : "Unable to load students for report cards.");
       } finally {
