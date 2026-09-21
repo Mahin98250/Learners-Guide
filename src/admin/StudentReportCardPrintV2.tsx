@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lg/supabase";
-import { getCurrentInstituteContext } from "@/lg/tenant";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 
 type Row = Record<string, any>;
@@ -18,6 +18,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 function Metric({ label, value }: { label: string; value: ReactNode }) { return <div className="rc-metric"><strong>{value}</strong><span>{label}</span></div>; }
 
 export function StudentReportCardPrintV2({ student, onReady, onError }: Props) {
+  const { instituteId } = useInstituteWorkspace();
   const [state, setState] = useState<{ loading: boolean; error: string; data: any | null }>({ loading: true, error: "", data: null });
   useEffect(() => { let live = true; (async () => { try {
     const id = clean(student.id);
@@ -42,7 +43,7 @@ export function StudentReportCardPrintV2({ student, onReady, onError }: Props) {
     const scopedHomework = (homework.data || []).filter((r: Row) => !r.batch_id || batchIds.has(clean(r.batch_id)));
     if (!live) return;
     setState({ loading: false, error: "", data: { attendance: attendance.data || [], results: canonical, marks: legacy, homework: scopedHomework, leaves: leaves.data || [], academicYear: (academicYears.data || [])[0] || null, batchId: (batches.data || [])[0]?.batch_id || "" } });
-  } catch (error) { if (!live) return; const message = error instanceof Error ? error.message : "Unable to generate report card."; setState({ loading: false, error: message, data: null }); onError?.(message); } })(); return () => { live = false; }; }, [student.id, onError]);
+  } catch (error) { if (!live) return; const message = error instanceof Error ? error.message : "Unable to generate report card."; setState({ loading: false, error: message, data: null }); onError?.(message); } })(); return () => { live = false; }; }, [student.id, onError, instituteId]);
   useEffect(() => { if (!state.loading && state.data && !state.error) onReady?.(); }, [state.loading, state.data, state.error, onReady]);
 
   const model = useMemo(() => { if (!state.data) return null; const d=state.data; const attendance=d.attendance as Row[];
