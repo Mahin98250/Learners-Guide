@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { supabase } from "@/lg/supabase";
 import "@/admin/admin-account.css";
 
@@ -23,6 +24,7 @@ function ProfilePage({ user }: { user: AdminUser }) {
 }
 
 function SecurityPage({ user }: { user: AdminUser }) {
+  const { instituteId } = useInstituteWorkspace();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [recoveryLoading, setRecoveryLoading] = useState(false);
@@ -37,13 +39,13 @@ function SecurityPage({ user }: { user: AdminUser }) {
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) { setError(sessionError.message); setLoading(false); return; }
       setEmail(data.session?.user?.email || "");
-      const result = await supabase.functions.invoke("admin-provision-user", { body: { action: "list-admins" } });
+      const result = await supabase.functions.invoke("admin-provision-user", { body: { action: "list-admins", instituteId } });
       if (result.error) setError(result.error.message || "Unable to load administrators.");
       else setAdmins(result.data?.admins || []);
       setLoading(false);
     };
     void load();
-  }, []);
+  }, [instituteId]);
 
   const sendRecovery = async () => {
     setNotice("");
@@ -69,6 +71,7 @@ function SecurityPage({ user }: { user: AdminUser }) {
 }
 
 function CreateAdminPage() {
+  const { instituteId } = useInstituteWorkspace();
   const [name, setName] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,11 +90,16 @@ function CreateAdminPage() {
     if (!validEmail(loginEmail)) { setError("Enter a valid administrator email address."); return; }
     if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     if (password !== confirm) { setError("Passwords do not match."); return; }
+    if (!instituteId) { setError("An active institute workspace must be selected."); return; }
     setLoading(true);
-    const { data, error: invokeError } = await supabase.functions.invoke("admin-provision-user", { body: { action: "create", role: "admin", loginId: loginEmail.trim(), password, name: name.trim() } });
+    const { data, error: invokeError } = await supabase.functions.invoke("admin-provision-user", { body: { action: "create", role: "admin", loginId: loginEmail.trim(), password, name: name.trim(), instituteId } });
     if (invokeError) setError(invokeError.message || "Unable to create administrator account.");
     else if (data?.error) setError(data.error);
-    else { setSuccess(`Administrator account created successfully. Login: ${data?.email || loginEmail.trim()}`); setName(""); setLoginEmail(""); setPassword(""); setConfirm(""); }
+    else if (!data?.authId) setError("Administrator authentication account was created, but no account ID was returned.");
+    else {
+      setSuccess(`Administrator account created successfully. Login: ${data?.email || loginEmail.trim()}`);
+      setName(""); setLoginEmail(""); setPassword(""); setConfirm("");
+    }
     setLoading(false);
   };
 
