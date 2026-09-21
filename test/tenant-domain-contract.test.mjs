@@ -7,8 +7,8 @@ const source = fs.readFileSync("src/lg/tenant.ts", "utf8");
 test("tenant resolver exposes hostname normalization", () => {
   assert.ok(source.includes("export function normalizeHostname(value: unknown)"));
   assert.ok(source.includes(".toLowerCase()"));
-  assert.ok(source.includes(".replace(/^https?:\\/\\//, "")"));
-  assert.ok(source.includes(".replace(/\\/$/, "")"));
+  assert.ok(source.includes(`.replace(/^https?:\\/\\//, "")`));
+  assert.ok(source.includes(`.replace(/\\/$/, "")`));
 });
 
 test("tenant resolver calls the server-side domain lookup RPC", () => {
