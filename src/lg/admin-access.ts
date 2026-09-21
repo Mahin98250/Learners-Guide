@@ -1,8 +1,8 @@
-import { getCurrentUser, type AuthUser } from "@/lg/auth";
+import { getCurrentUser } from "@/lg/auth";
 import { getCurrentInstituteContext, hasInstitutePermission, type InstituteMembershipContext, type InstituteTenant } from "@/lg/tenant";
 
 export type VerifiedAdminAccess = {
-  user: AuthUser;
+  user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
   tenant: InstituteTenant | null;
   membership: InstituteMembershipContext;
   memberships: InstituteMembershipContext[];
