@@ -4,6 +4,15 @@ import { readFileSync } from "node:fs";
 const queries = readFileSync("src/lg/data/queries.js", "utf8");
 const mutations = readFileSync("src/lg/data/mutations.js", "utf8");
 const migration = readFileSync("supabase/migrations/20260921175000_admin_crud_permission_guardrails.sql", "utf8");
+const directAdminFiles = [
+  "src/admin/HomeworkPage.tsx",
+  "src/admin/MaterialsDrive.tsx",
+  "src/admin/MaterialsDriveV2.tsx",
+  "src/admin/batches/BatchesTimetablePage.tsx",
+  "src/admin/batches/TeacherBatchAssignmentPage.tsx",
+  "src/admin/AdminAnalytics.tsx",
+  "src/admin/ModernAdminDashboard.tsx",
+].map(path => [path, readFileSync(path, "utf8")]);
 
 const readPermissions = [
   ["students", "students.read"],
