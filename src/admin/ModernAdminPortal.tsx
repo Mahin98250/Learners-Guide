@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { LGLogo } from "@/lg/ui";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
@@ -94,6 +95,9 @@ function PageFallback() {
 }
 
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
+  const { tenant, membership } = useInstituteWorkspace();
+  const workspaceName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const workspaceColor = tenant?.primary_color || "#4357e8";
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
@@ -120,7 +124,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
     <div className="modern-admin">
       <button type="button" className="modern-admin-mobile-back" onClick={() => setMobileOpen((open) => !open)} aria-label={mobileOpen ? "Close admin navigation" : "Open admin navigation"} aria-expanded={mobileOpen}>{mobileOpen ? "×" : "☰"}</button>
       <aside className={`modern-admin-sidebar ${mobileOpen ? "open" : ""}`}>
-        <div className="modern-admin-brand"><div className="modern-admin-brand-mark"><LGLogo size={58} showText={false} /></div><div><strong>Learner's Guide</strong><span>Admin Portal</span></div></div>
+        <div className="modern-admin-brand"><div className="modern-admin-brand-mark" style={{ borderColor: workspaceColor + "55" }}><LGLogo size={58} showText={false} /></div><div><strong>{workspaceName}</strong><span>Admin Portal · {membership?.role || "workspace"}</span></div></div>
         <nav className="modern-admin-nav" aria-label="Admin navigation">{GROUPS.map((group) => <div className="modern-admin-nav-group" key={group.label}><div className="modern-admin-nav-label">{group.label}</div>{group.items.map((item) => <button type="button" key={item.key} className={`modern-admin-nav-item ${active === item.key ? "active" : ""}`} onMouseEnter={() => preload(item)} onFocus={() => preload(item)} onClick={() => choose(item)}><span className="modern-admin-nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}</div>)}</nav>
         <div className="modern-admin-account-area">
           <div className="modern-admin-account-identity"><div className="modern-admin-avatar">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div className="modern-admin-profile-copy"><strong>{user.name || "Admin"}</strong><span>Administrator</span></div><span className="modern-admin-online" title="Signed in" /></div>
@@ -130,7 +134,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
         </div>
       </aside>
       <main className="modern-admin-main">
-        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">Learner's Guide <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
+        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">{workspaceName} <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div><button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
         <section className="modern-admin-content"><Suspense fallback={<PageFallback />}>{renderPage()}</Suspense></section>
       </main>
     </div>
