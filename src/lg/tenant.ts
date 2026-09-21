@@ -92,6 +92,7 @@ export async function getCurrentInstituteContext() {
   if (error) throw error;
 
   let memberships = (data || []) as InstituteMembershipContext[];
+  let settingsMap = new Map<string, any>();
   if (memberships.length) {
     const ids = memberships.map((item) => item.institute_id);
     const [{ data: institutes, error: instituteError }, { data: settings, error: settingsError }] = await Promise.all([
@@ -101,7 +102,7 @@ export async function getCurrentInstituteContext() {
     if (instituteError) throw instituteError;
     if (settingsError) throw settingsError;
     const instituteMap = new Map((institutes || []).map((item: any) => [String(item.id), item]));
-    const settingsMap = new Map((settings || []).map((item: any) => [String(item.institute_id), item]));
+    settingsMap = new Map((settings || []).map((item: any) => [String(item.institute_id), item]));
     memberships = memberships.map((item) => {
       const institute = instituteMap.get(item.institute_id);
       const setting = settingsMap.get(item.institute_id);
