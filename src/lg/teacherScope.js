@@ -1,4 +1,5 @@
 import { supabase } from "@/lg/supabase";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 
 const scopeCache = new Map();
 const inflight = new Map();
@@ -14,9 +15,13 @@ export async function loadTeacherBatches(teacherId) {
   if (running) return running;
 
   const request = (async () => {
+    const context = await getCurrentInstituteContext();
+    const instituteId = context.membership?.institute_id;
+    if (!instituteId) throw new Error("An active institute workspace must be selected.");
     const { data: entries, error: entriesError } = await supabase
       .from("timetable_entries")
       .select("batch_id,subject_name")
+      .eq("institute_id", instituteId)
       .eq("teacher_id", teacherId)
       .eq("status", "active");
     if (entriesError) throw entriesError;
@@ -30,6 +35,7 @@ export async function loadTeacherBatches(teacherId) {
     const { data: batches, error: batchError } = await supabase
       .from("batches")
       .select("id,name,cls,sec,status")
+      .eq("institute_id", instituteId)
       .in("id", ids);
     if (batchError) throw batchError;
 
