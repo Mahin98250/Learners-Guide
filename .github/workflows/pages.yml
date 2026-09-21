@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
           test -f dist/index.html
-          for route in admin auth app; do
+          for route in admin auth app owner; do
             mkdir -p "dist/$route"
             cp dist/index.html "dist/$route/index.html"
           done
@@ -45,6 +45,7 @@ jobs:
           test -f dist/admin/index.html
           test -f dist/auth/index.html
           test -f dist/app/index.html
+          test -f dist/owner/index.html
           test -f dist/manifest.webmanifest
       - name: Configure Pages
         uses: actions/configure-pages@v6
