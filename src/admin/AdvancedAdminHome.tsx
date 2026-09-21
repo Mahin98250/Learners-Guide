@@ -37,6 +37,11 @@ export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
     setLoading(true);
     setError("");
     const problems: string[] = [];
+    if (!instituteId) {
+      setError("An active institute workspace must be selected.");
+      setLoading(false);
+      return;
+    }
     const safeCount = async (table: string, label: string) => { try { return await countRows(table, instituteId); } catch { problems.push(label); return 0; } };
     try {
       const [students, teachers, batches, homework, tests] = await Promise.all([
@@ -77,7 +82,7 @@ export function AdvancedAdminHome({ user, onOpenManagement, onLogout }: Props) {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [instituteId]);
 
   const goBack = () => {
     if (window.history.length > 1) window.history.back();
