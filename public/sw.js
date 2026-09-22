@@ -1,5 +1,5 @@
-const CACHE = "mahin-v37";
-const APP_SHELL = ["./", "./manifest.webmanifest", "./file_00000000451c82118020d2baea54f76b.png"];
+const CACHE = "mahin-v38";
+const APP_SHELL = ["./", "./manifest.webmanifest"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
 
