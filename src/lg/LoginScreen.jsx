@@ -11,7 +11,7 @@ export function LoginScreen({ role, onBack, onLogin, onForgotPassword, tenant })
   const [loading, setLoading] = useState(false);
   const rc = ROLES.find((r) => r.key === role) || ROLES[0];
   const roleEmojis = { teacher: "👨‍🏫", student: "🎓", parent: "👨‍👩‍👧" };
-  const brandName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const brandName = tenant?.display_name || tenant?.name || "Mahin";
   const primaryColor = tenant?.primary_color || "#4357e8";
 
   const handle = async () => {
@@ -51,7 +51,7 @@ export function LoginScreen({ role, onBack, onLogin, onForgotPassword, tenant })
           </div>
           <WBtn ch={loading ? <><span className="spinning">⟳</span> Signing in…</> : "Login →"} onClick={handle} dis={loading} />
         </div>
-        <div style={{ textAlign: "center", marginTop: 20, fontSize: 12, color: "rgba(255,255,255,.35)" }}>Login credentials are provided by your institute administrator.</div>
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: 12, color: "rgba(255,255,255,.35)" }}>{tenant?.powered_by_enabled === false ? "Login credentials are provided by your institute administrator." : `Powered by Mahin • ${tenant?.name || "Secure institute portal"}`}</div>
       </div>
     </div>
   );
