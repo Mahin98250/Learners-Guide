@@ -95,3 +95,159 @@
 .owner-login-glass button{box-shadow:0 10px 22px rgba(83,84,214,.22),inset 0 1px 0 rgba(255,255,255,.22) !important}
 .owner-login-glass [role="alert"]{background:rgba(255,245,247,.70) !important;border:1px solid rgba(255,200,210,.64) !important;border-radius:14px !important}
 .owner-login-glass img{border-radius:18px;box-shadow:0 14px 34px rgba(40,45,75,.10)}
+
+
+/* 10X refinement layer: depth, material fallback, typography and interaction polish. */
+.owner-liquid-glass {
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "tnum" 1;
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  overscroll-behavior-x: none;
+}
+.owner-liquid-glass > header::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.9) 18%,rgba(255,255,255,.98) 50%,rgba(255,255,255,.9) 82%,transparent 100%);
+  pointer-events:none;
+}
+.owner-liquid-glass > header{
+  position:sticky;
+  overflow:hidden;
+}
+.owner-liquid-glass > header > div,
+.owner-liquid-glass > div{
+  contain:layout paint;
+}
+.owner-liquid-glass > div > section:first-of-type > div{
+  position:relative;
+  overflow:hidden;
+  transform:translateZ(0);
+  backface-visibility:hidden;
+}
+.owner-liquid-glass > div > section:first-of-type > div::after{
+  content:"";
+  position:absolute;
+  width:120%;
+  height:70%;
+  left:-10%;
+  top:-42%;
+  transform:rotate(-7deg);
+  background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0));
+  pointer-events:none;
+}
+.owner-liquid-glass > div > section:not(:first-of-type){
+  transform:translateZ(0);
+  backface-visibility:hidden;
+}
+.owner-liquid-glass > div > section:not(:first-of-type)::after,
+.owner-membership-panel::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,.16),transparent 34%,transparent 68%,rgba(255,255,255,.10));
+  pointer-events:none;
+  mix-blend-mode:screen;
+}
+.owner-liquid-glass h1,
+.owner-liquid-glass h2,
+.owner-liquid-glass h3{
+  font-feature-settings:"kern" 1,"liga" 1;
+}
+.owner-liquid-glass button,
+.owner-liquid-glass input,
+.owner-liquid-glass select,
+.owner-liquid-glass textarea{
+  -webkit-font-smoothing:antialiased;
+}
+.owner-liquid-glass button:disabled{
+  cursor:not-allowed !important;
+  transform:none !important;
+  box-shadow:none !important;
+}
+.owner-liquid-glass ::selection{
+  background:rgba(91,92,226,.18);
+  color:#151a29;
+}
+.owner-liquid-glass::-webkit-scrollbar,
+.owner-liquid-glass *::-webkit-scrollbar{width:10px;height:10px}
+.owner-liquid-glass::-webkit-scrollbar-track,
+.owner-liquid-glass *::-webkit-scrollbar-track{background:transparent}
+.owner-liquid-glass::-webkit-scrollbar-thumb,
+.owner-liquid-glass *::-webkit-scrollbar-thumb{
+  background:rgba(92,99,128,.20);
+  border:3px solid transparent;
+  background-clip:padding-box;
+  border-radius:999px;
+}
+.owner-liquid-glass::-webkit-scrollbar-thumb:hover,
+.owner-liquid-glass *::-webkit-scrollbar-thumb:hover{background:rgba(92,99,128,.32);background-clip:padding-box}
+.owner-liquid-glass{
+  scrollbar-color:rgba(92,99,128,.26) transparent;
+  scrollbar-width:thin;
+}
+.owner-liquid-glass [role="dialog"] > div{
+  animation:owner-sheet-in .22s cubic-bezier(.22,.78,.24,1) both;
+}
+@keyframes owner-sheet-in{
+  from{opacity:0;transform:translateY(8px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes owner-ambient-drift-a{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(34px,-18px,0) scale(1.035)}
+}
+@keyframes owner-ambient-drift-b{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(-28px,20px,0) scale(1.03)}
+}
+.owner-liquid-glass::before{animation:owner-ambient-drift-a 18s ease-in-out infinite}
+.owner-liquid-glass::after{animation:owner-ambient-drift-b 22s ease-in-out infinite}
+@media (pointer:fine){
+  .owner-liquid-glass > div > section:first-of-type > div:hover{
+    transform:translate3d(0,-2px,0);
+  }
+  .owner-liquid-glass > div > section:not(:first-of-type):hover,
+  .owner-membership-panel:hover{
+    border-color:rgba(255,255,255,.88) !important;
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .owner-liquid-glass::before,.owner-liquid-glass::after{animation:none !important}
+  .owner-liquid-glass [role="dialog"] > div{animation:none !important}
+}
+@media (prefers-reduced-transparency:reduce){
+  .owner-liquid-glass > header,
+  .owner-liquid-glass > div > section,
+  .owner-liquid-glass .owner-membership-panel,
+  .owner-login-glass > section{
+    background:rgba(248,249,253,.94) !important;
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+  }
+}
+@supports not ((backdrop-filter:blur(1px))){
+  .owner-liquid-glass > header,
+  .owner-liquid-glass > div > section,
+  .owner-liquid-glass .owner-membership-panel,
+  .owner-login-glass > section{
+    background:rgba(247,248,252,.94) !important;
+  }
+}
+@media (max-width:760px){
+  .owner-liquid-glass > header{
+    box-shadow:0 6px 22px rgba(31,36,66,.05) !important;
+  }
+  .owner-liquid-glass > div > section:first-of-type > div{
+    min-height:74px;
+  }
+}
+@media (max-width:460px){
+  .owner-liquid-glass > div > section:first-of-type > div{
+    border-radius:18px !important;
+  }
+}
