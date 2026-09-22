@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { LoginScreen } from "@/lg/LoginScreen";
 import { resolveInstituteForCurrentHostname, type InstituteTenant } from "@/lg/tenant";
 
-const title = "Sign in — Learner's Guide";
+const title = "Sign in — Mahin";
 const description = "Sign in with credentials provided by your institute administrator.";
 
 type AuthSearch = { role: "teacher" | "student" | "parent" };
