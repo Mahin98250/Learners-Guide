@@ -11,7 +11,8 @@ type Settings={id:number;product_name:string|null;legal_name:string|null;public_
 type PlatformFeature={code:string;name:string;description:string;category:string;sort_order:number;depends_on:string[]};
 type FeatureEntitlement={institute_id:string;feature_code:string;enabled:boolean};
 
-// create_institute remains the low-level provisioning primitive; the Owner UI now uses platform_provision_institute for atomic onboarding.\nconst shell={minHeight:"100vh",background:"#f5f7fb",color:"#14213d",fontFamily:"Poppins,system-ui,sans-serif"};
+// create_institute remains the low-level provisioning primitive; the Owner UI now uses platform_provision_institute for atomic onboarding.
+const shell={minHeight:"100vh",background:"#f5f7fb",color:"#14213d",fontFamily:"Poppins,system-ui,sans-serif"};
 const btn=(primary=true)=>({border:0,borderRadius:11,padding:"10px 14px",fontWeight:800,cursor:"pointer",background:primary?"#4f46e5":"#e8ecf5",color:primary?"#fff":"#24324a"});
 const date=(v:string)=>{const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString()};
 const err401=(e:any)=>Number(e?.status)===401||/jwt|unauthorized/i.test(String(e?.message||""));
