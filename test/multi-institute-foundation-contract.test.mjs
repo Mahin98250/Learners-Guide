@@ -22,9 +22,9 @@ test("multi-institute foundation creates the core tenant identity model", () => 
   }
 });
 
-test("multi-institute foundation seeds the legacy Learner's Guide tenant and backfills membership", () => {
+test("multi-institute foundation seeds the legacy Mahin tenant and backfills membership", () => {
   const sql = compact(migration);
-  assert.match(sql, /learners-guide/);
+  assert.match(sql, /mahin/);
   assert.match(sql, /from public\.users u/);
   assert.match(sql, /join public\.people p on p\.auth_id = u\.auth_id/);
   assert.match(sql, /public\.institute_memberships/);
