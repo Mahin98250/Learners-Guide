@@ -7,6 +7,8 @@ type Institute={id:string;name:string;slug:string;status:string;created_at:strin
 type Domain={id:string;institute_id:string;hostname:string;domain_type:string;status:string;tls_status:string;is_primary:boolean;created_at:string};
 type Audit={id:string;institute_id:string|null;action:string;entity_type:string|null;summary:string|null;created_at:string};
 type Settings={id:number;product_name:string|null;legal_name:string|null;public_website_url:string|null;default_app_domain:string|null;support_email:string|null;default_timezone:string;settings:Record<string,unknown>};
+type PlatformFeature={code:string;name:string;description:string;category:string;sort_order:number;depends_on:string[]};
+type FeatureEntitlement={institute_id:string;feature_code:string;enabled:boolean};
 
 const shell={minHeight:"100vh",background:"#f5f7fb",color:"#14213d",fontFamily:"Poppins,system-ui,sans-serif"};
 const btn=(primary=true)=>({border:0,borderRadius:11,padding:"10px 14px",fontWeight:800,cursor:"pointer",background:primary?"#4f46e5":"#e8ecf5",color:primary?"#fff":"#24324a"});
@@ -16,10 +18,12 @@ const err401=(e:any)=>Number(e?.status)===401||/jwt|unauthorized/i.test(String(e
 export default function PlatformOwnerPortal(){
  const [authenticated,setAuthenticated]=useState<boolean|null>(null),[allowed,setAllowed]=useState<boolean|null>(null),[roles,setRoles]=useState<string[]>([]);
  const [institutes,setInstitutes]=useState<Institute[]>([]),[domains,setDomains]=useState<Domain[]>([]),[audit,setAudit]=useState<Audit[]>([]),[settings,setSettings]=useState<Settings|null>(null);
+ const [features,setFeatures]=useState<PlatformFeature[]>([]),[entitlements,setEntitlements]=useState<FeatureEntitlement[]>([]),[featureInstitute,setFeatureInstitute]=useState("");
  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[working,setWorking]=useState("");
  const [search,setSearch]=useState(""),[statusFilter,setStatusFilter]=useState("all"),[auditFilter,setAuditFilter]=useState("all");
  const [createOpen,setCreateOpen]=useState(false),[domainOpen,setDomainOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false);
  const [name,setName]=useState(""),[slug,setSlug]=useState(""),[domainInstitute,setDomainInstitute]=useState(""),[hostname,setHostname]=useState(""),[token,setToken]=useState("");
+ const featureMap=useMemo(()=>new Map(entitlements.filter(x=>x.institute_id===featureInstitute).map(x=>[x.feature_code,x.enabled])),[entitlements,featureInstitute]);
  const [product,setProduct]=useState(""),[legal,setLegal]=useState(""),[website,setWebsite]=useState(""),[appDomain,setAppDomain]=useState(""),[support,setSupport]=useState(""),[timezone,setTimezone]=useState("Asia/Kolkata");
 
  const instituteMap=useMemo(()=>new Map(institutes.map(x=>[x.id,x.name])),[institutes]);
@@ -33,15 +37,17 @@ export default function PlatformOwnerPortal(){
    setAuthenticated(true);
    const rr=await supabase.rpc("current_platform_roles");if(rr.error){if(err401(rr.error)){await supabase.auth.signOut({scope:"local"});setAuthenticated(false);setAllowed(false);return}throw rr.error}
    const rs=(rr.data||[]).map((x:any)=>String(x.role||"")).filter(Boolean);setRoles(rs);setAllowed(rs.length>0);if(!rs.length)return;
-   const [i,d,a,s]=await Promise.all([
+   const [i,d,a,s,f,e]=await Promise.all([
     supabase.from("institutes").select("id,name,slug,status,created_at").order("created_at",{ascending:false}),
     supabase.from("institute_domains").select("id,institute_id,hostname,domain_type,status,tls_status,is_primary,created_at").order("created_at",{ascending:false}),
     supabase.from("audit_logs").select("id,institute_id,action,entity_type,summary,created_at").eq("scope","platform").order("created_at",{ascending:false}).limit(100),
-    supabase.from("platform_settings").select("id,product_name,legal_name,public_website_url,default_app_domain,support_email,default_timezone,settings").eq("id",1).maybeSingle()
+    supabase.from("platform_settings").select("id,product_name,legal_name,public_website_url,default_app_domain,support_email,default_timezone,settings").eq("id",1).maybeSingle(),
+    supabase.from("platform_features").select("code,name,description,category,sort_order,depends_on").eq("status","active").order("sort_order"),
+    supabase.from("institute_feature_entitlements").select("institute_id,feature_code,enabled")
    ]);
-   const failures=[i.error,d.error,a.error,s.error].filter(Boolean);if(failures.some(err401)){await supabase.auth.signOut({scope:"local"});setAuthenticated(false);setAllowed(false);return}
+   const failures=[i.error,d.error,a.error,s.error,f.error,e.error].filter(Boolean);if(failures.some(err401)){await supabase.auth.signOut({scope:"local"});setAuthenticated(false);setAllowed(false);return}
    if(i.error)throw i.error;if(d.error)throw d.error;if(a.error)throw a.error;if(s.error)throw s.error;
-   setInstitutes((i.data||[]) as Institute[]);setDomains((d.data||[]) as Domain[]);setAudit((a.data||[]) as Audit[]);setSettings((s.data||null) as Settings|null);
+   setInstitutes((i.data||[]) as Institute[]);setDomains((d.data||[]) as Domain[]);setAudit((a.data||[]) as Audit[]);setSettings((s.data||null) as Settings|null);setFeatures((f.data||[]) as PlatformFeature[]);setEntitlements((e.data||[]) as FeatureEntitlement[]);
   }catch(e){setError(e instanceof Error?e.message:"Unable to load the platform control center.");}
   finally{setLoading(false)}
  },[]);
@@ -61,6 +67,8 @@ export default function PlatformOwnerPortal(){
  if(authenticated===false)return <PlatformOwnerLogin onAuthenticated={authed}/>;
  if(allowed===false)return <main style={{...shell,display:"grid",placeItems:"center",padding:24}}><section style={{background:"#fff",padding:30,borderRadius:24,maxWidth:560}}><b>PLATFORM CONTROL CENTER</b><h1>Platform access required</h1><p>Active platform membership is required for this surface.</p></section></main>;
  if(loading)return <main style={{...shell,display:"grid",placeItems:"center"}}>Loading platform control center…</main>;
+
+ const setFeature=async(feature:PlatformFeature,enabled:boolean)=>{if(!featureInstitute)return;setWorking("feature:"+feature.code);setError("");setNotice("");try{const r=await supabase.rpc("platform_set_feature_enabled",{p_institute_id:featureInstitute,p_feature_code:feature.code,p_enabled:enabled});if(r.error)throw r.error;setEntitlements(prev=>[...prev.filter(x=>!(x.institute_id===featureInstitute&&x.feature_code===feature.code)),r.data as FeatureEntitlement]);setNotice(`${feature.name} ${enabled?"enabled":"disabled"}.`);}catch(e){setError(e instanceof Error?e.message:"Unable to update feature entitlement.");}finally{setWorking("");}};
 
  const active=institutes.filter(x=>x.status==="active").length,trial=institutes.filter(x=>x.status==="trial").length,suspended=institutes.filter(x=>x.status==="suspended").length,archived=institutes.filter(x=>x.status==="archived").length;
  const verified=domains.filter(x=>x.status==="verified").length,pending=domains.filter(x=>x.status==="pending").length,primaryDomains=domains.filter(x=>x.is_primary).length;
@@ -100,6 +108,12 @@ export default function PlatformOwnerPortal(){
      <div style={{padding:18,borderBottom:"1px solid #eef1f6"}}><div style={{fontSize:11,fontWeight:900,color:"#7c3aed",letterSpacing:1}}>PLATFORM SETTINGS</div><h2 style={{margin:"4px 0"}}>Configuration</h2></div>
      <div style={{padding:18,display:"grid",gap:9,fontSize:13}}><div><b>Product:</b> {settings?.product_name||"Not configured"}</div><div><b>Legal:</b> {settings?.legal_name||"Not configured"}</div><div><b>Website:</b> {settings?.public_website_url||"Not configured"}</div><div><b>App domain:</b> {settings?.default_app_domain||"Not configured"}</div><div><b>Support:</b> {settings?.support_email||"Not configured"}</div><div><b>Timezone:</b> {settings?.default_timezone||"Asia/Kolkata"}</div><button style={{...btn(true),marginTop:5}} onClick={openSettings}>Edit platform settings</button></div>
     </div>
+   </section>
+
+   <section style={{background:"#fff",border:"1px solid #e7ebf2",borderRadius:20,overflow:"hidden",marginTop:16}}>
+    <div style={{padding:18,borderBottom:"1px solid #eef1f6",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><div style={{fontSize:11,fontWeight:900,color:"#2563eb",letterSpacing:1}}>FEATURE ENTITLEMENTS</div><h2 style={{margin:"4px 0"}}>Institute modules</h2><p style={{margin:0,color:"#64748b",fontSize:12}}>Control which platform modules are enabled for each institute. Existing tenants start fully enabled.</p></div><select value={featureInstitute} onChange={e=>setFeatureInstitute(e.target.value)} style={{padding:10,borderRadius:10,border:"1px solid #d8dee9",minWidth:220}}><option value="">Choose institute</option>{institutes.filter(i=>i.status!=="archived").map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
+    {featureInstitute&&<div style={{padding:18,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}>{features.map(f=>{const enabled=featureMap.get(f.code)!==false;return <div key={f.code} style={{border:"1px solid #e7ebf2",borderRadius:15,padding:14,background:enabled?"#fbfdff":"#f8fafc"}}><div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"start"}}><div><div style={{fontWeight:900}}>{f.name}</div><div style={{fontSize:10,fontWeight:800,color:"#64748b",marginTop:3}}>{f.category.toUpperCase()} · {f.code}</div></div><button type="button" disabled={working==="feature:"+f.code} onClick={()=>void setFeature(f,!enabled)} style={{border:0,borderRadius:999,padding:"7px 10px",fontWeight:900,cursor:"pointer",background:enabled?"#dcfce7":"#e2e8f0",color:enabled?"#166534":"#475569"}}>{working==="feature:"+f.code?"…":enabled?"ON":"OFF"}</button></div><p style={{fontSize:12,lineHeight:1.45,color:"#64748b",margin:"10px 0 0"}}>{f.description}</p>{f.depends_on.length>0&&<div style={{fontSize:10,color:"#94a3b8",marginTop:8}}>Depends on: {f.depends_on.join(", ")}</div>}</div>})}</div>}
+    {!featureInstitute&&<div style={{padding:26,color:"#64748b"}}>Choose an institute to manage its feature entitlements.</div>}
    </section>
 
    <PlatformMembershipPanel institutes={institutes.map(({id,name,slug})=>({id,name,slug}))}/>

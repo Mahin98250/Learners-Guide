@@ -24,6 +24,7 @@ const ownerRpc = [
   "platform_remove_institute_membership",
   "create_institute",
   "register_institute_domain",
+  "platform_set_feature_enabled",
 ];
 
 test("owner login requires Google OAuth and MFA", () => {
@@ -85,4 +86,28 @@ test("every privileged platform mutation calls the owner guard", () => {
       name + " must enforce owner MFA and role authorization",
     );
   }
+});
+
+
+test("owner portal exposes feature entitlement controls", () => {
+  const portal = fs.readFileSync(
+    path.join(root, "src", "platform", "PlatformOwnerPortal.tsx"),
+    "utf8",
+  );
+  assert.match(portal, /platform_features/);
+  assert.match(portal, /institute_feature_entitlements/);
+  assert.match(portal, /platform_set_feature_enabled/);
+  assert.match(portal, /Feature entitlements/i);
+});
+
+test("feature entitlement mutation is MFA protected and dependency aware", () => {
+  const start = migrations.lastIndexOf(
+    "create or replace function public.platform_set_feature_enabled",
+  );
+  assert.ok(start >= 0, "feature entitlement RPC is missing");
+  const block = migrations.slice(start, migrations.length);
+  assert.match(block, /platform_owner_access_ok\(\)/i);
+  assert.match(block, /Platform owner MFA verification required/i);
+  assert.match(block, /depends_on/i);
+  assert.match(block, /Disable dependent features before disabling/i);
 });
