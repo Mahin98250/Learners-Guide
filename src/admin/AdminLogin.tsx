@@ -52,7 +52,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: (user: AdminUser) => void
           <div style={{ display: "inline-grid", placeItems: "center", width: 78, height: 78, borderRadius: 22, background: "#fff", padding: 6 }}>
             <LGLogo size={66} showText={false} />
           </div>
-          <h1 style={{ color: "#fff", margin: "12px 0 4px" }}>Learner's Guide</h1>
+          <h1 style={{ color: "#fff", margin: "12px 0 4px" }}>Mahin</h1>
           <div style={{ color: "#ffffff99", fontSize: 12 }}>Administrator access</div>
         </div>
         <form onSubmit={(event) => { event.preventDefault(); void submit(); }} style={{ background: "#fff", borderRadius: 20, padding: 26, boxShadow: "0 4px 20px rgba(15,27,61,.07)" }}>
