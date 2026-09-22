@@ -41,6 +41,14 @@ export default function PlatformOwnerPortal(){
   if(!silent)setLoading(true);setError("");
   try{
    const session=await supabase.auth.getSession();if(session.error||!session.data.session){setAuthenticated(false);setAllowed(false);return}
+   const aal=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+   if(aal.error)throw aal.error;
+   if(aal.data?.currentLevel!=="aal2"){
+    setAuthenticated(false);
+    setAllowed(false);
+    setRoles([]);
+    return;
+   }
    setAuthenticated(true);
    const rr=await supabase.rpc("current_platform_roles");if(rr.error){if(err401(rr.error)){await supabase.auth.signOut({scope:"local"});setAuthenticated(false);setAllowed(false);return}throw rr.error}
    const rs=(rr.data||[]).map((x:any)=>String(x.role||"")).filter(Boolean);setRoles(rs);setAllowed(rs.length>0);if(!rs.length)return;

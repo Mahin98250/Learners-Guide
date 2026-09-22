@@ -111,3 +111,43 @@ test("feature entitlement mutation is MFA protected and dependency aware", () =>
   assert.match(block, /depends_on/i);
   assert.match(block, /Disable dependent features before disabling/i);
 });
+
+test("owner portal does not render control-plane data before AAL2", () => {
+  const portal = fs.readFileSync(
+    path.join(root, "src", "platform", "PlatformOwnerPortal.tsx"),
+    "utf8",
+  );
+  const sessionStart = portal.indexOf(
+    "const session=await supabase.auth.getSession()",
+  );
+  assert.ok(sessionStart >= 0, "owner session gate is missing");
+  const sessionBlock = portal.slice(sessionStart, sessionStart + 500);
+  assert.match(sessionBlock, /getAuthenticatorAssuranceLevel/);
+  assert.match(sessionBlock, /currentLevel!==["']aal2["']/);
+  assert.match(sessionBlock, /setAuthenticated\(false\)/);
+  assert.match(sessionBlock, /setAllowed\(false\)/);
+});
+
+test("platform-level RLS membership helper requires AAL2", () => {
+  const hardening = fs.readFileSync(
+    path.join(
+      root,
+      "supabase",
+      "migrations",
+      "20260922220000_platform_member_aal2_rls.sql",
+    ),
+    "utf8",
+  );
+  assert.match(hardening, /create or replace function public\.is_platform_member\(\)/);
+  assert.match(hardening, /auth\.jwt\(\)\s*->>\s*'aal'/i);
+  assert.match(hardening, /=\s*'aal2'/i);
+  assert.match(hardening, /pm\.status\s*=\s*'active'/i);
+  assert.match(
+    hardening,
+    /revoke all on function public\.is_platform_member\(\) from public, anon/i,
+  );
+  assert.match(
+    hardening,
+    /grant execute on function public\.is_platform_member\(\) to authenticated/i,
+  );
+});
