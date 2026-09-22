@@ -85,7 +85,7 @@ export default function PlatformOwnerLogin({
     const { data: enrolled, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "Learner's Guide Owner",
+        friendlyName: "Mahin Platform Owner",
       });
     if (enrollError) throw enrollError;
 
@@ -284,7 +284,7 @@ export default function PlatformOwnerLogin({
               color: "#4f46e5",
             }}
           >
-            LEARNER&apos;S GUIDE · OWNER SECURITY
+            MAHIN · OWNER SECURITY
           </div>
           <h1 style={{ margin: "8px 0 6px", fontSize: 28 }}>
             {enrollment ? "Set up MFA" : "Verify MFA"}
@@ -449,7 +449,7 @@ export default function PlatformOwnerLogin({
             color: "#4f46e5",
           }}
         >
-          LEARNER&apos;S GUIDE
+          MAHIN
         </div>
         <h1 style={{ margin: "8px 0 6px", fontSize: 30 }}>
           Platform Owner
