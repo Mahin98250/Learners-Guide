@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">Learner's Guide</title>
-  <desc id="desc">Learner's Guide reading and growth mark</desc>
+  <title id="title">Mahin</title>
+  <desc id="desc">Mahin reading and growth mark</desc>
   <!-- Bright white app-icon background: keeps the original mark high-contrast on Android launchers. -->
   <rect width="512" height="512" rx="96" fill="#FFFFFF"/>
   <path d="M92 170c0-18 15-33 33-33h92c28 0 51 10 70 29 19-19 42-29 70-29h92c18 0 33 15 33 33v205c0 18-15 33-33 33h-92c-28 0-51 10-70 29-19-19-42-29-70-29h-92c-18 0-33-15-33-33V170Z" fill="#F8F9FF"/>
