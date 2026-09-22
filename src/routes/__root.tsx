@@ -6,11 +6,13 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  redirect,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { resolveInstituteForCurrentHostname } from "@/lg/tenant";
 
 function NotFoundComponent() {
   return (
@@ -107,6 +109,17 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  beforeLoad: async ({ location }) => {
+    const isPlatformControlRoute = location.pathname === "/owner" || location.pathname === "/admin";
+    if (!isPlatformControlRoute) return;
+    try {
+      const tenant = await resolveInstituteForCurrentHostname();
+      if (tenant) throw redirect({ to: "/" });
+    } catch (error) {
+      if (error && typeof error === "object" && "isRedirect" in error) throw error;
+      console.warn("Tenant route guard could not resolve the current hostname:", error);
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
