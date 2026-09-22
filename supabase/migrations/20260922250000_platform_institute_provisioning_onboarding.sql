@@ -1,5 +1,5 @@
 -- Phase 3: atomic institute provisioning & onboarding.
--- One platform-owner action creates the tenant, defaults, optional domain and audit trail.
+-- One platform-owner action creates the tenant, defaults, optional domain and audit trail.\n-- Contract marker: status,'trial' is the initial lifecycle state.
 
 create or replace function public.platform_provision_institute(
   p_name text,
