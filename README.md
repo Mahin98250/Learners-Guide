@@ -1,4 +1,4 @@
-# 🌟 Learner's Guide
+# 🌟 Mahin
 
 > **A complete education management system for Admins, Teachers, Students and Parents.**
 
