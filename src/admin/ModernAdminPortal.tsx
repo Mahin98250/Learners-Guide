@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { LGLogo } from "@/lg/ui";
-import { useInstituteWorkspace } from "@/lg/tenant-context";\nimport { NotifPanel } from "@/lg/panels";\nimport { supabase } from "@/lg/supabase";
+import { useInstituteWorkspace } from "@/lg/tenant-context";
+import { NotifPanel } from "@/lg/panels";
+import { supabase } from "@/lg/supabase";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
@@ -21,7 +23,8 @@ const loadMaterials = () => import("@/admin/MaterialsDriveV2");
 const loadLeave = () => import("@/lg/LeaveRequests");
 const loadAccount = () => import("@/admin/AdminAccountPage");
 const loadSectionPages = () => import("@/admin/ModernAdminSectionPages");
-const loadDashboard = () => import("@/admin/ModernAdminDashboard");\nconst loadPlatformInbox = () => import("@/admin/PlatformInboxPage");
+const loadDashboard = () => import("@/admin/ModernAdminDashboard");
+const loadPlatformInbox = () => import("@/admin/PlatformInboxPage");
 
 const AdminRecordsPage = lazy(() => loadAdminRecords());
 const TeacherRecordsPage = lazy(() => loadTeacherRecords());
@@ -34,7 +37,8 @@ const MaterialsDriveV2 = lazy(() => loadMaterials().then((module) => ({ default:
 const LeaveRequests = lazy(() => loadLeave().then((module) => ({ default: module.LeaveRequests })));
 const AdminAccountPage = lazy(() => loadAccount());
 const ModernAdminSectionPage = lazy(() => loadSectionPages().then((module) => ({ default: module.ModernAdminSectionPage })));
-const ModernAdminDashboard = lazy(() => loadDashboard().then((module) => ({ default: module.ModernAdminDashboard })));\nconst PlatformInboxPage = lazy(() => loadPlatformInbox().then((module) => ({ default: module.PlatformInboxPage })));
+const ModernAdminDashboard = lazy(() => loadDashboard().then((module) => ({ default: module.ModernAdminDashboard })));
+const PlatformInboxPage = lazy(() => loadPlatformInbox().then((module) => ({ default: module.PlatformInboxPage })));
 
 const preloaders: Partial<Record<Special, Preloader>> = {
   dashboard: loadDashboard,
@@ -55,7 +59,8 @@ const preloaders: Partial<Record<Special, Preloader>> = {
   fees: loadSectionPages,
   accounts: loadSectionPages,
   profiles: loadSectionPages,
-  analytics: loadSectionPages,\n  "platform-inbox": loadPlatformInbox,
+  analytics: loadSectionPages,
+  "platform-inbox": loadPlatformInbox,
 };
 
 const GROUPS: Group[] = [
@@ -99,14 +104,17 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
   const workspaceName = tenant?.display_name || tenant?.name || "Learner's Guide";
   const workspaceColor = tenant?.primary_color || "#4357e8";
   const workspaceOptions = memberships.length > 1 && !tenant ? memberships : [];
-  const [active, setActive] = useState("Dashboard");\n  const [showNotifications,setShowNotifications]=useState(false),[unreadNotifications,setUnreadNotifications]=useState(0);
+  const [active, setActive] = useState("Dashboard");
+  const [showNotifications,setShowNotifications]=useState(false),[unreadNotifications,setUnreadNotifications]=useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
-  useEffect(()=>{let live=true;const loadNotifications=async()=>{const {data}=await supabase.from("notifications").select("id").eq("uid",user.id).eq("read",false);if(live)setUnreadNotifications((data||[]).length)};void loadNotifications();const channel=supabase.channel("admin-notifications:"+user.id).on("postgres_changes",{event:"*",schema:"public",table:"notifications",filter:"uid=eq."+user.id},()=>void loadNotifications()).subscribe();return()=>{live=false;void supabase.removeChannel(channel)}},[user.id]);\n  const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
+  useEffect(()=>{let live=true;const loadNotifications=async()=>{const {data}=await supabase.from("notifications").select("id").eq("uid",user.id).eq("read",false);if(live)setUnreadNotifications((data||[]).length)};void loadNotifications();const channel=supabase.channel("admin-notifications:"+user.id).on("postgres_changes",{event:"*",schema:"public",table:"notifications",filter:"uid=eq."+user.id},()=>void loadNotifications()).subscribe();return()=>{live=false;void supabase.removeChannel(channel)}},[user.id]);
+  const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
   const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); };
   const go = (label: string) => { const item = allSelectableItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
   const preload = (item: Item) => { const loader = item.special ? preloaders[item.special] : undefined; if (loader) void loader(); };
   const renderPage = () => {
-    if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;\n    if (activeItem.special === "platform-inbox") return <div className="modern-admin-section-page"><PlatformInboxPage /></div>;
+    if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
+    if (activeItem.special === "platform-inbox") return <div className="modern-admin-section-page"><PlatformInboxPage /></div>;
     if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
     if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage kind="teachers" /></div>;
     if (activeItem.special === "batches") return <div className="modern-admin-native-page"><BatchesTimetablePage /></div>;
