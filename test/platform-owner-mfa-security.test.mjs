@@ -124,8 +124,8 @@ test("owner portal does not render control-plane data before AAL2", () => {
   const sessionBlock = portal.slice(sessionStart, sessionStart + 500);
   assert.match(sessionBlock, /getAuthenticatorAssuranceLevel/);
   assert.match(sessionBlock, /currentLevel!==["']aal2["']/);
-  assert.match(sessionBlock, /setAuthenticated(false)/);
-  assert.match(sessionBlock, /setAllowed(false)/);
+  assert.match(sessionBlock, /setAuthenticated\(false\)/);
+  assert.match(sessionBlock, /setAllowed\(false\)/);
 });
 
 test("platform-level RLS membership helper requires AAL2", () => {
