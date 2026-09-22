@@ -94,7 +94,7 @@ export async function resolveInstituteForCurrentHostname(): Promise<InstituteTen
  * When a hostname is mapped to an institute, that institute is selected and
  * must also be present in the user's membership set.
  */
-export async function getCurrentInstituteContext() {
+async function getCurrentInstituteContextUnsafe() {
   const tenant = await resolveInstituteForCurrentHostname();
   const { data, error } = await supabase
     .from("institute_memberships")
@@ -182,4 +182,46 @@ export async function getCurrentInstituteContext() {
   }
 
   return { tenant: null, membership: null, memberships };
+}
+
+
+const CONTEXT_CACHE_TTL_MS = 5_000;
+const contextCache = new Map<string, { value: Awaited<ReturnType<typeof getCurrentInstituteContextUnsafe>>; expiresAt: number }>();
+const contextInflight = new Map<string, Promise<Awaited<ReturnType<typeof getCurrentInstituteContextUnsafe>>>>();
+
+export function clearInstituteContextCache() {
+  contextCache.clear();
+  contextInflight.clear();
+}
+
+async function getInstituteContextCacheKey() {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user?.id || "anonymous";
+  return [userId, getCurrentHostname(), getPreferredInstituteId()].join("::");
+}
+
+export async function getCurrentInstituteContext() {
+  const key = await getInstituteContextCacheKey();
+  const hit = contextCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) return hit.value;
+  if (hit) contextCache.delete(key);
+
+  const running = contextInflight.get(key);
+  if (running) return running;
+
+  const request = getCurrentInstituteContextUnsafe();
+  contextInflight.set(key, request);
+  try {
+    const value = await request;
+    contextCache.set(key, { value, expiresAt: Date.now() + CONTEXT_CACHE_TTL_MS });
+    return value;
+  } finally {
+    contextInflight.delete(key);
+  }
+}
+
+if (typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((event) => {
+    if (["SIGNED_IN", "SIGNED_OUT", "USER_UPDATED"].includes(event)) clearInstituteContextCache();
+  });
 }

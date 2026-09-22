@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { clearCache } from "@/lg/data";
 import {
   getCurrentInstituteContext,
+  clearInstituteContextCache,
   setPreferredInstituteId,
   type InstituteMembershipContext,
   type InstituteTenant,
@@ -53,6 +54,7 @@ export function InstituteWorkspaceProvider({ children }: PropsWithChildren) {
     const valid = memberships.some((item) => item.institute_id === instituteId);
     if (!valid) throw new Error("You do not belong to that institute.");
     clearCache();
+    clearInstituteContextCache();
     setPreferredInstituteId(instituteId);
     await refresh();
   }, [memberships, refresh]);

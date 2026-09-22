@@ -18,8 +18,8 @@ const dataSource = [
 test("shared data loader has a bounded in-memory cache", () => {
   assert.match(dataSource, /MEMORY_CACHE_TTL_MS=15_000/);
   assert.match(dataSource, /const memoryCache=new Map/);
-  assert.match(dataSource, /getMemoryCache\(t\)/);
-  assert.match(dataSource, /setMemoryCache\(t,rows\)/);
+  assert.match(dataSource, /getMemoryCache\(cacheKey\)/);
+  assert.match(dataSource, /setMemoryCache\(cacheKey,rows\)/);
 });
 
 test("cache invalidates after CRUD writes and full clear", () => {
@@ -32,7 +32,7 @@ test("cache invalidates after CRUD writes and full clear", () => {
 });
 
 test("timetable keeps role-scoped query behavior while using the shared cache", () => {
-  assert.match(dataSource, /const cached=getMemoryCache\("timetable"\)/);
+  assert.match(dataSource, /const cacheKey=await getReadCacheKey\("timetable"/);
   assert.match(dataSource, /\.eq\("status","active"\)/);
   assert.match(dataSource, /role==="teacher"&&ref/);
   assert.match(dataSource, /role==="student"\|\|role==="parent"/);

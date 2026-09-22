@@ -26,15 +26,15 @@ test("Performance: admin analytics keeps bounded explicit projections", () => {
 test("Performance: shared data layer coalesces concurrent table reads", () => {
   const source = dataSource;
   assert.match(source, /const inflight=new Map/);
-  assert.match(source, /inflight\.has\(t\)/);
-  assert.match(source, /inflight\.set\(t,request\)/);
-  assert.match(source, /inflight\.delete\(t\)/);
+  assert.match(source, /inflight\.has\(cacheKey\)/);
+  assert.match(source, /inflight\.set\(cacheKey,request\)/);
+  assert.match(source, /inflight\.delete\(cacheKey\)/);
 });
 
 test("Performance: shared memory cache has a bounded TTL and is reset on auth session changes", () => {
   const source = dataSource;
   assert.match(source, /const MEMORY_CACHE_TTL_MS=15_000/);
-  assert.match(source, /expiresAt:Date\.now\(\)\+MEMORY_CACHE_TTL_MS/);
+  assert.match(source, /expiresAt:Date\.now\(\)\+Math\.max\(0,ttlMs\)/);
   assert.match(source, /onAuthStateChange\(\(event\)\s*=>\s*\{[^}]*SIGNED_IN[^}]*SIGNED_OUT[^}]*clearCache\(\)/s);
 });
 
