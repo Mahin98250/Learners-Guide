@@ -17,7 +17,7 @@ test("100x tenant migration uses restrictive RLS for tenant boundary", () => {
 test("tenant login gateway receives and validates hostname membership", () => {
   const auth = read("src/lg/auth.js");
   const gateway = read("supabase/functions/auth-login/index.ts");
-  assert.match(auth, /hostname: typeof window !== "undefined" ? getCurrentHostname() : ""/);
+  assert.ok(auth.includes('hostname: typeof window !== "undefined" ? getCurrentHostname() : ""'));
   assert.match(gateway, /normalizeHostname/);
   assert.match(gateway, /resolveTenant/);
   assert.match(gateway, /hasTenantMembership/);
