@@ -28,7 +28,7 @@ Deno.serve(async(req)=>{
     if(prepareError) return json({error:prepareError.message},400);
 
     const admin=createClient(url,service,{auth:{autoRefreshToken:false,persistSession:false}});
-    const redirectTo=(Deno.env.get("MAHIN_ADMIN_INVITE_REDIRECT")||"https://mahin98250.github.io/Mahin/admin/invite").trim();
+    const redirectTo=(Deno.env.get("MAHIN_ADMIN_INVITE_REDIRECT")||"https://mahin98250.github.io/Mahin/admin-invite").trim();
     const {data:invite,error:inviteError}=await admin.auth.admin.inviteUserByEmail(email,{
       data:{mahin_invitation_id:invId,mahin_institute_id:instituteId,mahin_role:roleKey},
       redirectTo
