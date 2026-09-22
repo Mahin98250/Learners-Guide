@@ -55,3 +55,7 @@ phase8-owner-liquid-glass-contract.test.mjs checks:
 - reduced-motion support
 - removal of the desktop-only Owner route gate
 - core glass visual properties
+
+## 10X refinement layer
+
+The second pass adds material fallbacks for browsers without backdrop blur, reduced-transparency handling, ambient-motion depth, dialog entrance motion, typography smoothing, scrollbar polish, selection/focus refinement, and coarse-pointer safeguards. These remain scoped to the Owner UI.
