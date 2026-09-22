@@ -8,9 +8,9 @@ const admin=fs.readFileSync("src/admin/ModernAdminPortal.tsx","utf8");
 
 test("runtime entitlement check is tenant-aware and not anonymously callable",()=>{
   assert.match(migration,/current_institute_feature_enabled/);
-  assert.match(migration,/m\.status='active'/);
-  assert.match(migration,/e\.enabled=true/);
-  assert.match(migration,/auth\.uid\(\)/);
+  assert.ok(migration.includes("m.status = 'active'"));
+  assert.ok(migration.includes("e.enabled = true"));
+  assert.ok(migration.includes("auth.uid()"));
   assert.ok(migration.includes("revoke all on function public.current_institute_feature_enabled(text) from public, anon"));
   assert.ok(migration.includes("grant execute on function public.current_institute_feature_enabled(text) to authenticated"));
 });
