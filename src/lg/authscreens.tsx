@@ -9,7 +9,7 @@ export type Role = "teacher" | "student" | "parent";
 export function RoleSelect({ onNext, tenant }: { onNext: (role: Role) => void; tenant?: InstituteTenant | null }) {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Role | "">("");
-  const brandName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const brandName = tenant?.display_name || tenant?.name || "Mahin";
   const primaryColor = tenant?.primary_color || "#FFFFFF";
 
   const choose = (role: Role) => {
@@ -40,7 +40,7 @@ export function RoleSelect({ onNext, tenant }: { onNext: (role: Role) => void; t
           padding: "28px 20px 40px",
         }}
       >
-        <BackBtn onClick={() => navigate({ to: "/" })} />
+        {!tenant && <BackBtn onClick={() => navigate({ to: "/" })} />}
 
         <div style={{ textAlign: "center", padding: "52px 0 30px" }}>
           <div
@@ -70,7 +70,7 @@ export function RoleSelect({ onNext, tenant }: { onNext: (role: Role) => void; t
             <div style={{ width: 42, height: 4, borderRadius: 999, background: primaryColor, margin: "0 auto 8px" }} />
           )}
           <p style={{ margin: 0, color: "rgba(255,255,255,.62)", fontSize: 14 }}>
-            Choose how you want to sign in.
+            {tenant?.login_title || "Choose how you want to sign in."}
           </p>
         </div>
 
@@ -128,7 +128,7 @@ export function RoleSelect({ onNext, tenant }: { onNext: (role: Role) => void; t
         </section>
 
         <p style={{ textAlign: "center", margin: "24px 0 0", color: "rgba(255,255,255,.35)", fontSize: 11 }}>
-          Login credentials are provided by your institute administrator.
+          {tenant?.powered_by_enabled === false ? "Login credentials are provided by your institute administrator." : `Powered by Mahin • ${tenant?.name || "Secure institute portal"}`}
         </p>
       </div>
     </main>
