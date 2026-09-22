@@ -4,7 +4,6 @@ import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { NotifPanel } from "@/lg/panels";
 import { supabase } from "@/lg/supabase";
 import { useInstituteFeatures } from "@/lg/institute-features";
-import { NotificationIntegrationsCenter } from "@/admin/NotificationIntegrationsCenter";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
