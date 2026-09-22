@@ -34,14 +34,14 @@ Deno.serve(async(req)=>{
       redirectTo
     });
     if(inviteError){
-      await caller.from("platform_admin_invitations").update({status:"revoked",updated_at:new Date().toISOString()}).eq("id",invId);
+      await caller.rpc("platform_revoke_admin_invitation",{p_invitation_id:invId});
       return json({error:inviteError.message},502);
     }
 
     const {data:finalized,error:finalizeError}=await caller.rpc("platform_finalize_admin_invitation",{p_invitation_id:invId,p_auth_id:invite.user.id});
     if(finalizeError){
       await admin.auth.admin.deleteUser(invite.user.id).catch(()=>{});
-      await caller.from("platform_admin_invitations").update({status:"revoked",updated_at:new Date().toISOString()}).eq("id",invId);
+      await caller.rpc("platform_revoke_admin_invitation",{p_invitation_id:invId});
       return json({error:finalizeError.message},502);
     }
     return json({invitationId:invId,authId:invite.user.id,email,roleKey,status:finalized?.status||"pending"});
