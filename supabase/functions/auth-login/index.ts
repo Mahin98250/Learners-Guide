@@ -16,7 +16,7 @@ const key = (v: unknown) => clean(v).toLowerCase().replace(/[^a-z0-9]/g, "");
 const inactive = (v: unknown) => ["inactive", "disabled", "suspended", "deleted"].includes(clean(v).toLowerCase());
 const prefix: Record<string, string> = { teacher: "t", student: "s", parent: "p" };
 
-const normalizeHostname = (value: unknown) => clean(value).toLowerCase().replace(/^https?:\\/\\//, "").replace(/\\/+$/, "");
+const normalizeHostname = (value: unknown) => clean(value).toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
 
 async function resolveTenant(admin: ReturnType<typeof createClient>, hostname: string) {
   const normalized = normalizeHostname(hostname);
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
     if (role === "student") {
       let student: any = null;
       for (const column of ["sid", "id"]) {
-        const { data, error } = await admin.from("students").select("id,sid,status").eq(column, loginId).limit(1).maybeSingle();
+        const { data, error } = await admin.from("students").select("id,sid,status,institute_id").eq(column, loginId).limit(1).maybeSingle();
         if (error) return json({ error: "Unable to verify login. Please try again." }, 503);
         if (data) { student = data; break; }
       }
