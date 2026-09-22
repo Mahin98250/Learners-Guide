@@ -1,11 +1,13 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { LGLogo } from "@/lg/ui";
 import { useInstituteWorkspace } from "@/lg/tenant-context";
+import { NotifPanel } from "@/lg/panels";
+import { supabase } from "@/lg/supabase";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Special = "dashboard" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" | "account-security" | "create-admin";
+type Special = "dashboard" | "platform-inbox" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" | "account-security" | "create-admin";
 type Item = { key: string; icon: string; label: string; special?: Special };
 type Group = { label: string; items: Item[] };
 type Preloader = () => Promise<unknown>;
@@ -22,6 +24,7 @@ const loadLeave = () => import("@/lg/LeaveRequests");
 const loadAccount = () => import("@/admin/AdminAccountPage");
 const loadSectionPages = () => import("@/admin/ModernAdminSectionPages");
 const loadDashboard = () => import("@/admin/ModernAdminDashboard");
+const loadPlatformInbox = () => import("@/admin/PlatformInboxPage");
 
 const AdminRecordsPage = lazy(() => loadAdminRecords());
 const TeacherRecordsPage = lazy(() => loadTeacherRecords());
@@ -35,6 +38,7 @@ const LeaveRequests = lazy(() => loadLeave().then((module) => ({ default: module
 const AdminAccountPage = lazy(() => loadAccount());
 const ModernAdminSectionPage = lazy(() => loadSectionPages().then((module) => ({ default: module.ModernAdminSectionPage })));
 const ModernAdminDashboard = lazy(() => loadDashboard().then((module) => ({ default: module.ModernAdminDashboard })));
+const PlatformInboxPage = lazy(() => loadPlatformInbox().then((module) => ({ default: module.PlatformInboxPage })));
 
 const preloaders: Partial<Record<Special, Preloader>> = {
   dashboard: loadDashboard,
@@ -56,10 +60,11 @@ const preloaders: Partial<Record<Special, Preloader>> = {
   accounts: loadSectionPages,
   profiles: loadSectionPages,
   analytics: loadSectionPages,
+  "platform-inbox": loadPlatformInbox,
 };
 
 const GROUPS: Group[] = [
-  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }] },
+  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }, { key: "Platform Inbox", icon: "✉", label: "Platform Inbox", special: "platform-inbox" }] },
   { label: "People", items: [
     { key: "Students", icon: "🎓", label: "Students", special: "students" },
     { key: "Teachers", icon: "👨‍🏫", label: "Teachers", special: "teachers" },
@@ -100,13 +105,16 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
   const workspaceColor = tenant?.primary_color || "#4357e8";
   const workspaceOptions = memberships.length > 1 && !tenant ? memberships : [];
   const [active, setActive] = useState("Dashboard");
+  const [showNotifications,setShowNotifications]=useState(false),[unreadNotifications,setUnreadNotifications]=useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(()=>{let live=true;const loadNotifications=async()=>{const {data}=await supabase.from("notifications").select("id").eq("uid",user.id).eq("read",false);if(live)setUnreadNotifications((data||[]).length)};void loadNotifications();const channel=supabase.channel("admin-notifications:"+user.id).on("postgres_changes",{event:"*",schema:"public",table:"notifications",filter:"uid=eq."+user.id},()=>void loadNotifications()).subscribe();return()=>{live=false;void supabase.removeChannel(channel)}},[user.id]);
   const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
   const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); };
   const go = (label: string) => { const item = allSelectableItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
   const preload = (item: Item) => { const loader = item.special ? preloaders[item.special] : undefined; if (loader) void loader(); };
   const renderPage = () => {
     if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
+    if (activeItem.special === "platform-inbox") return <div className="modern-admin-section-page"><PlatformInboxPage /></div>;
     if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
     if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage kind="teachers" /></div>;
     if (activeItem.special === "batches") return <div className="modern-admin-native-page"><BatchesTimetablePage /></div>;
@@ -135,7 +143,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
         </div>
       </aside>
       <main className="modern-admin-main">
-        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">{workspaceName} <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div>{workspaceOptions.length > 1 && <select aria-label="Switch institute workspace" value={membership?.institute_id || ""} onChange={(event) => { void selectInstitute(event.target.value); }} style={{ border: "1px solid #d7ddea", borderRadius: 10, padding: "8px 10px", background: "#fff", color: "#24324a", fontWeight: 700, maxWidth: 240 }}>{workspaceOptions.map((option) => <option key={option.institute_id} value={option.institute_id}>{option.display_name || option.institute_name || option.slug || option.institute_id} · {option.role}</option>)}</select>}<button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
+        <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">{workspaceName} <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><button type="button" onClick={()=>setShowNotifications(true)} aria-label="Open notifications" style={{position:"relative",border:"1px solid #d7ddea",background:"#fff",borderRadius:11,width:40,height:40,cursor:"pointer",fontSize:18}}>🔔{unreadNotifications>0&&<span style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,padding:"0 4px",borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"grid",placeItems:"center"}}>{unreadNotifications>99?"99+":unreadNotifications}</span>}</button><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div>{workspaceOptions.length > 1 && <select aria-label="Switch institute workspace" value={membership?.institute_id || ""} onChange={(event) => { void selectInstitute(event.target.value); }} style={{ border: "1px solid #d7ddea", borderRadius: 10, padding: "8px 10px", background: "#fff", color: "#24324a", fontWeight: 700, maxWidth: 240 }}>{workspaceOptions.map((option) => <option key={option.institute_id} value={option.institute_id}>{option.display_name || option.institute_name || option.slug || option.institute_id} · {option.role}</option>)}</select>}<button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
         <section className="modern-admin-content"><Suspense fallback={<PageFallback />}>{renderPage()}</Suspense></section>
       </main>
     </div>
