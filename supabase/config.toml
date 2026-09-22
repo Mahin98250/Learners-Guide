@@ -6,3 +6,9 @@ verify_jwt = true
 
 [functions.pdf-compression-jobs]
 verify_jwt = false
+
+[functions.notification-dispatcher]
+verify_jwt = false
+
+[functions.web-push]
+verify_jwt = false
