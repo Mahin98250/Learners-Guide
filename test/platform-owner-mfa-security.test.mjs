@@ -117,10 +117,11 @@ test("owner portal does not render control-plane data before AAL2", () => {
     path.join(root, "src", "platform", "PlatformOwnerPortal.tsx"),
     "utf8",
   );
-  const sessionBlock = portal.slice(
-    portal.indexOf("const session=await supabase.auth.getSession()"),
-    portal.indexOf("const load=", portal.indexOf("const session=await supabase.auth.getSession()")) + 1,
+  const sessionStart = portal.indexOf(
+    "const session=await supabase.auth.getSession()",
   );
+  assert.ok(sessionStart >= 0, "owner session gate is missing");
+  const sessionBlock = portal.slice(sessionStart, sessionStart + 500);
   assert.match(sessionBlock, /getAuthenticatorAssuranceLevel/);
   assert.match(sessionBlock, /currentLevel!==["']aal2["']/);
   assert.match(sessionBlock, /setAuthenticated(false)/);
