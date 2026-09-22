@@ -184,7 +184,7 @@ export function PlatformMembershipPanel({ institutes }: { institutes: Institute[
   };
 
   return (
-    <section style={{ marginTop: 16, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 22, overflow: "hidden" }}>
+    <section className="owner-membership-panel" style={{ marginTop: 16, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 22, overflow: "hidden" }}>
       <div style={{ padding: 20, background: "linear-gradient(135deg,#f8f7ff,#fff)", borderBottom: "1px solid #eef1f6" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
           <div>
