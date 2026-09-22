@@ -31,3 +31,8 @@ $function$;
 
 revoke all on function public.current_institute_feature_enabled(text) from public, anon;
 grant execute on function public.current_institute_feature_enabled(text) to authenticated;
+
+drop policy if exists institute_feature_entitlements_member_read on public.institute_feature_entitlements;
+create policy institute_feature_entitlements_member_read on public.institute_feature_entitlements
+for select to authenticated
+using (public.user_is_institute_member(institute_id));
