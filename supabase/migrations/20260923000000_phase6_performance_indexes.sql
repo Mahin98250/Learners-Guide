@@ -31,8 +31,6 @@ create index if not exists idx_timetable_entries_institute_teacher_active_day
   on public.timetable_entries (institute_id, teacher_id, day_of_week, start_time)
   where status = 'active';
 
-create index if not exists idx_users_institute_role_status
-  on public.users (institute_id, role, status);
 
 analyze public.notifications;
 analyze public.material_folders;
