@@ -3,32 +3,32 @@ import { supabase } from "@/lg/supabase";
 
 const OWNER_EMAIL = "patelmahin140@gmail.com";
 
-export default function PlatformOwnerLogin({
-  onAuthenticated,
-}: {
-  onAuthenticated: (roles: string[]) => void;
-}) {
+type Props = { onAuthenticated: (roles: string[]) => void };
+
+function redirectTarget() {
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  return `${window.location.origin}${normalizedBase}owner`;
+}
+
+export default function PlatformOwnerLogin({ onAuthenticated }: Props) {
   const [checking, setChecking] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const verifyCurrentSession = async () => {
+  const verifyOwnerSession = async () => {
     try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const session = data.session;
-      if (!session?.user) return;
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) return;
 
-      const email = String(session.user.email || "").trim().toLowerCase();
+      const email = String(sessionData.session.user.email || "").trim().toLowerCase();
       if (email !== OWNER_EMAIL) {
         await supabase.auth.signOut({ scope: "local" });
-        setError(`Only the authorized owner account (${OWNER_EMAIL}) can access this panel.`);
+        setError("This Google account is not the authorized platform owner account.");
         return;
       }
 
-      const { data: roles, error: roleError } = await supabase.rpc(
-        "current_platform_roles",
-      );
+      const { data: roles, error: roleError } = await supabase.rpc("current_platform_roles");
       if (roleError) throw roleError;
 
       const next = (roles || [])
@@ -37,147 +37,71 @@ export default function PlatformOwnerLogin({
 
       if (next.length) {
         onAuthenticated(next);
-        return;
+      } else {
+        await supabase.auth.signOut({ scope: "local" });
+        setError("This account is authenticated, but it has no active platform-owner access.");
       }
-
-      await supabase.auth.signOut({ scope: "local" });
-      setError("This Google account is not authorized for the platform owner panel.");
-    } catch (e) {
+    } catch {
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-      setError(e instanceof Error ? e.message : "Unable to verify the owner session.");
+      setError("Unable to verify platform-owner access.");
     } finally {
       setChecking(false);
     }
   };
 
   useEffect(() => {
-    void verifyCurrentSession();
+    void verifyOwnerSession();
     const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
-        setChecking(false);
-        setBusy(false);
-      }
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") void verifyOwnerSession();
+      if (event === "SIGNED_OUT") setChecking(false);
     });
     return () => data.subscription.unsubscribe();
   }, []);
 
-  const continueWithGoogle = async () => {
+  const signInWithGoogle = async () => {
     setBusy(true);
     setError("");
 
-    const redirectTo = new URL(
-      `${import.meta.env.BASE_URL}owner`,
-      window.location.origin,
-    ).toString();
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-          queryParams: {
-            access_type: "offline",
-            prompt: "select_account",
-          },
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectTarget(),
+        queryParams: {
+          prompt: "select_account",
         },
-      });
-      if (authError) throw authError;
-    } catch (e) {
+      },
+    });
+
+    if (oauthError) {
+      setError("Google sign-in is unavailable. Make sure Google OAuth is enabled for this Supabase project.");
       setBusy(false);
-      setError(e instanceof Error ? e.message : "Unable to start Google sign-in.");
     }
   };
 
   if (checking) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          fontFamily: "Poppins,sans-serif",
-        }}
-      >
-        Checking owner session…
+      <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Poppins,sans-serif" }}>
+        Checking platform session…
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background: "#f5f7fb",
-        fontFamily: "Poppins,system-ui,sans-serif",
-      }}
-    >
-      <section
-        style={{
-          width: "min(460px,100%)",
-          background: "#fff",
-          borderRadius: 24,
-          padding: 30,
-          border: "1px solid #e7ebf2",
-          boxShadow: "0 24px 80px rgba(15,23,42,.12)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 900,
-            letterSpacing: 1.5,
-            color: "#4f46e5",
-          }}
-        >
-          LEARNER&apos;S GUIDE
-        </div>
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "#f5f7fb", fontFamily: "Poppins,system-ui,sans-serif" }}>
+      <section style={{ width: "min(460px,100%)", background: "#fff", borderRadius: 24, padding: 30, border: "1px solid #e7ebf2", boxShadow: "0 24px 80px rgba(15,23,42,.12)" }}>
+        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5, color: "#4f46e5" }}>LEARNER&apos;S GUIDE</div>
         <h1 style={{ margin: "8px 0 6px", fontSize: 30 }}>Platform Owner</h1>
         <p style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>
-          Owner access is restricted to the authorized Google account and verified
-          platform membership.
+          Owner access is restricted to the authorized Google account below. Platform membership is verified in the database after Google authentication.
         </p>
 
-        <label
-          style={{
-            display: "block",
-            marginTop: 16,
-            fontSize: 11,
-            fontWeight: 900,
-            color: "#475569",
-            letterSpacing: 0.6,
-          }}
-        >
-          AUTHORIZED GOOGLE ACCOUNT
-          <div
-            style={{
-              marginTop: 7,
-              padding: 12,
-              borderRadius: 11,
-              border: "1px solid #d8dee9",
-              background: "#f8fafc",
-              color: "#14213d",
-              fontWeight: 800,
-            }}
-          >
-            {OWNER_EMAIL}
-          </div>
-        </label>
+        <div style={{ padding: 13, borderRadius: 12, background: "#f8fafc", border: "1px solid #e7ebf2", margin: "16px 0", fontSize: 13 }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b", letterSpacing: 1 }}>AUTHORIZED OWNER ACCOUNT</div>
+          <div style={{ marginTop: 4, fontWeight: 900 }}>{OWNER_EMAIL}</div>
+        </div>
 
         {error && (
-          <div
-            role="alert"
-            style={{
-              margin: "12px 0",
-              padding: 11,
-              borderRadius: 10,
-              background: "#fff1f2",
-              color: "#b42318",
-              fontSize: 12,
-            }}
-          >
+          <div role="alert" style={{ margin: "8px 0 12px", padding: 11, borderRadius: 10, background: "#fff1f2", color: "#b42318", fontSize: 12 }}>
             {error}
           </div>
         )}
@@ -185,32 +109,15 @@ export default function PlatformOwnerLogin({
         <button
           type="button"
           disabled={busy}
-          onClick={() => void continueWithGoogle()}
-          style={{
-            width: "100%",
-            border: 0,
-            borderRadius: 11,
-            padding: 13,
-            marginTop: 14,
-            background: "#4f46e5",
-            color: "#fff",
-            fontWeight: 900,
-            cursor: busy ? "wait" : "pointer",
-          }}
+          onClick={() => void signInWithGoogle()}
+          style={{ width: "100%", border: 0, borderRadius: 11, padding: 13, background: "#4f46e5", color: "#fff", fontWeight: 900, cursor: busy ? "wait" : "pointer" }}
         >
           {busy ? "Opening Google…" : "Continue with Google"}
         </button>
 
-        <div
-          style={{
-            marginTop: 12,
-            textAlign: "center",
-            color: "#94a3b8",
-            fontSize: 11,
-          }}
-        >
-          No password login is exposed on the Owner panel.
-        </div>
+        <p style={{ margin: "14px 0 0", color: "#94a3b8", fontSize: 11, lineHeight: 1.5 }}>
+          A Google account alone does not grant owner access. The signed-in account must match the authorized email and have an active platform membership.
+        </p>
       </section>
     </main>
   );
