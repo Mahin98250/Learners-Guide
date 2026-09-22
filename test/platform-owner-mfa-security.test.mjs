@@ -46,7 +46,7 @@ test("owner login cannot grant access before AAL2", () => {
 
 test("owner enrollment supports a TOTP authenticator", () => {
   assert.match(login, /factorType:\s*"totp"/);
-  assert.match(login, /friendlyName:\s*"Learner's Guide Owner"/);
+  assert.match(login, /friendlyName:\s*"Mahin Platform Owner"/);
   assert.match(login, /qr_code/);
   assert.match(login, /secret/);
 });

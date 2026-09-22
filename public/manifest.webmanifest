@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Learner's Guide",
-  "short_name": "Learner's Guide",
-  "description": "Learner's Guide connects classrooms with timetables, attendance, homework, notes, marks and fees.",
+  "name": "Mahin",
+  "short_name": "Mahin",
+  "description": "Mahin connects classrooms with timetables, attendance, homework, notes, marks and fees.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

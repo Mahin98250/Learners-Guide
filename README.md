@@ -1,8 +1,8 @@
-# 🌟 Learner's Guide
+# 🌟 Mahin
 
-> **A complete education management system for Admins, Teachers, Students and Parents.**
+> **A multi-institute education platform for Admins, Teachers, Students and Parents.**
 
-Learner's Guide is a web-based education management platform designed to bring the important daily work of an institute into one connected system.
+Mahin is the temporary platform/company brand for this project while the permanent company name is being decided. **Learner's Guide is an institute/tenant using the platform, not the platform company name.** The existing Learner's Guide institute identity and data remain unchanged.
 
 It is made to reduce the need for separate notebooks, spreadsheets, manual registers, scattered messages and disconnected tools.
 
@@ -21,7 +21,7 @@ This README explains the project in **simple, non-technical language** so that a
 
 | Item | Details |
 |---|---|
-| Product | Learner's Guide |
+| Platform | Mahin |
 | Type | Education / Institute Management System |
 | Main users | Admin, Teacher, Student, Parent |
 | Web app | Yes |

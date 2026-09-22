@@ -9,7 +9,7 @@ export type Role = "teacher" | "student" | "parent";
 export function RoleSelect({ onNext, tenant }: { onNext: (role: Role) => void; tenant?: InstituteTenant | null }) {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Role | "">("");
-  const brandName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const brandName = tenant?.display_name || tenant?.name || "Mahin";
   const primaryColor = tenant?.primary_color || "#FFFFFF";
 
   const choose = (role: Role) => {

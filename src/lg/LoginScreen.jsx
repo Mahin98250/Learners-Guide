@@ -11,7 +11,7 @@ export function LoginScreen({ role, onBack, onLogin, onForgotPassword, tenant })
   const [loading, setLoading] = useState(false);
   const rc = ROLES.find((r) => r.key === role) || ROLES[0];
   const roleEmojis = { teacher: "👨‍🏫", student: "🎓", parent: "👨‍👩‍👧" };
-  const brandName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const brandName = tenant?.display_name || tenant?.name || "Mahin";
   const primaryColor = tenant?.primary_color || "#4357e8";
 
   const handle = async () => {

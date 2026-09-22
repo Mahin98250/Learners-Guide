@@ -46,7 +46,7 @@ self.addEventListener("push", (event) => {
       const existing = await self.registration.getNotifications({ tag });
       existing.forEach((notification) => notification.close());
     } catch {}
-    await self.registration.showNotification(payload.title || "Learner's Guide", {
+    await self.registration.showNotification(payload.title || "Mahin", {
       body: payload.body || "You have a new notification.",
       tag,
       renotify: false,
