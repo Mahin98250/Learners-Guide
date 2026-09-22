@@ -135,11 +135,8 @@ on conflict (institute_id,role_key,event_type) do nothing;
 -- New tenants created through the protected provisioning RPC also get the same
 -- baseline configuration.
 create or replace function public.seed_institute_defaults(p_institute_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
+returns void language plpgsql security definer set search_path = public, pg_temp
+as $
 begin
   insert into public.institute_roles (institute_id, role_key, name, description, is_system) values
     (p_institute_id, 'institute_owner', 'Institute Owner', 'Full control of this institute workspace.', true),
@@ -194,19 +191,34 @@ begin
 
   insert into public.institute_role_permissions (role_id, permission_code)
   select r.id, p.code from public.institute_roles r
-  join public.permissions p on p.code = any(array['materials.read','materials.manage','announcements.read','announcements.manage'])
+  join public.permissions p on p.code = any(array[
+    'institute.read_settings','materials.read','materials.manage','announcements.read','announcements.manage','reports.read'
+  ])
   where r.institute_id = p_institute_id and r.role_key = 'content_manager' on conflict do nothing;
 
   insert into public.institute_role_permissions (role_id, permission_code)
   select r.id, p.code from public.institute_roles r
-  join public.permissions p on p.code = any(array['students.read','attendance.read','homework.read','materials.read','assessments.read','timetable.read','announcements.read','reports.read'])
+  join public.permissions p on p.code = any(array[
+    'institute.read_settings','timetable.read','attendance.read','homework.read','materials.read',
+    'assessments.read','fees.read','announcements.read'
+  ])
   where r.institute_id = p_institute_id and r.role_key = 'student' on conflict do nothing;
 
   insert into public.institute_role_permissions (role_id, permission_code)
   select r.id, p.code from public.institute_roles r
-  join public.permissions p on p.code = any(array['students.read','guardians.read','attendance.read','homework.read','materials.read','assessments.read','timetable.read','announcements.read','reports.read'])
+  join public.permissions p on p.code = any(array[
+    'institute.read_settings','timetable.read','attendance.read','homework.read','materials.read',
+    'assessments.read','fees.read','announcements.read','reports.read'
+  ])
   where r.institute_id = p_institute_id and r.role_key = 'parent' on conflict do nothing;
 
+  insert into public.institute_role_permissions (role_id, permission_code)
+  select r.id, p.code from public.institute_roles r
+  join public.permissions p on p.code = any(array[
+    'people.read','students.read','teachers.read','academics.read','attendance.read','homework.read',
+    'materials.read','assessments.read','fees.read','timetable.read','announcements.read','reports.read'
+  ])
+  where r.institute_id = p_institute_id and r.role_key = 'staff' on conflict do nothing;
   insert into public.institute_notification_integrations(institute_id,provider_code,enabled,secret_configured,display_name,config)
   select p_institute_id,x.provider_code,x.enabled,x.secret_configured,x.display_name,x.config
   from (values
@@ -224,7 +236,6 @@ begin
   cross join (values ('announcement'),('homework'),('material'),('attendance'),('timetable'),('message')) e(event_type)
   on conflict (institute_id,role_key,event_type) do nothing;
 end;
-$$;
+$;
 
-revoke all on function public.seed_institute_defaults(uuid) from public,anon;
-grant execute on function public.seed_institute_defaults(uuid) to authenticated;
+revoke all on function public.seed_institute_defaults(uuid) from public, anon, authenticated;
