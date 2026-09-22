@@ -51,6 +51,7 @@ as $$
 declare
   v_notification public.notifications%rowtype;
   v_role text;
+  v_recipient_auth_id uuid;
   v_count integer := 0;
   v_pref public.institute_notification_preferences%rowtype;
   v_integration public.institute_notification_integrations%rowtype;
@@ -60,11 +61,11 @@ begin
   select * into v_notification from public.notifications where id = p_notification_id;
   if not found or v_notification.institute_id is null then return 0; end if;
 
-  select im.role into v_role
+  select im.role, p.auth_id into v_role, v_recipient_auth_id
   from public.institute_memberships im
   join public.people p on p.id = im.person_id
   where im.institute_id = v_notification.institute_id
-    and p.auth_id = v_notification.uid::uuid
+    and p.auth_id::text = v_notification.uid
     and im.status = 'active'
     and p.status = 'active'
   limit 1;
@@ -110,7 +111,7 @@ begin
     values (
       v_notification.institute_id,
       v_notification.id,
-      v_notification.uid::uuid,
+      v_recipient_auth_id,
       case when v_channel = 'push' then 'web_push' else v_channel end,
       case when v_integration.secret_configured then 'pending' else 'blocked' end
     )
