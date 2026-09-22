@@ -38,9 +38,10 @@ test("existing shared data architecture scopes reads and writes to the active te
 });
 
 test("platform Owner remains a separate control-plane route", () => {
-  assert.match(ownerRoute, /createFileRoute\("\/owner"\)/);
+  assert.match(ownerRoute, /createFileRoute("\/owner")/);
   assert.match(ownerPortal, /PLATFORM OWNER/);
-  assert.match(ownerPortal, /platform_owner_access_ok/);
+  assert.match(ownerPortal, /current_platform_roles/);
+  assert.match(ownerPortal, /mfa\.getAuthenticatorAssuranceLevel/);
 });
 
 test("Phase 9 requires bounded control-plane reads instead of browser-wide materialization", () => {
