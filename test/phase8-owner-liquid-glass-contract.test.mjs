@@ -41,4 +41,7 @@ test("glass surfaces use translucency, blur, highlights and focus states", () =>
   assert.match(css, /inset 0 1px 0 rgba\(255,255,255,.95\)/);
   assert.match(css, /focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /prefers-reduced-transparency/);
+  assert.match(css, /@supports not \(\(backdrop-filter:blur\(1px\)\)\)/);
+  assert.match(css, /@keyframes owner-sheet-in/);
 });
