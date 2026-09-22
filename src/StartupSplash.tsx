@@ -41,7 +41,7 @@ export default function StartupSplash() {
         <div className="startup-splash__spark startup-splash__spark--two" />
         <div className="startup-splash__spark startup-splash__spark--three" />
 
-        <div className="startup-splash__title">Learner's Guide</div>
+        <div className="startup-splash__title">Mahin</div>
         <div className="startup-splash__tagline">Learn. Grow. Achieve.</div>
       </div>
 
