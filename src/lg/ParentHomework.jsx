@@ -4,7 +4,7 @@ import { C } from "@/lg/data";
 import { supabase, SB_KEY, SB_URL } from "@/lg/supabase";
 import { dueState } from "@/lg/dateUtils";
 
-const DB_NAME = "learners-guide-offline-pdfs";
+const DB_NAME = "mahin-offline-pdfs";
 const STORE = "files";
 
 function openDb() {
