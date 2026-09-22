@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.notification-dispatcher]
 verify_jwt = false
+
+[functions.web-push]
+verify_jwt = false
