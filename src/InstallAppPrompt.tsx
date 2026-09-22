@@ -42,7 +42,7 @@ export default function InstallAppPrompt() {
   return (
     <button
       type="button"
-      aria-label="Install Learner's Guide app"
+      aria-label="Install Mahin app"
       onClick={async () => {
         const current = prompt;
         await current.prompt();

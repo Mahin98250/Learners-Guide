@@ -40,7 +40,7 @@ function NotFoundComponent() {
           <span aria-hidden="true">🎓</span>
         </div>
 
-        <p className="relative text-[11px] font-black uppercase tracking-[0.34em] text-indigo-200/90">Learner's Guide</p>
+        <p className="relative text-[11px] font-black uppercase tracking-[0.34em] text-indigo-200/90">Mahin</p>
         <h1
           className="relative mt-3 bg-gradient-to-b from-white via-white to-indigo-200 bg-clip-text text-[clamp(6rem,20vw,9rem)] font-black leading-[0.82] tracking-[-0.075em] text-transparent"
           style={{ textShadow: "0 14px 45px rgba(99,102,241,.22)" }}
@@ -55,7 +55,7 @@ function NotFoundComponent() {
 
         <h2 className="relative mt-5 text-2xl font-black tracking-tight text-white sm:text-3xl">This page took a wrong turn.</h2>
         <p className="relative mx-auto mt-3 max-w-md text-sm leading-6 text-slate-300 sm:text-[15px]">
-          The link doesn't lead anywhere in Learner's Guide. Let's get you safely back to where your learning is.
+          The link doesn't lead anywhere in Mahin. Let's get you safely back to where your learning is.
         </p>
 
         <div className="relative mt-8 grid gap-3 sm:grid-cols-2">
@@ -78,7 +78,7 @@ function NotFoundComponent() {
 
         <div className="relative mt-7 rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-xs font-medium text-slate-400 backdrop-blur-xl">
           <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-300 align-middle shadow-[0_0_10px_rgba(110,231,183,.7)]" aria-hidden="true" />
-          You're still connected to Learner's Guide.
+          You're still connected to Mahin.
         </div>
       </section>
     </main>
@@ -111,10 +111,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Learner's Guide" },
+      { title: "Mahin" },
       { name: "description", content: "School app for teachers, students and parents — classes, homework, marks and fees." },
-      { name: "author", content: "Learner's Guide" },
-      { property: "og:title", content: "Learner's Guide" },
+      { name: "author", content: "Mahin" },
+      { property: "og:title", content: "Mahin" },
       { property: "og:description", content: "School app for teachers, students and parents — classes, homework, marks and fees." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

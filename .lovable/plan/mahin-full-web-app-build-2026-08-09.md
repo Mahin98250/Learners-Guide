@@ -1,4 +1,4 @@
-# Learner's Guide — full web app build
+# Mahin — full web app build
 
 Rebuild the Claude artifact as a real multi-page app: three role apps (Teacher, Student, Parent), the same purple-gradient mobile UI, logo, animations, bottom tab bars, and every screen that exists today.
 

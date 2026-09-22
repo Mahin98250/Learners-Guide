@@ -21,7 +21,7 @@ jobs:
     env:
       SUPABASE_URL: https://efnxjfzyqbdulpjhffsm.supabase.co
       BACKUP_BROKER_URL: https://efnxjfzyqbdulpjhffsm.supabase.co/functions/v1/backup-broker
-      OIDC_AUDIENCE: learners-guide-supabase-backup
+      OIDC_AUDIENCE: mahin-supabase-backup
       BACKUP_DIR: backup
 
     steps:
@@ -274,7 +274,7 @@ jobs:
           set -euo pipefail
           echo 'package:start' >> "$BACKUP_DIR/diagnostics/stage.log"
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-          archive="$BACKUP_DIR/learners-guide-complete-${stamp}.tar.gz"
+          archive="$BACKUP_DIR/mahin-complete-${stamp}.tar.gz"
           printf 'Learner\x27s Guide complete Supabase recovery set\nCommit: %s\nRun: %s\nCreated: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$stamp" > "$BACKUP_DIR/manifest.txt"
           tar -czf "$archive" -C "$BACKUP_DIR" database storage auth-users.json manifest.txt diagnostics
           tar -tzf "$archive" >/dev/null
@@ -287,7 +287,7 @@ jobs:
         with:
           name: supabase-complete-backup-${{ github.run_id }}
           path: |
-            backup/learners-guide-complete-*.tar.gz
+            backup/mahin-complete-*.tar.gz
             backup/sha256.txt
             backup/manifest.txt
             backup/diagnostics/validation.json

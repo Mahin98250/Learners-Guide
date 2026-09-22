@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Learner's Guide backend (existing project). The publishable anon key is safe
+// Mahin backend (existing project). The publishable anon key is safe
 // in client code; row level security is what protects the data.
 export const SB_URL = "https://efnxjfzyqbdulpjhffsm.supabase.co";
 export const SB_KEY =

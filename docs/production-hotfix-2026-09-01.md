@@ -28,7 +28,7 @@ The current responsive foundation now keeps the shell fluid, prevents horizontal
 - bottom content clearance so the last item is reachable;
 - scoped CSS so Parent styling does not leak into other portals.
 
-The real Learner's Guide logo remains owned by the shared `LGLogo` implementation.
+The real Mahin logo remains owned by the shared `LGLogo` implementation.
 
 ## Admin lifecycle fix
 
@@ -36,7 +36,7 @@ The dedicated `/admin` route now re-checks the current authenticated admin sessi
 
 ## PWA/cache fix
 
-Service-worker cache generation is now `learners-guide-v33`. JavaScript and CSS continue to prefer fresh network assets when online, while Supabase REST/Auth/Functions requests are not handled by the static asset cache path. The cache generation bump forces devices that still hold the previous PWA shell/assets to activate the current production bundle.
+Service-worker cache generation is now `mahin-v33`. JavaScript and CSS continue to prefer fresh network assets when online, while Supabase REST/Auth/Functions requests are not handled by the static asset cache path. The cache generation bump forces devices that still hold the previous PWA shell/assets to activate the current production bundle.
 
 ## Student assessment integrity fix
 

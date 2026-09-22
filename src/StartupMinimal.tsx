@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { LOGO_IMG_SRC } from "@/lg/ui";
 
-/** Short launch transition using the real Learner's Guide logo. */
+/** Short launch transition using the real Mahin logo. */
 export default function StartupMinimal() {
   const [exiting, setExiting] = useState(false);
 
@@ -12,7 +12,7 @@ export default function StartupMinimal() {
 
   return (
     <div className={`lg-minimal-launch${exiting ? " lg-minimal-launch--exit" : ""}`} aria-hidden="true">
-      <img className="lg-minimal-launch__logo" src={LOGO_IMG_SRC} alt="Learner's Guide" />
+      <img className="lg-minimal-launch__logo" src={LOGO_IMG_SRC} alt="Mahin" />
       <style>{`
         .lg-minimal-launch{position:fixed;inset:0;z-index:2147483647;pointer-events:none;background:#fff;display:flex;align-items:center;justify-content:center;opacity:1;overflow:hidden;transition:opacity 240ms cubic-bezier(.22,1,.36,1)}
         .lg-minimal-launch--exit{opacity:0}

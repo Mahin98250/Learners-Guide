@@ -7,7 +7,7 @@ const MIN_PDF_BYTES = 256 * 1024;
 const TMP_BUCKET = "pdf-compression-tmp";
 const STRUCTURAL_ENGINE = "cantoo-pdf-lib-structural-v1";
 const RASTER_ENGINE = "sharp-pdf-raster-v1";
-const DEFAULT_RASTER_WORKER_URL = "https://learners-guide.vercel.app/api/pdf-compression-worker";
+const DEFAULT_RASTER_WORKER_URL = "https://mahin.vercel.app/api/pdf-compression-worker";
 const allowedBuckets = new Set(["homework", "materials"]);
 const allowedProfiles = new Set(["recommended", "extreme", "less"]);
 
@@ -496,7 +496,7 @@ async function resolveTenant(
   // than silently failing the upload. This does NOT grant any source access:
   // source ownership and the application record binding are still checked.
   const slug = `compression-user-${userId.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase()}`;
-  const name = role === "admin" ? "Learner's Guide" : `Learner's Guide User ${userId.slice(0, 8)}`;
+  const name = role === "admin" ? "Mahin" : `Mahin User ${userId.slice(0, 8)}`;
 
   const { data: existing } = await admin
     .from("compression_tenants")

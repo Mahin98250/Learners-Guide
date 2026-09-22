@@ -67,13 +67,13 @@ The application keeps the existing 50 MB PDF processing boundary. Vercel Functio
 
 The worker is exposed through the production route:
 
-https://learners-guide.vercel.app/api/pdf-compression-worker
+https://mahin.vercel.app/api/pdf-compression-worker
 
 The Supabase function can override this route with the PDF_COMPRESSION_RASTER_WORKER_URL environment variable for staging or another trusted Vercel deployment.
 
 ## Phase 3 boundary
 
-Phase 3 is the first production implementation in Learner's Guide that can materially reduce the size of image-heavy/scanned PDFs through actual raster recompression.
+Phase 3 is the first production implementation in Mahin that can materially reduce the size of image-heavy/scanned PDFs through actual raster recompression.
 
 It is intentionally not a full PDF rendering engine. PDFs with complex transparency, uncommon color spaces, unsupported filters or unusual image predictors are skipped at the image level and continue through the safe structural fallback.
 

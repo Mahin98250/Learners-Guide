@@ -1,7 +1,7 @@
 # Phase 4D — Role-by-Role Responsive & Production QA
 
 Date: 2026-09-01
-Repository: Mahin98250/Learners-Guide
+Repository: Mahin98250/mahin
 
 ## Objective
 
@@ -16,7 +16,7 @@ Every mobile portal must satisfy all of the following:
 - keep the shared header visually bounded;
 - keep fixed bottom navigation inside the viewport and reserve content clearance;
 - remain stable after browser back/forward, refresh, tab switch, app switch, visibility restore, and reopening an existing tab;
-- preserve the real Learner's Guide logo from the shared `LGLogo` implementation;
+- preserve the real Mahin logo from the shared `LGLogo` implementation;
 - wrap long titles, PDF names, notes, and labels instead of widening the page;
 - keep primary actions reachable without clipping;
 - render authoritative Supabase data once, without presentation-level duplication;

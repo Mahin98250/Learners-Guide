@@ -8,7 +8,7 @@ const normalizeId = (value: unknown) => normalize(value).replace(/[^a-z0-9]/g, "
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const genericMessage = "If the account details match an active account with a verified recovery email, a password reset link has been sent. Check the recovery email inbox and spam folder.";
 const deliveryError = "We could not send the recovery email right now. Please try again in a few minutes or contact the institute administrator.";
-const PRODUCTION_SITE_URL = "https://learners-guide.vercel.app/";
+const PRODUCTION_SITE_URL = "https://mahin.vercel.app/";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });

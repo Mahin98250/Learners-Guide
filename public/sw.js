@@ -1,4 +1,4 @@
-const CACHE = "learners-guide-v37";
+const CACHE = "mahin-v37";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./file_00000000451c82118020d2baea54f76b.png"];
 const APP_SCOPE = self.registration?.scope || self.location.href;
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
@@ -46,7 +46,7 @@ self.addEventListener("push", (event) => {
       const existing = await self.registration.getNotifications({ tag });
       existing.forEach((notification) => notification.close());
     } catch {}
-    await self.registration.showNotification(payload.title || "Learner's Guide", {
+    await self.registration.showNotification(payload.title || "Mahin", {
       body: payload.body || "You have a new notification.",
       tag,
       renotify: false,

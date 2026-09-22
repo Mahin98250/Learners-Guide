@@ -1,4 +1,4 @@
-# Learner's Guide — Supabase Database Backup Runbook
+# Mahin — Supabase Database Backup Runbook
 
 ## What was implemented
 
@@ -22,7 +22,7 @@ GitHub Actions artifacts are separate from repository commits. The repository it
 
 ## Secure backup destination
 
-The selected destination is GitHub Actions artifact storage. It is appropriate for the current small Free-plan Learner's Guide database because it is private, versioned per workflow run, not part of the Git history, and supports automatic expiry.
+The selected destination is GitHub Actions artifact storage. It is appropriate for the current small Free-plan Mahin database because it is private, versioned per workflow run, not part of the Git history, and supports automatic expiry.
 
 This is still not a perfect disaster-recovery design because the backup remains tied to the GitHub account/repository. For stronger resilience against GitHub account loss, repository deletion, or organization-level compromise, add an **independent encrypted object-storage destination** later (for example, a private S3-compatible bucket with lifecycle retention). Do not use a public bucket.
 
@@ -111,7 +111,7 @@ A failed check causes the GitHub Actions job to fail, making the backup failure 
 
 ## Storage backup requirement
 
-Learner's Guide actively uses Supabase Storage for application files. The production code contains reads/uploads/downloads against the `materials` Storage bucket, and the current Supabase project has Storage objects.
+Mahin actively uses Supabase Storage for application files. The production code contains reads/uploads/downloads against the `materials` Storage bucket, and the current Supabase project has Storage objects.
 
 Therefore:
 

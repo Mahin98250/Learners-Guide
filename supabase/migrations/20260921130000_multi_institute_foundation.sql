@@ -3,7 +3,7 @@
 -- Additive rollout:
 --   * creates platform/institute identity tables;
 --   * adds nullable institute_id to legacy institute-owned tables;
---   * backfills existing Learner's Guide data into the original institute;
+--   * backfills existing Mahin data into the original institute;
 --   * leaves current RLS unchanged until the application is tenant-aware.
 --
 -- Phase 2 will make institute_id required and switch RLS to membership + permissions.
@@ -155,7 +155,7 @@ alter table public.institute_settings enable row level security;
 alter table public.institute_domains enable row level security;
 
 insert into public.institutes (name, slug, status)
-values ('Learner''s Guide', 'learners-guide', 'active')
+values ('Learner''s Guide', 'mahin', 'active')
 on conflict (slug) do update
 set name = excluded.name,
     status = excluded.status,
@@ -164,7 +164,7 @@ set name = excluded.name,
 insert into public.institute_settings (institute_id, display_name, short_name)
 select id, name, 'Learner''s Guide'
 from public.institutes
-where slug = 'learners-guide'
+where slug = 'mahin'
 on conflict (institute_id) do nothing;
 
 insert into public.people (auth_id, display_name, email, phone)
@@ -201,7 +201,7 @@ select
 from public.users u
 join public.people p on p.auth_id = u.auth_id
 cross join public.institutes i
-where i.slug = 'learners-guide'
+where i.slug = 'mahin'
   and u.auth_id is not null
 on conflict (institute_id, person_id) do update
 set role = excluded.role,
@@ -327,7 +327,7 @@ declare
 begin
   select id into v_institute_id
   from public.institutes
-  where slug = 'learners-guide';
+  where slug = 'mahin';
 
   foreach v_table in array v_tables loop
     execute format(

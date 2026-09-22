@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       let sent = 0;
       for (const sub of subs || []) {
         try {
-          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth }, expirationTime: sub.expiration_time }, JSON.stringify({ title: n.title || "Learner's Guide", body: n.desc || "You have a new notification.", type: n.type || "message", notificationId: n.id, url: "app" }), { TTL: 86400 });
+          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth }, expirationTime: sub.expiration_time }, JSON.stringify({ title: n.title || "Mahin", body: n.desc || "You have a new notification.", type: n.type || "message", notificationId: n.id, url: "app" }), { TTL: 86400 });
           sent++;
           await admin.from("push_subscriptions").update({ last_success_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq("id", sub.id);
         } catch (error) {

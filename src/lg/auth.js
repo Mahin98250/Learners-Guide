@@ -2,7 +2,7 @@ import { supabase } from "@/lg/supabase";
 import { getCurrentInstituteContext } from "@/lg/tenant";
 
 /**
- * Production authentication for Learner's Guide.
+ * Production authentication for Mahin.
  * Passwords are handled only by Supabase Auth.
  * Role/ref are read from server-managed app_metadata.
  * Profile existence and active status are re-checked after every online login.

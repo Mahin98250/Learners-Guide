@@ -1,6 +1,6 @@
-const CACHE_NAME = "learners-guide-study-materials-v2";
+const CACHE_NAME = "mahin-study-materials-v2";
 const STORAGE_PATH = "/storage/v1/object/";
-const STATE_EVENT = "learners-guide:offline-state";
+const STATE_EVENT = "mahin:offline-state";
 let installed = false;
 
 function isMaterialRequest(input: RequestInfo | URL) {

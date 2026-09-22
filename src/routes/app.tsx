@@ -13,8 +13,8 @@ const LeaveAccess = lazy(() => import("@/lg/LeaveAccess").then((module) => ({ de
 const PushNotificationPrompt = lazy(() => import("@/lg/pushNotifications").then((module) => ({ default: module.PushNotificationPrompt })));
 const ChangePassword = lazy(() => import("@/lg/ChangePassword"));
 
-const title = "My Dashboard — Learner's Guide";
-const description = "Your Learner's Guide dashboard: classes, attendance, homework, exams, results and study materials.";
+const title = "My Dashboard — Mahin";
+const description = "Your Mahin dashboard: classes, attendance, homework, exams, results and study materials.";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
