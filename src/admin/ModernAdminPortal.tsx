@@ -96,7 +96,7 @@ function PageFallback() {
 
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const { tenant, membership, memberships, selectInstitute } = useInstituteWorkspace();
-  const workspaceName = tenant?.display_name || tenant?.name || "Learner's Guide";
+  const workspaceName = tenant?.display_name || tenant?.name || "Mahin";
   const workspaceColor = tenant?.primary_color || "#4357e8";
   const workspaceOptions = memberships.length > 1 && !tenant ? memberships : [];
   const [active, setActive] = useState("Dashboard");
