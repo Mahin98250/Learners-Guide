@@ -1,7 +1,7 @@
 # Phase 4A — Architecture & Repository Audit
 
 Date: 2026-09-01
-Repository: Mahin98250/Learners-Guide
+Repository: Mahin98250/mahin
 
 ## Scope
 
@@ -50,7 +50,7 @@ Current main remains ahead of this baseline because of intentional production/da
 1. There are multiple historical Student/Parent implementations in the repository, including `parent.jsx`, `parentWorkflows.jsx`, `parentWorkflows.safe.jsx`, and `StudentAppFixed.jsx`. Only actively imported modules should be considered canonical; legacy copies should not be modified casually.
 2. `src/main.tsx` currently includes mobile restoration recovery logic. It should remain narrowly scoped to page lifecycle recovery and must not become a second layout system.
 3. `src/mobile.css` and `src/production-mobile.css` together form the active responsive stack. Future changes should first remove/replace conflicting rules rather than append more global patches.
-4. `src/lg/ui.jsx` contains the real Learner's Guide logo and shared Shell/AppBar. Branding should continue to use `LOGO_IMG_SRC`; do not substitute generated or temporary artwork.
+4. `src/lg/ui.jsx` contains the real Mahin logo and shared Shell/AppBar. Branding should continue to use `LOGO_IMG_SRC`; do not substitute generated or temporary artwork.
 5. `package.json` exposes the production gates `npm run typecheck`, `npm run build`, and `npm run lint`.
 
 ## Phase 4A acceptance criteria
