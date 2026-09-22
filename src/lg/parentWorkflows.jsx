@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import { supabase } from "@/lg/supabase";
 import { Badge, Card, Shell, AppBar, Sec } from "@/lg/ui";
 import { relativeDate } from "@/lg/dateUtils";
+import { getCurrentInstituteContext } from "@/lg/tenant";
 
 const ParentNotifications = lazy(() => import("@/lg/ParentNotifications").then(m => ({ default: m.ParentNotifications })));
 const ParentHomework = lazy(() => import("@/lg/ParentHomework").then(m => ({ default: m.ParentHomework })));
@@ -29,28 +30,32 @@ export function ParentApp({ user, onLogout }) {
       const authId = auth?.user?.id;
       if (!authId) throw new Error("Parent session expired. Please sign in again.");
 
-      const { data: links, error: linkError } = await supabase.from("parent_student_links").select("student_id,status").eq("parent_auth_id", authId).eq("status", "active");
+      const context = await getCurrentInstituteContext();
+      const instituteId = context.membership?.institute_id;
+      if (!instituteId) throw new Error("An active institute workspace must be selected.");
+
+      const { data: links, error: linkError } = await supabase.from("parent_student_links").select("student_id,status").eq("institute_id", instituteId).eq("parent_auth_id", authId).eq("status", "active");
       if (linkError) throw linkError;
       const ids = [...new Set((links || []).map(x => String(x.student_id)).filter(Boolean))];
       if (!ids.length && user?.ref) ids.push(String(user.ref));
       if (!ids.length) { setChildren([]); setMemberships([]); setAttendance([]); setFees([]); setTests([]); setResults([]); setHomework([]); setTimetable([]); return; }
 
-      const { data: students, error: studentError } = await supabase.from("students").select("id,name,sid,cls,sec").in("id", ids);
+      const { data: students, error: studentError } = await supabase.from("students").select("id,name,sid,cls,sec").eq("institute_id", instituteId).in("id", ids);
       if (studentError) throw studentError;
       setChildren(students || []);
       setSelectedId(cur => cur && students?.some(s => String(s.id) === String(cur)) ? cur : students?.[0]?.id || null);
 
-      const { data: memberships, error: membershipError } = await supabase.from("batch_students").select("student_id,batch_id,status").in("student_id", ids).eq("status", "active");
+      const { data: memberships, error: membershipError } = await supabase.from("batch_students").select("student_id,batch_id,status").eq("institute_id", instituteId).in("student_id", ids).eq("status", "active");
       if (membershipError) throw membershipError;
       setMemberships(memberships || []);
       const batchIds = [...new Set((memberships || []).map(m => String(m.batch_id)).filter(Boolean))];
 
       const [tr, ar, fr, hw, test] = await Promise.all([
-        batchIds.length ? supabase.from("timetable_entries").select("id,batch_id,subject_name,start_time,end_time,status,day_of_week").in("batch_id", batchIds).eq("status", "active") : Promise.resolve({ data: EMPTY, error: null }),
-        supabase.from("attendance").select("id,sid,date,status").in("sid", ids).order("date", { ascending: false }),
-        supabase.from("fees").select("id,sid,desc,amount,status,due").in("sid", ids).order("due"),
-        supabase.from("homework").select("id,batch_id,subject,desc,given,due,created_at,pdfname").in("batch_id", batchIds).order("created_at", { ascending: false }),
-        batchIds.length ? supabase.from("tests").select("id,title,description,batch_id,subject,test_date,total_marks,status").in("batch_id", batchIds).order("test_date") : Promise.resolve({ data: EMPTY, error: null })
+        batchIds.length ? supabase.from("timetable_entries").select("id,batch_id,subject_name,start_time,end_time,status,day_of_week").eq("institute_id", instituteId).in("batch_id", batchIds).eq("status", "active") : Promise.resolve({ data: EMPTY, error: null }),
+        supabase.from("attendance").select("id,sid,date,status").eq("institute_id", instituteId).in("sid", ids).order("date", { ascending: false }),
+        supabase.from("fees").select("id,sid,desc,amount,status,due").eq("institute_id", instituteId).in("sid", ids).order("due"),
+        supabase.from("homework").select("id,batch_id,subject,desc,given,due,created_at,pdfname").eq("institute_id", instituteId).in("batch_id", batchIds).order("created_at", { ascending: false }),
+        batchIds.length ? supabase.from("tests").select("id,title,description,batch_id,subject,test_date,total_marks,status").eq("institute_id", instituteId).in("batch_id", batchIds).order("test_date") : Promise.resolve({ data: EMPTY, error: null })
       ]);
       if (tr.error) throw tr.error;
       if (ar.error) throw ar.error;
@@ -65,7 +70,7 @@ export function ParentApp({ user, onLogout }) {
       setTests(test.data || []);
 
       const testIds = (test.data || []).map(x => String(x.id)).filter(Boolean);
-      const resultResponse = testIds.length ? await supabase.from("test_results").select("id,student_id,test_id,marks,remarks").in("test_id", testIds).in("student_id", ids) : { data: [], error: null };
+      const resultResponse = testIds.length ? await supabase.from("test_results").select("id,student_id,test_id,marks,remarks").eq("institute_id", instituteId).in("test_id", testIds).in("student_id", ids) : { data: [], error: null };
       if (resultResponse.error) throw resultResponse.error;
       const testMap = new Map((test.data || []).map(t => [String(t.id), t]));
       setResults((resultResponse.data || []).map(r => ({ ...r, test: testMap.get(String(r.test_id)) || null })));
