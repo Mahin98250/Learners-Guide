@@ -6,6 +6,7 @@ const root = new URL("../", import.meta.url);
 const read = (path) => fs.readFileSync(new URL(path, root), "utf8");
 
 const portal = read("src/platform/PlatformOwnerPortal.tsx");
+const controlPlane = read("src/platform/PlatformOwnerControlPlane.tsx");
 const login = read("src/platform/PlatformOwnerLogin.tsx");
 const membership = read("src/platform/PlatformMembershipPanel.tsx");
 const route = read("src/routes/owner.tsx");
@@ -30,15 +31,16 @@ test("owner UI has responsive desktop/tablet/mobile breakpoints", () => {
   assert.match(css, /@media \(prefers-reduced-motion:reduce\)/);
 });
 
-test("owner route is no longer blocked by the desktop-only gate", () => {
+test("owner route uses the bounded control-plane entry point", () => {
   assert.doesNotMatch(route, /DesktopOnlyGate/);
-  assert.match(route, /component: PlatformOwnerPortal/);
+  assert.match(route, /component: PlatformOwnerControlPlane/);
+  assert.match(controlPlane, /listPlatformInstitutes/);
 });
 
 test("glass surfaces use translucency, blur, highlights and focus states", () => {
   assert.match(css, /rgba\(255,255,255,.58\)/);
   assert.match(css, /backdrop-filter:blur\(24px\) saturate\(165%\)/);
-  assert.match(css, /inset 0 1px 0 rgba\(255,255,255,.95\)/);
+  assert.match(css, /inset 0 1px 0 rgba\(255,255,255,.95)/);
   assert.match(css, /focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
 });
