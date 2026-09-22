@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { PasswordRecovery } from "@/lg/PasswordRecovery";
 
-const title = "Reset Password — Learner's Guide";
+const title = "Reset Password — Mahin";
 
 type RecoverySearch = { role: "teacher" | "student" | "parent" | "admin" };
 
