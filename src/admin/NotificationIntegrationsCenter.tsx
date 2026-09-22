@@ -194,7 +194,7 @@ export function NotificationIntegrationsCenter() {
               {providers.map(([code, name, description, icon]) => {
                 const item = integrationMap.get(code);
                 const ready = Boolean(item?.secret_configured);
-                const disabled = !canManage || code === "in_app" || (code !== "in_app" && !ready);
+                const disabled = !canManage || code === "in_app" || !ready;
                 return (
                   <div key={code} style={{ border: "1px solid #e7ebf2", borderRadius: 15, padding: 14, background: item?.enabled ? "#f8faff" : "#fff" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
