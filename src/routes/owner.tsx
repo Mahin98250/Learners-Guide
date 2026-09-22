@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import PlatformOwnerPortal from "@/platform/PlatformOwnerPortal";
-import { DesktopOnlyGate } from "@/admin/DesktopOnlyGate";
 
 export const Route = createFileRoute("/owner")({
   ssr: false,
@@ -10,9 +9,5 @@ export const Route = createFileRoute("/owner")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
-  component: () => (
-    <DesktopOnlyGate>
-      <PlatformOwnerPortal />
-    </DesktopOnlyGate>
-  ),
+  component: PlatformOwnerPortal,
 });

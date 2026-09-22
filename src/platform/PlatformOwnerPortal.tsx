@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import PlatformOwnerLogin from "@/platform/PlatformOwnerLogin";
 import { PlatformMembershipPanel } from "@/platform/PlatformMembershipPanel";
+import "./owner-liquid-glass.css";
 
 type Institute={id:string;name:string;slug:string;status:string;created_at:string};
 type InstituteSettings={institute_id:string;display_name:string|null;short_name:string|null;logo_url:string|null;favicon_url:string|null;primary_color:string|null;secondary_color:string|null;login_title:string|null;powered_by_enabled:boolean;timezone:string;locale:string};
@@ -77,15 +78,15 @@ export default function PlatformOwnerPortal(){
  const saveSettings=async()=>{setWorking("settings");setError("");setNotice("");try{const r=await supabase.rpc("platform_update_settings",{p_product_name:product.trim(),p_legal_name:legal.trim(),p_public_website_url:website.trim(),p_default_app_domain:appDomain.trim().toLowerCase(),p_support_email:support.trim().toLowerCase(),p_default_timezone:timezone.trim(),p_settings:settings?.settings||{}});if(r.error)throw r.error;setSettings(r.data as Settings);setSettingsOpen(false);setNotice("Platform settings saved to Supabase.");await load()}catch(e){setError(e instanceof Error?e.message:"Unable to save platform settings.")}finally{setWorking("")}};
 
  if(authenticated===false)return <PlatformOwnerLogin onAuthenticated={authed}/>;
- if(allowed===false)return <main style={{...shell,display:"grid",placeItems:"center",padding:24}}><section style={{background:"#fff",padding:30,borderRadius:24,maxWidth:560}}><b>PLATFORM CONTROL CENTER</b><h1>Platform access required</h1><p>Active platform membership is required for this surface.</p></section></main>;
- if(loading)return <main style={{...shell,display:"grid",placeItems:"center"}}>Loading platform control center…</main>;
+ if(allowed===false)return <main className="owner-liquid-glass owner-state-card" style={{...shell,display:"grid",placeItems:"center",padding:24}}><section style={{background:"#fff",padding:30,borderRadius:24,maxWidth:560}}><b>PLATFORM CONTROL CENTER</b><h1>Platform access required</h1><p>Active platform membership is required for this surface.</p></section></main>;
+ if(loading)return <main className="owner-liquid-glass owner-state-card" style={{...shell,display:"grid",placeItems:"center"}}>Loading platform control center…</main>;
 
  const setFeature=async(feature:PlatformFeature,enabled:boolean)=>{if(!featureInstitute)return;setWorking("feature:"+feature.code);setError("");setNotice("");try{const r=await supabase.rpc("platform_set_feature_enabled",{p_institute_id:featureInstitute,p_feature_code:feature.code,p_enabled:enabled});if(r.error)throw r.error;setEntitlements(prev=>[...prev.filter(x=>!(x.institute_id===featureInstitute&&x.feature_code===feature.code)),r.data as FeatureEntitlement]);setNotice(`${feature.name} ${enabled?"enabled":"disabled"}.`);}catch(e){setError(e instanceof Error?e.message:"Unable to update feature entitlement.");}finally{setWorking("");}};
 
  const active=institutes.filter(x=>x.status==="active").length,trial=institutes.filter(x=>x.status==="trial").length,suspended=institutes.filter(x=>x.status==="suspended").length,archived=institutes.filter(x=>x.status==="archived").length;
  const verified=domains.filter(x=>x.status==="verified").length,pending=domains.filter(x=>x.status==="pending").length,primaryDomains=domains.filter(x=>x.is_primary).length;
 
- return <main style={shell}>
+ return <main className="owner-liquid-glass" style={shell}>
   <header style={{padding:"25px clamp(16px,4vw,42px) 20px",background:"linear-gradient(135deg,#17124d,#3224a6)",color:"#fff"}}>
    <div style={{maxWidth:1280,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",gap:18,flexWrap:"wrap"}}>
     <div><div style={{fontSize:11,fontWeight:900,letterSpacing:1.6,opacity:.72}}>PLATFORM OWNER · CONTROL PLANE</div><h1 style={{margin:"5px 0",fontSize:"clamp(28px,4vw,40px)"}}>Control Center</h1><div style={{opacity:.75}}>Tenants, domains, access, configuration, audit and operational health.</div></div>
