@@ -19,7 +19,7 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  select case when count(*) = 1 then min(m.institute_id) else null end
+  select case when count(*) = 1 then (array_agg(m.institute_id))[1] else null end
   from public.institute_memberships m
   join public.people p on p.id = m.person_id
   where p.auth_id = auth.uid()
