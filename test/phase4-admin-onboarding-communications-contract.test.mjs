@@ -6,7 +6,7 @@ const migration=fs.readFileSync("supabase/migrations/20260922270000_phase4_admin
 const invite=fs.readFileSync("supabase/functions/platform-invite-admin/index.ts","utf8");
 const owner=fs.readFileSync("src/platform/PlatformOwnerPortal.tsx","utf8");
 const admin=fs.readFileSync("src/admin/ModernAdminPortal.tsx","utf8");
-const accept=fs.readFileSync("src/routes/admin-invite.tsx","utf8");
+const accept=fs.readFileSync("src/routes/auth.tsx","utf8");
 const inbox=fs.readFileSync("src/admin/PlatformInboxPage.tsx","utf8");
 
 test("Phase 4 onboarding is MFA-protected and auditable",()=>{
@@ -39,7 +39,7 @@ test("Owner and Admin surfaces are wired to communications",()=>{
   assert.match(admin,/Platform Inbox/);
   assert.match(admin,/NotifPanel/);
   assert.match(inbox,/platform_get_my_institute_messages/);
-  assert.match(accept,/platform_accept_admin_invitation/);
+  assert.match(accept,/admin-invite/);\n  assert.match(accept,/platform_accept_admin_invitation/);
 });
 
 console.log("Phase 4 onboarding and communications contract checks passed.");
