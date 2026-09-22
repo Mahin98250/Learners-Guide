@@ -3,12 +3,13 @@ import { LGLogo } from "@/lg/ui";
 import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { NotifPanel } from "@/lg/panels";
 import { supabase } from "@/lg/supabase";
+import { useInstituteFeatures } from "@/lg/institute-features";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
 type Special = "dashboard" | "platform-inbox" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" | "account-security" | "create-admin";
-type Item = { key: string; icon: string; label: string; special?: Special };
+type Item = { key: string; icon: string; label: string; special?: Special; feature?: string };
 type Group = { label: string; items: Item[] };
 type Preloader = () => Promise<unknown>;
 
@@ -64,29 +65,29 @@ const preloaders: Partial<Record<Special, Preloader>> = {
 };
 
 const GROUPS: Group[] = [
-  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }, { key: "Platform Inbox", icon: "✉", label: "Platform Inbox", special: "platform-inbox" }] },
+  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }, { key: "Platform Inbox", icon: "✉", label: "Platform Inbox", special: "platform-inbox", feature: "notifications" }] },
   { label: "People", items: [
-    { key: "Students", icon: "🎓", label: "Students", special: "students" },
-    { key: "Teachers", icon: "👨‍🏫", label: "Teachers", special: "teachers" },
+    { key: "Students", icon: "🎓", label: "Students", special: "students", feature: "students" },
+    { key: "Teachers", icon: "👨‍🏫", label: "Teachers", special: "teachers", feature: "teachers" },
     { key: "User Accounts", icon: "🔐", label: "User Accounts", special: "accounts" },
     { key: "Search Profiles", icon: "⌕", label: "Search Profiles", special: "profiles" },
   ] },
   { label: "Academic", items: [
-    { key: "Batches & Timetable", icon: "▦", label: "Batches & Timetable", special: "batches" },
-    { key: "Attendance", icon: "✓", label: "Attendance", special: "attendance" },
-    { key: "Homework", icon: "✎", label: "Homework", special: "homework" },
-    { key: "Exam Schedule", icon: "▤", label: "Exam Schedule", special: "tests" },
-    { key: "Student Results", icon: "🏆", label: "Student Results", special: "results" },
-    { key: "Marks Overview", icon: "◒", label: "Marks Overview", special: "marks" },
-    { key: "Study Materials", icon: "📚", label: "Study Materials", special: "materials" },
-    { key: "Report Cards", icon: "▤", label: "Report Cards", special: "report-cards" },
+    { key: "Batches & Timetable", icon: "▦", label: "Batches & Timetable", special: "batches", feature: "academics" },
+    { key: "Attendance", icon: "✓", label: "Attendance", special: "attendance", feature: "attendance" },
+    { key: "Homework", icon: "✎", label: "Homework", special: "homework", feature: "homework" },
+    { key: "Exam Schedule", icon: "▤", label: "Exam Schedule", special: "tests", feature: "assessments" },
+    { key: "Student Results", icon: "🏆", label: "Student Results", special: "results", feature: "assessments" },
+    { key: "Marks Overview", icon: "◒", label: "Marks Overview", special: "marks", feature: "assessments" },
+    { key: "Study Materials", icon: "📚", label: "Study Materials", special: "materials", feature: "materials" },
+    { key: "Report Cards", icon: "▤", label: "Report Cards", special: "report-cards", feature: "reports" },
   ] },
   { label: "Operations", items: [
-    { key: "Fees", icon: "₹", label: "Fees", special: "fees" },
-    { key: "Announcements", icon: "📢", label: "Announcements", special: "announcements" },
+    { key: "Fees", icon: "₹", label: "Fees", special: "fees", feature: "fees" },
+    { key: "Announcements", icon: "📢", label: "Announcements", special: "announcements", feature: "announcements" },
     { key: "Leave Requests", icon: "☷", label: "Leave Requests", special: "leave" },
   ] },
-  { label: "Insights", items: [{ key: "Analytics", icon: "↗", label: "Analytics", special: "analytics" }] },
+  { label: "Insights", items: [{ key: "Analytics", icon: "↗", label: "Analytics", special: "analytics", feature: "reports" }] },
 ];
 const allItems = GROUPS.flatMap((group) => group.items);
 const accountItems: Item[] = [
@@ -101,6 +102,7 @@ function PageFallback() {
 
 export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogout: () => void }) {
   const { tenant, membership, memberships, selectInstitute } = useInstituteWorkspace();
+  const { isEnabled: isFeatureEnabled, loading: featuresLoading } = useInstituteFeatures();
   const workspaceName = tenant?.display_name || tenant?.name || "Learner's Guide";
   const workspaceColor = tenant?.primary_color || "#4357e8";
   const workspaceOptions = memberships.length > 1 && !tenant ? memberships : [];
@@ -108,9 +110,12 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
   const [showNotifications,setShowNotifications]=useState(false),[unreadNotifications,setUnreadNotifications]=useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(()=>{let live=true;const loadNotifications=async()=>{const {data}=await supabase.from("notifications").select("id").eq("uid",user.id).eq("read",false);if(live)setUnreadNotifications((data||[]).length)};void loadNotifications();const channel=supabase.channel("admin-notifications:"+user.id).on("postgres_changes",{event:"*",schema:"public",table:"notifications",filter:"uid=eq."+user.id},()=>void loadNotifications()).subscribe();return()=>{live=false;void supabase.removeChannel(channel)}},[user.id]);
-  const activeItem = useMemo(() => allSelectableItems.find((item) => item.key === active) || allItems[0], [active]);
+  const visibleGroups = useMemo(() => GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => !item.feature || isFeatureEnabled(item.feature)) })).filter((group) => group.items.length > 0), [isFeatureEnabled]);
+  const visibleItems = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
+  const activeItem = useMemo(() => visibleItems.find((item) => item.key === active) || allItems[0], [active, visibleItems]);
   const choose = (item: Item) => { setActive(item.key); setMobileOpen(false); };
-  const go = (label: string) => { const item = allSelectableItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
+  const go = (label: string) => { const item = visibleItems.find((x) => x.key === label || x.label === label); if (item) choose(item); };
+  useEffect(() => { if (!featuresLoading && !visibleItems.some((item) => item.key === active) && active !== "Dashboard") setActive("Dashboard"); }, [featuresLoading, visibleItems, active]);
   const preload = (item: Item) => { const loader = item.special ? preloaders[item.special] : undefined; if (loader) void loader(); };
   const renderPage = () => {
     if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
@@ -144,7 +149,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
       </aside>
       <main className="modern-admin-main">
         <header className="modern-admin-topbar"><div className="modern-admin-heading"><span className="modern-admin-breadcrumb">{workspaceName} <b>•</b> Admin</span><h1>{activeItem.label}</h1></div><div className="modern-admin-top-actions"><button type="button" onClick={()=>setShowNotifications(true)} aria-label="Open notifications" style={{position:"relative",border:"1px solid #d7ddea",background:"#fff",borderRadius:11,width:40,height:40,cursor:"pointer",fontSize:18}}>🔔{unreadNotifications>0&&<span style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,padding:"0 4px",borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"grid",placeItems:"center"}}>{unreadNotifications>99?"99+":unreadNotifications}</span>}</button><div className="modern-admin-top-admin"><div className="modern-admin-avatar small">{(user.name || "A").trim().charAt(0).toUpperCase()}</div><div><strong>{user.name || "Admin"}</strong><span>Administrator</span></div></div>{workspaceOptions.length > 1 && <select aria-label="Switch institute workspace" value={membership?.institute_id || ""} onChange={(event) => { void selectInstitute(event.target.value); }} style={{ border: "1px solid #d7ddea", borderRadius: 10, padding: "8px 10px", background: "#fff", color: "#24324a", fontWeight: 700, maxWidth: 240 }}>{workspaceOptions.map((option) => <option key={option.institute_id} value={option.institute_id}>{option.display_name || option.institute_name || option.slug || option.institute_id} · {option.role}</option>)}</select>}<button type="button" className="modern-admin-top-logout" onClick={onLogout}>Logout</button></div></header>
-        <section className="modern-admin-content"><Suspense fallback={<PageFallback />}>{renderPage()}</Suspense></section>
+        <section className="modern-admin-content">{featuresLoading ? <PageFallback /> : <Suspense fallback={<PageFallback />}>{renderPage()}</Suspense>}</section>
       </main>
     </div>
   );
