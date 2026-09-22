@@ -47,7 +47,7 @@ begin
   end if;
 
   insert into public.institutes(name,slug,status)
-  values(trim(p_name),v_slug,'trial')
+  values(trim(p_name),v_slug, 'trial')
   returning id into v_id;
 
   insert into public.institute_settings(
