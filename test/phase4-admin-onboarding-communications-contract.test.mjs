@@ -6,7 +6,7 @@ const migration=fs.readFileSync("supabase/migrations/20260922270000_phase4_admin
 const invite=fs.readFileSync("supabase/functions/platform-invite-admin/index.ts","utf8");
 const owner=fs.readFileSync("src/platform/PlatformOwnerPortal.tsx","utf8");
 const admin=fs.readFileSync("src/admin/ModernAdminPortal.tsx","utf8");
-const accept=fs.readFileSync("src/routes/admin/invite.tsx","utf8");
+const accept=fs.readFileSync("src/routes/admin-invite.tsx","utf8");
 const inbox=fs.readFileSync("src/admin/PlatformInboxPage.tsx","utf8");
 
 test("Phase 4 onboarding is MFA-protected and auditable",()=>{
