@@ -24,7 +24,7 @@ test("Phase 4 onboarding is MFA-protected and auditable",()=>{
 
 test("Platform messages target only institute administrators and create notifications",()=>{
   assert.match(migration,/platform_send_institute_admin_message/);
-  assert.match(migration,/r.role_key in ('institute_admin','institute_owner')/);
+  assert.match(migration,/r\\.role_key in \\(\'institute_admin\',\'institute_owner\'\\)/);
   assert.match(migration,/insert into public.notifications/);
   assert.match(migration,/platform_message/);
   assert.match(migration,/platform_get_my_institute_messages/);
