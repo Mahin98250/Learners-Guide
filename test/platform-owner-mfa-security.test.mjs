@@ -111,3 +111,18 @@ test("feature entitlement mutation is MFA protected and dependency aware", () =>
   assert.match(block, /depends_on/i);
   assert.match(block, /Disable dependent features before disabling/i);
 });
+
+test("owner portal does not render control-plane data before AAL2", () => {
+  const portal = fs.readFileSync(
+    path.join(root, "src", "platform", "PlatformOwnerPortal.tsx"),
+    "utf8",
+  );
+  const sessionBlock = portal.slice(
+    portal.indexOf("const session=await supabase.auth.getSession()"),
+    portal.indexOf("const load=", portal.indexOf("const session=await supabase.auth.getSession()")) + 1,
+  );
+  assert.match(sessionBlock, /getAuthenticatorAssuranceLevel/);
+  assert.match(sessionBlock, /currentLevel!==["']aal2["']/);
+  assert.match(sessionBlock, /setAuthenticated(false)/);
+  assert.match(sessionBlock, /setAllowed(false)/);
+});
