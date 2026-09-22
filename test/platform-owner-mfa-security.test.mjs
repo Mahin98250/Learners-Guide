@@ -126,3 +126,27 @@ test("owner portal does not render control-plane data before AAL2", () => {
   assert.match(sessionBlock, /setAuthenticated(false)/);
   assert.match(sessionBlock, /setAllowed(false)/);
 });
+
+test("platform-level RLS membership helper requires AAL2", () => {
+  const hardening = fs.readFileSync(
+    path.join(
+      root,
+      "supabase",
+      "migrations",
+      "20260922220000_platform_member_aal2_rls.sql",
+    ),
+    "utf8",
+  );
+  assert.match(hardening, /create or replace function public\.is_platform_member\(\)/);
+  assert.match(hardening, /auth\.jwt\(\)\s*->>\s*'aal'/i);
+  assert.match(hardening, /=\s*'aal2'/i);
+  assert.match(hardening, /pm\.status\s*=\s*'active'/i);
+  assert.match(
+    hardening,
+    /revoke all on function public\.is_platform_member\(\) from public, anon/i,
+  );
+  assert.match(
+    hardening,
+    /grant execute on function public\.is_platform_member\(\) to authenticated/i,
+  );
+});
