@@ -4,11 +4,12 @@ import { useInstituteWorkspace } from "@/lg/tenant-context";
 import { NotifPanel } from "@/lg/panels";
 import { supabase } from "@/lg/supabase";
 import { useInstituteFeatures } from "@/lg/institute-features";
+import { NotificationIntegrationsCenter } from "@/admin/NotificationIntegrationsCenter";
 import "@/admin/modern-admin.css";
 import "@/admin/modern-admin-native.css";
 
 type AdminUser = { id: string; name: string; phone: string; role: string; ref: string | null };
-type Special = "dashboard" | "platform-inbox" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" | "account-security" | "create-admin";
+type Special = "dashboard" | "platform-inbox" | "materials" | "leave" | "students" | "teachers" | "batches" | "tests" | "homework" | "announcements" | "attendance" | "results" | "marks" | "fees" | "accounts" | "profiles" | "analytics" | "report-cards" | "account-security" | "create-admin" | "notifications-integrations";
 type Item = { key: string; icon: string; label: string; special?: Special; feature?: string };
 type Group = { label: string; items: Item[] };
 type Preloader = () => Promise<unknown>;
@@ -26,6 +27,7 @@ const loadAccount = () => import("@/admin/AdminAccountPage");
 const loadSectionPages = () => import("@/admin/ModernAdminSectionPages");
 const loadDashboard = () => import("@/admin/ModernAdminDashboard");
 const loadPlatformInbox = () => import("@/admin/PlatformInboxPage");
+const loadNotificationIntegrations = () => import("@/admin/NotificationIntegrationsCenter");
 
 const AdminRecordsPage = lazy(() => loadAdminRecords());
 const TeacherRecordsPage = lazy(() => loadTeacherRecords());
@@ -40,6 +42,7 @@ const AdminAccountPage = lazy(() => loadAccount());
 const ModernAdminSectionPage = lazy(() => loadSectionPages().then((module) => ({ default: module.ModernAdminSectionPage })));
 const ModernAdminDashboard = lazy(() => loadDashboard().then((module) => ({ default: module.ModernAdminDashboard })));
 const PlatformInboxPage = lazy(() => loadPlatformInbox().then((module) => ({ default: module.PlatformInboxPage })));
+const NotificationIntegrationsCenter = lazy(() => loadNotificationIntegrations().then((module) => ({ default: module.NotificationIntegrationsCenter })));
 
 const preloaders: Partial<Record<Special, Preloader>> = {
   dashboard: loadDashboard,
@@ -62,10 +65,11 @@ const preloaders: Partial<Record<Special, Preloader>> = {
   profiles: loadSectionPages,
   analytics: loadSectionPages,
   "platform-inbox": loadPlatformInbox,
+  "notifications-integrations": loadNotificationIntegrations,
 };
 
 const GROUPS: Group[] = [
-  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }, { key: "Platform Inbox", icon: "✉", label: "Platform Inbox", special: "platform-inbox", feature: "notifications" }] },
+  { label: "Overview", items: [{ key: "Dashboard", icon: "⌂", label: "Dashboard", special: "dashboard" }, { key: "Platform Inbox", icon: "✉", label: "Platform Inbox", special: "platform-inbox", feature: "notifications" }, { key: "Notifications & Integrations", icon: "🔔", label: "Notifications & Integrations", special: "notifications-integrations", feature: "notifications" }] },
   { label: "People", items: [
     { key: "Students", icon: "🎓", label: "Students", special: "students", feature: "students" },
     { key: "Teachers", icon: "👨‍🏫", label: "Teachers", special: "teachers", feature: "teachers" },
@@ -120,6 +124,7 @@ export function ModernAdminPortal({ user, onLogout }: { user: AdminUser; onLogou
   const renderPage = () => {
     if (activeItem.special === "dashboard") return <ModernAdminDashboard user={user} onNavigate={go} />;
     if (activeItem.special === "platform-inbox") return <div className="modern-admin-section-page"><PlatformInboxPage /></div>;
+    if (activeItem.special === "notifications-integrations") return <div className="modern-admin-section-page"><NotificationIntegrationsCenter /></div>;
     if (activeItem.special === "students") return <div className="modern-admin-native-page"><AdminRecordsPage kind="students" /></div>;
     if (activeItem.special === "teachers") return <div className="modern-admin-native-page"><TeacherRecordsPage kind="teachers" /></div>;
     if (activeItem.special === "batches") return <div className="modern-admin-native-page"><BatchesTimetablePage /></div>;
