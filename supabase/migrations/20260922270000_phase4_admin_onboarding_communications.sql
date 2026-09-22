@@ -159,6 +159,22 @@ begin
 end;
 $function$;
 
+create or replace function public.platform_revoke_admin_invitation(p_invitation_id uuid)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $function$
+begin
+  if not public.platform_owner_access_ok() then raise exception 'Platform owner MFA verification required'; end if;
+  update public.platform_admin_invitations set status='revoked',updated_at=now()
+  where id=p_invitation_id and status='pending';
+  if not found then raise exception 'Pending invitation not found'; end if;
+  insert into public.audit_logs(scope,institute_id,actor_auth_id,action,entity_type,entity_id,summary)
+  select 'platform',institute_id,auth.uid(),'admin.invitation.revoked','admin_invitation',id::text,
+    'Institute administrator invitation revoked.' from public.platform_admin_invitations where id=p_invitation_id;
+  return true;
+end;
+$function$;
+
 create or replace function public.platform_accept_admin_invitation()
 returns public.platform_admin_invitations
 language plpgsql security definer set search_path = ''
@@ -275,6 +291,7 @@ $function$;
 revoke all on function public.platform_create_admin_invitation(uuid,text,text) from public,anon;
 revoke all on function public.platform_finalize_admin_invitation(uuid,uuid) from public,anon;
 revoke all on function public.platform_accept_admin_invitation() from public,anon;
+revoke all on function public.platform_revoke_admin_invitation(uuid) from public,anon;
 revoke all on function public.platform_send_institute_admin_message(uuid,text,text) from public,anon;
 revoke all on function public.platform_get_my_institute_messages() from public,anon;
 revoke all on function public.platform_mark_institute_message_read(uuid) from public,anon;
@@ -282,6 +299,7 @@ revoke all on function public.platform_mark_institute_message_read(uuid) from pu
 grant execute on function public.platform_create_admin_invitation(uuid,text,text) to authenticated;
 grant execute on function public.platform_finalize_admin_invitation(uuid,uuid) to authenticated;
 grant execute on function public.platform_accept_admin_invitation() to authenticated;
+grant execute on function public.platform_revoke_admin_invitation(uuid) to authenticated;
 grant execute on function public.platform_send_institute_admin_message(uuid,text,text) to authenticated;
 grant execute on function public.platform_get_my_institute_messages() to authenticated;
 grant execute on function public.platform_mark_institute_message_read(uuid) to authenticated;
