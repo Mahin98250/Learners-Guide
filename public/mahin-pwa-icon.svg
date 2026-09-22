@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Mahin</title>
+  <rect width="512" height="512" rx="96" fill="#FFFFFF"/>
+  <g fill="#202640">
+    <path d="M122 177c0-14 11-25 25-25h80c31 0 55 10 73 31 18-21 42-31 73-31h80c14 0 25 11 25 25v111c0 14-11 25-25 25h-80c-29 0-53 8-73 27-20-19-44-27-73-27h-80c-14 0-25-11-25-25V177Z"/>
+    <path d="M256 180v166" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/>
+    <path d="M256 182c-22-34-51-48-82-39 5 34 29 58 67 63Z" fill="#FFFFFF"/>
+    <path d="M256 182c22-34 51-48 82-39-5 34-29 58-67 63Z" fill="#FFFFFF"/>
+    <circle cx="256" cy="142" r="20" fill="#202640"/>
+  </g>
+  <path d="M168 373c34-14 66-21 97-21 19 0 37 4 54 13 17-9 35-13 54-13 31 0 63 7 97 21" fill="none" stroke="#202640" stroke-width="13" stroke-linecap="round"/>
+</svg>
