@@ -2,10 +2,9 @@ import fs from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const root = process.cwd();
 const migration = fs.readFileSync("supabase/migrations/20260922240000_platform_domains_url_management.sql", "utf8");
 const portal = fs.readFileSync("src/platform/PlatformOwnerPortal.tsx", "utf8");
-const tenant = fs.readFileSync("src/lg/tenant.ts", "utf8");
+const tenantFoundation = fs.readFileSync("supabase/migrations/20260921130000_multi_institute_foundation.sql", "utf8");
 
 test("Phase 2 protects all domain mutations with platform-owner MFA", () => {
   for (const name of [
@@ -33,12 +32,13 @@ test("Owner portal exposes the full domain lifecycle", () => {
     "platform_disable_domain",
   ]) assert.match(portal, new RegExp(name));
   assert.match(portal, /DNS TXT verification/);
-  assert.match(portal, /TLS active/);
+  assert.match(portal, /Mark TLS active/);
 });
 
 test("Tenant resolver remains verification and TLS gated", () => {
-  assert.match(tenant, /resolve_institute_domain/);
-  assert.match(tenant, /verified/);
+  assert.match(tenantFoundation, /create or replace function public\.resolve_institute_domain/);
+  assert.match(tenantFoundation, /d\.status = 'verified'/);
+  assert.match(tenantFoundation, /d\.tls_status in \('active', 'provisioning'\)/);
 });
 
 console.log("Phase 2 Domains & Institute URL Management contract checks passed.");
