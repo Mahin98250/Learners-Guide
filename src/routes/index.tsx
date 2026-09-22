@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lg/auth";
 import { RoleSelect, type Role } from "@/lg/authscreens";
 import { resolveInstituteForCurrentHostname, type InstituteTenant } from "@/lg/tenant";
 
-const title="Learner's Guide — School App for Teachers, Students & Parents";
-const description="Learner's Guide connects classrooms: timetables, attendance, homework, exams, results and study materials for teachers, students and parents in one app.";
+const title="Mahin — School App for Teachers, Students & Parents";
+const description="Mahin connects classrooms: timetables, attendance, homework, exams, results and study materials for teachers, students and parents in one app.";
 
 export const Route=createFileRoute("/")({
   head:()=>({meta:[
