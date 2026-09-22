@@ -14,7 +14,7 @@ test("Phase 2 protects all domain mutations with platform-owner MFA", () => {
     "platform_record_domain_dns_verified",
     "platform_set_domain_tls_status",
   ]) {
-    assert.match(migration, new RegExp(`create or replace function public.\${name}`));
+    assert.match(migration, new RegExp(`create or replace function public.${name}`));
   }
   assert.equal((migration.match(/platform_owner_access_ok\(\)/g) || []).length, 5);
   assert.match(migration, /revoke all on function public\.register_institute_domain/);
