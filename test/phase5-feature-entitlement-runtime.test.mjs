@@ -11,8 +11,8 @@ test("runtime entitlement check is tenant-aware and not anonymously callable",()
   assert.match(migration,/m\.status='active'/);
   assert.match(migration,/e\.enabled=true/);
   assert.match(migration,/auth\.uid\(\)/);
-  assert.match(migration,/revoke all on function public\.current_institute_feature_enabled\(text\) from public, anon/);
-  assert.match(migration,/grant execute on function public\.current_institute_feature_enabled\(text\) to authenticated/);
+  assert.ok(migration.includes("revoke all on function public.current_institute_feature_enabled(text) from public, anon"));
+  assert.ok(migration.includes("grant execute on function public.current_institute_feature_enabled(text) to authenticated"));
 });
 
 test("tenant members can read only their entitlement rows",()=>{
