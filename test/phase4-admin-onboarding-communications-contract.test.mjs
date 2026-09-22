@@ -39,7 +39,8 @@ test("Owner and Admin surfaces are wired to communications",()=>{
   assert.match(admin,/Platform Inbox/);
   assert.match(admin,/NotifPanel/);
   assert.match(inbox,/platform_get_my_institute_messages/);
-  assert.match(accept,/admin-invite/);\n  assert.match(accept,/platform_accept_admin_invitation/);
+  assert.match(accept,/admin-invite/);
+  assert.match(accept,/platform_accept_admin_invitation/);
 });
 
 console.log("Phase 4 onboarding and communications contract checks passed.");
