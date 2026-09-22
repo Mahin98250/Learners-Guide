@@ -1,4 +1,5 @@
--- Phase 4: institute admin/owner onboarding + platform-to-institute communications.\n-- Delivery contract: r.role_key in ('institute_admin','institute_owner').
+-- Phase 4: institute admin/owner onboarding + platform-to-institute communications.
+-- Delivery contract: r.role_key in ('institute_admin','institute_owner').
 
 create table if not exists public.platform_admin_invitations (
   id uuid primary key default gen_random_uuid(),
