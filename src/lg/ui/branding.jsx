@@ -9,14 +9,14 @@ export function LGLogo({ size=80, showText=true, light=false }){
         background:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
         boxShadow:"0 8px 32px rgba(0,0,0,0.22)", overflow:"hidden", padding:size*0.05,
       }}>
-        <img src={LOGO_IMG_SRC} alt="Learner's Guide"
+        <img src={LOGO_IMG_SRC} alt="Mahin"
           style={{width:"100%",height:"100%",objectFit:"contain"}}/>
       </div>
       {showText&&(
         <div style={{fontSize:size*0.19,fontWeight:900,letterSpacing:1.5,
           color:tc,fontFamily:"'Poppins',sans-serif",textTransform:"uppercase",
           textAlign:"center",lineHeight:1.1}}>
-          LEARNER'S GUIDE
+          MAHIN
         </div>
       )}
     </div>
