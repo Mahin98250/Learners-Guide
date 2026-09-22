@@ -1,6 +1,6 @@
 # Multi-Institute Foundation — Phase 1
 
-This is the first implementation phase of converting the current single-institute Learner's Guide application into a multi-institute SaaS.
+This is the first implementation phase of converting the current single-institute Mahin application into a multi-institute SaaS.
 
 ## Added now
 
@@ -16,8 +16,8 @@ This is the first implementation phase of converting the current single-institut
 The current production data is treated as the original tenant:
 
 ```text
-Institute name: Learner's Guide
-Slug: learners-guide
+Institute name: Mahin
+Slug: mahin
 ```
 
 Existing authenticated users are copied into `people` and linked through `institute_memberships`.
@@ -45,7 +45,7 @@ notifications, parent_student_links, rooms, students, subjects,
 teachers, test_results, tests, timetable, timetable_entries
 ```
 
-Existing rows are backfilled to the Learner's Guide tenant.
+Existing rows are backfilled to the Mahin tenant.
 
 The column is intentionally nullable in Phase 1 because the current UI still writes the legacy schema. Making it required before converting all writes would break production.
 
