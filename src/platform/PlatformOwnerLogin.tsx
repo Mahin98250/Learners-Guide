@@ -242,6 +242,7 @@ export default function PlatformOwnerLogin({
   if (checking) {
     return (
       <main
+        className="owner-login-glass"
         style={{
           minHeight: "100vh",
           display: "grid",
@@ -257,6 +258,7 @@ export default function PlatformOwnerLogin({
   if (challenge || enrollment) {
     return (
       <main
+        className="owner-login-glass"
         style={{
           minHeight: "100vh",
           display: "grid",
@@ -422,6 +424,7 @@ export default function PlatformOwnerLogin({
 
   return (
     <main
+      className="owner-login-glass"
       style={{
         minHeight: "100vh",
         display: "grid",
