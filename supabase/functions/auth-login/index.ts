@@ -15,6 +15,66 @@ const clean = (v: unknown) => String(v ?? "").trim();
 const key = (v: unknown) => clean(v).toLowerCase().replace(/[^a-z0-9]/g, "");
 const inactive = (v: unknown) => ["inactive", "disabled", "suspended", "deleted"].includes(clean(v).toLowerCase());
 const prefix: Record<string, string> = { teacher: "t", student: "s", parent: "p" };
+
+const normalizeHostname = (value: unknown) => clean(value).toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+
+async function resolveTenant(admin: ReturnType<typeof createClient>, hostname: string) {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized) return null;
+  const { data: domain, error: domainError } = await admin
+    .from("institute_domains")
+    .select("institute_id,status,tls_status")
+    .eq("hostname", normalized)
+    .maybeSingle();
+  if (domainError) throw domainError;
+  if (!domain || domain.status !== "verified" || !["active", "provisioning"].includes(String(domain.tls_status || ""))) return null;
+  const { data: institute, error: instituteError } = await admin
+    .from("institutes")
+    .select("id,status")
+    .eq("id", domain.institute_id)
+    .maybeSingle();
+  if (instituteError) throw instituteError;
+  if (!institute || !["trial", "active"].includes(String(institute.status || ""))) return null;
+  return { instituteId: String(institute.id), hostname: normalized };
+}
+
+async function hasTenantMembership(
+  admin: ReturnType<typeof createClient>,
+  authId: string,
+  instituteId: string,
+  role: string,
+) {
+  const { data: person, error: personError } = await admin
+    .from("people")
+    .select("id")
+    .eq("auth_id", authId)
+    .maybeSingle();
+  if (personError) throw personError;
+  if (!person) return false;
+  const { data: membership, error: membershipError } = await admin
+    .from("institute_memberships")
+    .select("id,role,status")
+    .eq("institute_id", instituteId)
+    .eq("person_id", person.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership) return false;
+  return String(membership.role || "").toLowerCase() === role;
+}
+
+async function firstTenantBoundUser(
+  admin: ReturnType<typeof createClient>,
+  candidates: any[],
+  instituteId: string | null,
+  role: string,
+) {
+  for (const candidate of candidates || []) {
+    if (!candidate?.id) continue;
+    if (!instituteId || await hasTenantMembership(admin, String(candidate.id), instituteId, role)) return candidate;
+  }
+  return null;
+}
 const emailFor = (loginId: string, role: string) => {
   const value = clean(loginId);
   if (value.includes("@")) return value.toLowerCase();
@@ -90,21 +150,23 @@ Deno.serve(async (req) => {
     if (role === "student") {
       let student: any = null;
       for (const column of ["sid", "id"]) {
-        const { data, error } = await admin.from("students").select("id,sid,status").eq(column, loginId).limit(1).maybeSingle();
+        const { data, error } = await admin.from("students").select("id,sid,status,institute_id").eq(column, loginId).limit(1).maybeSingle();
         if (error) return json({ error: "Unable to verify login. Please try again." }, 503);
         if (data) { student = data; break; }
       }
       if (!student) return json({ error: "Invalid login ID or password." }, 401);
+      if (tenant && String(student.institute_id || "") !== tenant.instituteId) return json({ error: "This login is not available on this institute portal." }, 403);
       if (inactive(student.status)) return json({ error: "This account is inactive. Please contact the institute administrator." }, 403);
       const profile = await findAuthUserByUsersRow(admin, role, loginId, String(student.id));
       if (profile?.blocked) return json({ error: "This account is inactive. Please contact the institute administrator." }, 403);
-      if (profile?.user) {
+      if (profile?.user && (!tenant || await hasTenantMembership(admin, profile.user.id, tenant.instituteId, role))) {
         authId = profile.user.id;
         email = clean(profile.user.email).toLowerCase() || clean(profile.row.email).toLowerCase() || email;
       }
-      if (!profile?.user) {
+      if (!authId) {
         const fallback = await findAuthUserByRoleAndLoginFallback(admin, role, loginId);
-        if (fallback) { authId = fallback.id; email = clean(fallback.email).toLowerCase() || email; }
+        const tenantBound = await firstTenantBoundUser(admin, fallback ? [fallback] : [], tenant?.instituteId || null, role);
+        if (tenantBound) { authId = tenantBound.id; email = clean(tenantBound.email).toLowerCase() || email; }
       }
     } else {
       let profile = await findAuthUserByUsersRow(admin, role, loginId);
@@ -112,27 +174,37 @@ Deno.serve(async (req) => {
       if (profile?.blocked) return json({ error: "This account is inactive. Please contact the institute administrator." }, 403);
 
       let authUser = profile?.user || null;
+      if (authUser && tenant && !(await hasTenantMembership(admin, authUser.id, tenant.instituteId, role))) authUser = null;
       if (authUser) {
         authId = authUser.id;
         email = clean(authUser.email).toLowerCase() || clean(profile?.row?.email).toLowerCase() || email;
       } else {
         const fallback = await findAuthUserByRoleAndLoginFallback(admin, role, loginId);
-        authUser = fallback;
+        authUser = await firstTenantBoundUser(admin, fallback ? [fallback] : [], tenant?.instituteId || null, role);
         if (authUser) { authId = authUser.id; email = clean(authUser.email).toLowerCase() || email; }
       }
 
       if (!authUser) {
-        const { data: appUser, error } = await admin.from("users").select("auth_id,email,ref,phone,status,role").eq("role", role).eq("phone", loginId).limit(1).maybeSingle();
-        if (!error && appUser) {
-          if (inactive(appUser.status)) return json({ error: "This account is inactive. Please contact the institute administrator." }, 403);
-          authId = clean(appUser.auth_id);
-          if (clean(appUser.email).includes("@")) email = clean(appUser.email).toLowerCase();
-          if (authId) {
-            const { data: byId, error: byIdError } = await admin.auth.admin.getUserById(authId);
-            if (!byIdError && byId.user) authUser = byId.user;
+        const { data: appUsers, error } = await admin.from("users").select("auth_id,email,ref,phone,status,role").eq("role", role).eq("phone", loginId).limit(20);
+        if (!error) {
+          for (const appUser of appUsers || []) {
+            if (inactive(appUser.status)) continue;
+            const candidateId = clean(appUser.auth_id);
+            let candidateUser = null;
+            if (candidateId) {
+              const { data: byId, error: byIdError } = await admin.auth.admin.getUserById(candidateId);
+              if (!byIdError && byId.user) candidateUser = byId.user;
+            }
+            if (!candidateUser && appUser.ref) candidateUser = await findAuthUserByRefFallback(admin, role, String(appUser.ref));
+            if (candidateUser && (!tenant || await hasTenantMembership(admin, candidateUser.id, tenant.instituteId, role))) {
+              authUser = candidateUser;
+              break;
+            }
           }
-          if (!authUser && appUser.ref) authUser = await findAuthUserByRefFallback(admin, role, String(appUser.ref));
-          if (authUser) authId = authUser.id;
+        }
+        if (authUser) {
+          authId = authUser.id;
+          email = clean(authUser.email).toLowerCase() || email;
         }
       }
       if (!authUser) return json({ error: "Invalid login ID or password." }, 401);
@@ -151,7 +223,11 @@ Deno.serve(async (req) => {
       await client.auth.signOut();
       return json({ error: "That account is registered under a different role." }, 403);
     }
-    return json({ session: data.session, user: data.user }, 200);
+    if (tenant && !(await hasTenantMembership(admin, data.user.id, tenant.instituteId, role))) {
+      await client.auth.signOut();
+      return json({ error: "This account does not belong to this institute portal." }, 403);
+    }
+    return json({ session: data.session, user: data.user, tenant: tenant ? { institute_id: tenant.instituteId, hostname: tenant.hostname } : null }, 200);
   } catch (error) {
     console.error("auth-login:", error);
     return json({ error: "Unable to sign in right now. Please try again." }, 500);

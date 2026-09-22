@@ -1,5 +1,5 @@
 import { supabase } from "@/lg/supabase";
-import { getCurrentInstituteContext } from "@/lg/tenant";
+import { getCurrentInstituteContext, getCurrentHostname } from "@/lg/tenant";
 
 /**
  * Production authentication for Mahin.
@@ -66,7 +66,7 @@ async function readFunctionError(error, fallback = "Unable to sign in right now.
 
 async function signInViaGateway(loginId, password, role) {
   let data = null, error = null;
-  try { const result = await supabase.functions.invoke("auth-login", { body: { loginId, password, role } }); data = result.data; error = result.error; } catch (invokeError) { error = invokeError; }
+  try { const result = await supabase.functions.invoke("auth-login", { body: { loginId, password, role, hostname: typeof window !== "undefined" ? getCurrentHostname() : "" } }); data = result.data; error = result.error; } catch (invokeError) { error = invokeError; }
   if (!error && data?.session?.access_token && data?.session?.refresh_token && data?.user) {
     const session = { access_token: data.session.access_token, refresh_token: data.session.refresh_token };
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
