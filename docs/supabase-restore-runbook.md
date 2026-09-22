@@ -1,4 +1,4 @@
-# Learner's Guide — Supabase Restore Runbook
+# Mahin — Supabase Restore Runbook
 
 ## What this adds
 
@@ -22,7 +22,7 @@ The workflow:
 - downloads the selected backup artifact using the GitHub Actions token;
 - verifies the backup tarball with the stored SHA-256 checksum;
 - extracts the archive;
-- verifies the target is not the current Learner's Guide production project;
+- verifies the target is not the current Mahin production project;
 - tests the target PostgreSQL connection;
 - restores `roles.sql`, `schema.sql`, and `data.sql` in the documented logical restore order;
 - recreates Storage buckets and uploads every backed-up Storage object through the supported Supabase Storage API;
@@ -39,6 +39,6 @@ The restored database and Storage data may still reference Auth user IDs. A futu
 
 ## Safety
 
-Do not put a production database connection string or production project URL into the restore secrets. The workflow contains a hard stop for the current Learner's Guide production project reference and URL, but the safest procedure is still to use a dedicated test/recovery Supabase project first.
+Do not put a production database connection string or production project URL into the restore secrets. The workflow contains a hard stop for the current Mahin production project reference and URL, but the safest procedure is still to use a dedicated test/recovery Supabase project first.
 
 GitHub Actions automatically masks secrets used in workflow runs. Never echo the database connection string or service-role key into logs.
