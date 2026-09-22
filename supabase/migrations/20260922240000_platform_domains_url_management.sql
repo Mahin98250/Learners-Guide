@@ -137,7 +137,7 @@ begin
   where id=p_domain_id returning * into v_domain;
 
   insert into public.audit_logs(scope,institute_id,actor_auth_id,action,entity_type,entity_id,summary,metadata)
-  values('platform',v_domain.institute_id,'','domain.tls_status_changed','domain',p_domain_id::text,
+  values('platform',v_domain.institute_id,(select auth.uid()),'domain.tls_status_changed','domain',p_domain_id::text,
     'Portal domain TLS status changed.',jsonb_build_object('hostname',v_domain.hostname,'tls_status',p_tls_status));
   return v_domain;
 end;
