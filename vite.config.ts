@@ -9,7 +9,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === "true";
 
 export default defineConfig({
-  base: isGitHubPagesBuild ? "/mahin/" : "/",
+  base: isGitHubPagesBuild ? "/Mahin/" : "/",
   plugins: [
     tanstackRouterPlugin({ target: "react", autoCodeSplitting: true }),
     react(),
