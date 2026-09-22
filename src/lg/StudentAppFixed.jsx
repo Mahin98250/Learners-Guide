@@ -8,7 +8,7 @@ import {STExams,STResults}from"@/lg/studentResults";
 import {STAttendanceFixed}from"@/lg/studentAttendance";
 import { dueState } from "@/lg/dateUtils";
 const text=v=>v==null?"":String(v);
-const OFFLINE_PDF_DB="learners-guide-offline-pdfs";
+const OFFLINE_PDF_DB="mahin-offline-pdfs";
 const openPdfDb=()=>new Promise((resolve,reject)=>{if(!window.indexedDB)return reject(new Error("Offline storage is not available in this browser."));const r=indexedDB.open(OFFLINE_PDF_DB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains("files"))r.result.createObjectStore("files")};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error("Unable to open offline storage."))});
 const cachePdf=async(id,blob)=>{try{const db=await openPdfDb();await new Promise((resolve,reject)=>{const tx=db.transaction("files","readwrite");tx.objectStore("files").put(blob,String(id));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch{} };
 const getCachedPdf=async id=>{try{const db=await openPdfDb();const blob=await new Promise((resolve,reject)=>{const tx=db.transaction("files","readonly");const req=tx.objectStore("files").get(String(id));req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return blob}catch{return null}};
