@@ -5,10 +5,10 @@ import postgres from "npm:postgres@3";
 
 const PROJECT_REF = "efnxjfzyqbdulpjhffsm";
 const REGION = "ap-northeast-1";
-const EXPECTED_REPOSITORY = "Mahin98250/Learners-Guide";
+const EXPECTED_REPOSITORY = "Mahin98250/mahin";
 const EXPECTED_REF = "refs/heads/main";
 const EXPECTED_WORKFLOW_REF = `${EXPECTED_REPOSITORY}/.github/workflows/supabase-complete-backup-final.yml@${EXPECTED_REF}`;
-const OIDC_AUDIENCE = "learners-guide-supabase-backup";
+const OIDC_AUDIENCE = "mahin-supabase-backup";
 const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 const DEFAULT_POOLER_HOST = `aws-1-${REGION}.pooler.supabase.com`;
 
