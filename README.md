@@ -2,7 +2,7 @@
 
 > **A complete education management system for Admins, Teachers, Students and Parents.**
 
-Learner's Guide is a web-based education management platform designed to bring the important daily work of an institute into one connected system.
+Mahin is a web-based education management platform designed to bring the important daily work of an institute into one connected system.
 
 It is made to reduce the need for separate notebooks, spreadsheets, manual registers, scattered messages and disconnected tools.
 
@@ -21,7 +21,7 @@ This README explains the project in **simple, non-technical language** so that a
 
 | Item | Details |
 |---|---|
-| Product | Learner's Guide |
+| Product | Mahin |
 | Type | Education / Institute Management System |
 | Main users | Admin, Teacher, Student, Parent |
 | Web app | Yes |
@@ -49,7 +49,7 @@ This README explains the project in **simple, non-technical language** so that a
 
 ## One-time Project Price: **₹45,000**
 
-The planned price for the complete Learner's Guide system is:
+The planned price for the complete Mahin system is:
 
 ### **₹45,000 one-time**
 
@@ -79,7 +79,7 @@ Large new features or major redesigns are not automatically included in the ₹1
 
 # 💡 What the ₹45,000 Includes
 
-The project price covers the overall Learner's Guide application and its main systems, including:
+The project price covers the overall Mahin application and its main systems, including:
 
 - Admin portal
 - Teacher portal
@@ -115,7 +115,7 @@ The exact scope is the functionality described in this README and the current pr
 
 ---
 
-# 🏫 What Problem Does Learner's Guide Solve?
+# 🏫 What Problem Does Mahin Solve?
 
 An institute often has many separate tasks:
 
@@ -135,7 +135,7 @@ An institute often has many separate tasks:
 
 If these are handled separately, information can become difficult to find and maintain.
 
-Learner's Guide brings these areas together so the institute can use one connected system.
+Mahin brings these areas together so the institute can use one connected system.
 
 ### Simple example
 
@@ -145,7 +145,7 @@ Instead of:
 
 The goal is:
 
-**Admin → Learner's Guide → Teacher / Student / Parent**
+**Admin → Mahin → Teacher / Student / Parent**
 
 The same academic information can then move through the correct part of the system.
 
@@ -153,7 +153,7 @@ The same academic information can then move through the correct part of the syst
 
 # 👑 Admin Portal
 
-The Admin Portal is the main control center of Learner's Guide.
+The Admin Portal is the main control center of Mahin.
 
 The admin can manage the institute's important information and workflows.
 
@@ -386,7 +386,7 @@ This is important because a parent should not be able to see another student's p
 
 # 📝 Exams & Results System
 
-The Exams & Results system is one of the major academic parts of Learner's Guide.
+The Exams & Results system is one of the major academic parts of Mahin.
 
 The basic flow is:
 
@@ -478,7 +478,7 @@ The system is designed so students see homework relevant to them rather than the
 
 # 📁 Study Materials
 
-Learner's Guide includes a Study Materials area that works like an organized educational file library.
+Mahin includes a Study Materials area that works like an organized educational file library.
 
 It supports concepts such as:
 
@@ -536,7 +536,7 @@ This makes announcements more useful than sending the same information to everyo
 
 # 🔔 Notifications
 
-Learner's Guide includes both in-app and browser push notification support.
+Mahin includes both in-app and browser push notification support.
 
 Notifications can be used for supported events such as:
 
@@ -559,7 +559,7 @@ Dead browser push subscriptions can also be removed when the push provider repor
 
 # 📱 Mobile & PWA
 
-Learner's Guide is a web application that is designed to work well on both computers and mobile devices.
+Mahin is a web application that is designed to work well on both computers and mobile devices.
 
 It also has Progressive Web App (PWA) support.
 
@@ -609,7 +609,7 @@ The system is designed to avoid unnecessarily counting the same academic result 
 
 Parents can have a monthly view of their linked student's available academic/institute information.
 
-Reports are intended to be easy to read and suitable for the Learner's Guide brand.
+Reports are intended to be easy to read and suitable for the Mahin brand.
 
 ---
 
@@ -617,7 +617,7 @@ Reports are intended to be easy to read and suitable for the Learner's Guide bra
 
 Security is an important part of the system.
 
-Learner's Guide uses a combination of:
+Mahin uses a combination of:
 
 - Secure login
 - Role-based access
@@ -707,7 +707,7 @@ A successful automated build means the code passed the project's automated check
 
 # 🗃️ Backend & Database
 
-Learner's Guide uses **Supabase** as its main backend platform.
+Mahin uses **Supabase** as its main backend platform.
 
 In simple language, Supabase provides the online services that store and protect the application's important information.
 
@@ -725,7 +725,7 @@ It handles areas such as:
 
 # ☁️ Supabase — Free Plan vs Paid Plan
 
-Supabase offers multiple plans. The most relevant comparison for Learner's Guide is the **Free Plan** and **Pro Plan**.
+Supabase offers multiple plans. The most relevant comparison for Mahin is the **Free Plan** and **Pro Plan**.
 
 > **Important:** Supabase pricing can change. The figures below are based on the official Supabase pricing information checked for this README. Third-party service charges are separate from the ₹45,000 project price and ₹1,000 monthly maintenance charge.
 
@@ -828,11 +828,11 @@ Supabase also provides a Spend Cap option on Pro to help control certain unexpec
 
 ---
 
-# 🏫 Which Supabase Plan Makes Sense for Learner's Guide?
+# 🏫 Which Supabase Plan Makes Sense for Mahin?
 
 For a small institute with relatively low usage, the Free Plan can be enough for development and early testing.
 
-However, if Learner's Guide is being used as a real institute system where users expect it to be available every day, the **Supabase Pro Plan is the safer production choice** because the Free Plan's inactivity pause does not fit an always-on production expectation.
+However, if Mahin is being used as a real institute system where users expect it to be available every day, the **Supabase Pro Plan is the safer production choice** because the Free Plan's inactivity pause does not fit an always-on production expectation.
 
 The final choice should depend on:
 
@@ -952,7 +952,7 @@ In simple terms, the institute gets one connected system for:
 
 # 🔄 How Everything Connects
 
-The main strength of Learner's Guide is that the systems are connected.
+The main strength of Mahin is that the systems are connected.
 
 For example:
 
@@ -1040,7 +1040,7 @@ These decisions help keep the product focused instead of maintaining multiple ov
 A student can use the system like this:
 
 ```text
-Open Learner's Guide
+Open Mahin
        ↓
 Login
        ↓
@@ -1178,7 +1178,7 @@ Check Analytics / Reports
 
 # 🛠️ Technology — Explained Simply
 
-The project uses modern software tools, but you do not need to understand them to use Learner's Guide.
+The project uses modern software tools, but you do not need to understand them to use Mahin.
 
 ### React
 Used to build the screens and user interface.
@@ -1216,7 +1216,7 @@ Sensitive operations are kept away from normal browser code wherever appropriate
 You do not need programming knowledge to understand the project structure.
 
 ```text
-Learner's Guide
+Mahin
 │
 ├── App screens
 │   ├── Admin
@@ -1291,7 +1291,7 @@ New major features should be planned separately so the system remains stable ins
 For a real institute that expects the application to be available regularly, the recommended approach is:
 
 ```text
-Learner's Guide application
+Mahin application
           ↓
 Production hosting
           ↓
@@ -1310,7 +1310,7 @@ For Supabase, the **Pro Plan is generally more appropriate for an always-on prod
 
 # 🧾 Final Summary
 
-**Learner's Guide is a complete institute management platform designed to connect Admins, Teachers, Students and Parents in one system.**
+**Mahin is a complete institute management platform designed to connect Admins, Teachers, Students and Parents in one system.**
 
 It covers the main academic and administrative workflows:
 
@@ -1354,8 +1354,8 @@ https://supabase.com/pricing
 
 # 📄 Project Status
 
-This README describes the current Learner's Guide project scope and the major systems implemented in the repository.
+This README describes the current Mahin project scope and the major systems implemented in the repository.
 
 The application is continuously improved, so this document should be updated when major product scope, pricing assumptions or infrastructure decisions change.
 
-**Learner's Guide — One system. Four portals. Connected institute management.**
+**Mahin — One system. Four portals. Connected institute management.**
