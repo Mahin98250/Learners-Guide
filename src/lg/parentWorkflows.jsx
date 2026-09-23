@@ -80,12 +80,20 @@ export function ParentApp({ user, onLogout }) {
   }, [user?.ref]);
 
   useEffect(() => { void load(); }, [load]);
+  const childMemberships = useMemo(
+    () => memberships.filter(m => String(m.student_id) === String(selected?.id)),
+    [memberships, selected?.id],
+  );
+  const childBatchIds = useMemo(
+    () => new Set(childMemberships.map(m => String(m.batch_id))),
+    [childMemberships],
+  );
   const sectionLoadedRef = useRef(new Set());
   const [sectionLoading, setSectionLoading] = useState(false);
 
   const childBatchKey = useMemo(
-    () => [...childMemberships].map(m => String(m.batch_id)).filter(Boolean).sort().join(","),
-    [childMemberships],
+    () => [...childBatchIds].sort().join(","),
+    [childBatchIds],
   );
 
   useEffect(() => {
@@ -168,14 +176,7 @@ export function ParentApp({ user, onLogout }) {
   }, [loading, tab, selected?.id, childBatchKey]);
 
 
-  const childMemberships = useMemo(
-    () => memberships.filter(m => String(m.student_id) === String(selected?.id)),
-    [memberships, selected?.id],
-  );
-  const childBatchIds = useMemo(
-    () => new Set(childMemberships.map(m => String(m.batch_id))),
-    [childMemberships],
-  );
+
   const childAttendance = useMemo(
     () => attendance.filter(a => String(a.sid) === String(selected?.id)),
     [attendance, selected?.id],
