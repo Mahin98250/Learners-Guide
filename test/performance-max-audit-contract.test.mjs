@@ -33,6 +33,15 @@ test("Performance 10X: admin unread badge requests a count, not all rows", () =>
   assert.match(source, /select\("id",\{count:"exact",head:true\}\)/);
   assert.doesNotMatch(source, /from\("notifications"\)\.select\("id"\)\.eq\("uid",user\.id\)/);
 });
+test("Performance 10X: teacher shell defers upload and secondary workflows", () => {
+  const source = read("src/lg/teacherHomeworkApp.jsx");
+  assert.match(source, /TeacherHomeworkPage/);
+  assert.match(source, /@\/lg\/teacherWorkflows/);
+  assert.match(source, /@\/lg\/teacherTests/);
+  assert.match(source, /@\/lg\/TeacherAnnouncements/);
+  assert.match(source, /@\/lg\/panels/);
+  assert.ok(source.length < 4000, "teacher shell should stay small enough for fast first paint");
+});
 
 test("Performance 10X: large unused binary asset is absent", () => {
   const treeUrl = "public/file_00000000451c82118020d2baea54f76b.png";
