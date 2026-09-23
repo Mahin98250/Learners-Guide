@@ -7,8 +7,6 @@ import { Card, Badge, Sec, GBtn } from "@/lg/ui";
 import { loadTeacherBatches } from "@/lg/teacherScope";
 import { getCurrentInstituteContext } from "@/lg/tenant";
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const errText = (e) => e instanceof Error ? e.message : (e?.message || "Something went wrong. Please try again.");
 const ACCEPT = ".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg";
 const TYPES = new Set([
   "application/pdf",
@@ -25,7 +23,6 @@ const fileLabel = (file) => {
   const mb = file.size / 1048576;
   return `${file.name} · ${mb < 1 ? `${(file.size / 1024).toFixed(0)} KB` : `${mb.toFixed(1)} MB`}`;
 };
-
 export function T5HomeworkWithFiles({ teacher }) {
   const [batches, setBatches] = useState([]);
   const [rows, setRows] = useState([]);
@@ -254,3 +251,5 @@ export function T5HomeworkWithFiles({ teacher }) {
     </div>
   );
 }
+
+
