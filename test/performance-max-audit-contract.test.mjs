@@ -7,7 +7,7 @@ const read = (file) => fs.readFileSync(file, "utf8");
 test("Performance 10X: startup HTML does not inline duplicate image payloads", () => {
   const html = read("index.html");
   assert.doesNotMatch(html, /href="data:image\//);
-  assert.match(read("src/lg/ui/branding.jsx"), /mahin-icon\.svg/);
+  assert.match(read("src/lg/ui/branding.jsx"), /mahin-original-logo\.png/);
   assert.match(html, /pwa-icon\.svg/);
   assert.match(html, /preconnect[^>]+supabase\.co/);
 });
