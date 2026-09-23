@@ -4,7 +4,7 @@ import fs from "node:fs";
 const read=(p)=>fs.readFileSync(new URL(`../${p}`,import.meta.url),"utf8");
 const app=read("src/lg/teacherHomeworkApp.jsx");
 const teacher=read("src/lg/teacher.jsx");
-const homework=app;
+const homework=read("src/lg/TeacherHomeworkPage.jsx");
 const tests=read("src/lg/teacherTests.jsx");
 const materials=read("src/lg/teacherWorkflows.jsx");
 const analytics=read("src/lg/TeacherAnalytics.jsx");
