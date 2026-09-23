@@ -9,6 +9,22 @@ import { getCurrentInstituteContext } from "@/lg/tenant";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const errText = (e) => e instanceof Error ? e.message : (e?.message || "Something went wrong. Please try again.");
+const ACCEPT = ".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg";
+const TYPES = new Set([
+  "application/pdf",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png",
+  "image/jpeg",
+]);
+const validFile = (file) => Boolean(file && ((file.type && TYPES.has(file.type)) || /\.(pdf|pptx?|docx?|png|jpe?g)$/i.test(file.name)));
+const fileLabel = (file) => {
+  if (!file) return "No file selected";
+  const mb = file.size / 1048576;
+  return `${file.name} · ${mb < 1 ? `${(file.size / 1024).toFixed(0)} KB` : `${mb.toFixed(1)} MB`}`;
+};
 
 export function T5HomeworkWithFiles({ teacher }) {
   const [batches, setBatches] = useState([]);
