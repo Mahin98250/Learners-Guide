@@ -78,7 +78,7 @@ const hasProjection = (source, table, required) => projectionFields(source, tabl
 const teacherProfileFields = ["id", "name", "tid", "subject", "phone", "classes", "status"];
 const teacherHomeworkFields = ["id", "batch_id", "cls", "sec", "subject", "desc", "given", "due", "tid", "pdfname", "storage_path", "file_size", "mime_type", "created_at"];
 check(hasProjection(tc, "teachers", teacherProfileFields), "src/lg/teacherHomeworkApp.jsx: teacher profile read is missing required projection fields");
-check(hasProjection(teacherHomework, "homework", teacherHomeworkFields), "src/lg/TeacherHomeworkPage.jsx: teacher homework projection is incomplete");
+check(hasProjection(compact(teacherHomework), "homework", teacherHomeworkFields), "src/lg/TeacherHomeworkPage.jsx: teacher homework projection is incomplete");
 check(!tc.includes('supabase.from("teachers").select("*")') && !tc.includes("supabase.from('teachers').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard profile read");
 check(!tc.includes('supabase.from("homework").select("*")') && !tc.includes("supabase.from('homework').select('*')"), "src/lg/teacherHomeworkApp.jsx: teacher portal still contains a wildcard homework read");
 
