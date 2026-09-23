@@ -34,9 +34,6 @@
     <link rel="dns-prefetch" href="//efnxjfzyqbdulpjhffsm.supabase.co" />
     <title>Mahin</title>
     <script>
-      // Mobile browsers can block window.open() when it is called after an
-      // async file fetch. Blob URLs are our own generated file previews, so
-      // safely open those in the current tab instead of showing a popup error.
       (() => {
         const nativeOpen = window.open.bind(window);
         window.open = (url, target, features) => {

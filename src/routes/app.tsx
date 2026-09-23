@@ -7,7 +7,7 @@ import { GLOBAL_CSS, LGLogo } from "@/lg/ui";
 const TeacherAppWithHomeworkFiles = lazy(() =>
   import("@/lg/teacherHomeworkApp").then((module) => ({ default: module.TeacherAppWithHomeworkFiles })),
 );
-const StudentApp = lazy(() => import("@/lg/student").then((module) => ({ default: module.StudentApp })));
+const StudentApp = lazy(() => import("@/lg/StudentAppFixed").then((module) => ({ default: module.StudentAppFixed })));
 const ParentApp = lazy(() => import("@/lg/parentWorkflows").then((module) => ({ default: module.ParentApp })));
 const LeaveAccess = lazy(() => import("@/lg/LeaveAccess").then((module) => ({ default: module.LeaveAccess })));
 const PushNotificationPrompt = lazy(() => import("@/lg/pushNotifications").then((module) => ({ default: module.PushNotificationPrompt })));

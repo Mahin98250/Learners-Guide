@@ -25,7 +25,8 @@ function Index(){
   useEffect(()=>{
     let mounted=true;
     const restoreSession=async()=>{
-      const tenantPromise=resolveInstituteForCurrentHostname()
+      // Tenant branding is useful but must not block the first interactive frame.
+      void resolveInstituteForCurrentHostname()
         .then((resolved)=>{ if(mounted) setTenant(resolved); })
         .catch((error)=>console.warn("Unable to resolve institute domain:",error));
 
@@ -37,7 +38,6 @@ function Index(){
       }catch(error){
         console.warn("Unable to restore saved login session:",error);
       }finally{
-        await tenantPromise;
         if(mounted)setCheckingSession(false);
       }
     };

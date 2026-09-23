@@ -4,7 +4,6 @@ import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
 import StartupMinimal from "./StartupMinimal";
 import { LOGO_IMG_SRC } from "@/lg/ui";
-import { installOfflineMaterialCache } from "@/lg/offlineMaterials";
 import PdfOptimizationOverlay from "./PdfOptimizationOverlay";
 import "./mobile.css";
 import "./parent-visual-fix.css";
@@ -100,5 +99,5 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 
 if (typeof window !== "undefined") {
   const defer = window.requestIdleCallback ?? ((callback: IdleRequestCallback) => window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 } as IdleDeadline), 1));
-  defer(() => installOfflineMaterialCache());
+  defer(() => { void import("@/lg/offlineMaterials").then(({ installOfflineMaterialCache }) => installOfflineMaterialCache()); });
 }

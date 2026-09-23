@@ -53,7 +53,7 @@ test("Performance: known retired/compatibility path does not reintroduce wildcar
 test("Performance: authenticated portal bundles are lazy-loaded after session discovery", () => {
   const source = read("src/routes/app.tsx");
   assert.match(source, /const TeacherAppWithHomeworkFiles\s*=\s*lazy\([\s\S]{0,220}?import\(\s*["']@\/lg\/teacherHomeworkApp["']\s*\)/);
-  assert.match(source, /const StudentApp\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/lg\/student["']\s*\)/);
+  assert.match(source, /const StudentApp\s*=\s*lazy\([\s\S]{0,220}?import\(\s*["']@\/lg\/StudentAppFixed["']\s*\)/);
   assert.match(source, /const ParentApp\s*=\s*lazy\([\s\S]{0,180}?import\(\s*["']@\/lg\/parentWorkflows["']\s*\)/);
   assert.doesNotMatch(source, /import \{ TeacherAppWithHomeworkFiles \} from/);
   assert.doesNotMatch(source, /import \{ StudentApp \} from/);

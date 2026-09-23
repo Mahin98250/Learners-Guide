@@ -15,7 +15,7 @@ test("Student tests are split into upcoming and previous sections", () => {
 test("Teacher portal exposes tests and result entry", () => {
   const app = read("src/lg/teacherHomeworkApp.jsx");
   const tests = read("src/lg/teacherTests.jsx");
-  assert.match(app, /import\s*\{\s*TTests\s*,\s*TTestResults\s*\}\s*from\s*"@\/lg\/teacherTests"/);
+  assert.match(app, /import\("@\/lg\/teacherTests"\)/);
   assert.match(app, /key:\s*"tests"\s*,\s*icon:\s*"📋"\s*,\s*label:\s*"Tests"/);
   assert.match(app, /tab\s*===\s*"tests"\s*\?/);
   assert.match(app, /<TTests\s+teacher=\{teacher\}\s*\/>/);
