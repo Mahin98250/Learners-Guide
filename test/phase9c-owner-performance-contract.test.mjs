@@ -7,8 +7,8 @@ const read = (path) => fs.readFileSync(new URL(path, root), "utf8");
 
 const controlPlane = read("src/platform/PlatformOwnerControlPlane.tsx");
 const client = read("src/platform/platform-tenant-data.ts");
+const performanceMigration = read("supabase/migrations/20260923030000_phase9c_owner_performance_indexes.sql");
 const directoryMigration = read("supabase/migrations/20260923010000_phase9_platform_institute_directory.sql");
-const detailMigration = read("supabase/migrations/20260923020000_phase9b_owner_lazy_tenant_detail.sql");
 const legacyPortal = read("src/platform/PlatformOwnerPortal.tsx");
 
 test("Owner search is debounced and stale responses cannot overwrite newer results", () => {
@@ -31,12 +31,12 @@ test("Owner mutation refreshes invalidate cached aggregate counts", () => {
 });
 
 test("Directory and lazy-detail queries have scale-oriented indexes", () => {
-  assert.match(directoryMigration, /institutes_created_id_idx/);
   assert.match(directoryMigration, /institutes_status_created_id_idx/);
   assert.match(directoryMigration, /pg_trgm/);
-  assert.match(detailMigration, /institute_domains_institute_created_id_idx/);
-  assert.match(detailMigration, /institute_feature_entitlements_institute_feature_idx/);
-  assert.match(detailMigration, /institute_memberships_institute_status_idx/);
+  assert.match(performanceMigration, /institutes_created_id_idx/);
+  assert.match(performanceMigration, /institute_domains_institute_created_id_idx/);
+  assert.match(performanceMigration, /institute_feature_entitlements_institute_feature_idx/);
+  assert.match(performanceMigration, /institute_memberships_institute_status_idx/);
 });
 
 test("The heavy legacy Owner operations stay out of the initial control-plane bundle", () => {
