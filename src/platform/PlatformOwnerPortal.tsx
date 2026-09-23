@@ -67,7 +67,7 @@ export default function PlatformOwnerPortal(){
   finally{setLoading(false)}
  },[]);
 
- useEffect(()=>{const {data}=supabase.auth.onAuthStateChange(e=>{if(e==="SIGNED_OUT"){setAuthenticated(false);setAllowed(false);setRoles([])}});void load();const t=window.setInterval(()=>void load(true),30000);return()=>{data.subscription.unsubscribe();window.clearInterval(t)}},[load]);
+ useEffect(()=>{const {data}=supabase.auth.onAuthStateChange(e=>{if(e==="SIGNED_OUT"){setAuthenticated(false);setAllowed(false);setRoles([])}});void load();return()=>{data.subscription.unsubscribe()}},[load]);
  const authed=(r:string[])=>{setRoles(r);setAuthenticated(true);setAllowed(true);void load()};
  const signOut=async()=>{await supabase.auth.signOut({scope:"local"}).catch(()=>{});setAuthenticated(false);setAllowed(false);setRoles([])};
 
