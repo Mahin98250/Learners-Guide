@@ -10,6 +10,7 @@ const mutations = fs.readFileSync("src/lg/data/mutations.js", "utf8");
 const adminRoute = fs.readFileSync("src/routes/admin.tsx", "utf8");
 const ownerRoute = fs.readFileSync("src/routes/owner.tsx", "utf8");
 const ownerPortal = fs.readFileSync("src/platform/PlatformOwnerPortal.tsx", "utf8");
+const ownerControlPlane = fs.readFileSync("src/platform/PlatformOwnerControlPlane.tsx", "utf8");
 
 test("Phase 9 architecture keeps the existing institute portals as the data plane", () => {
   assert.match(architecture, /Existing institute application \/ data plane/);
@@ -39,9 +40,10 @@ test("existing shared data architecture scopes reads and writes to the active te
 
 test("platform Owner remains a separate control-plane route", () => {
   assert.match(ownerRoute, /createFileRoute\("\/owner"\)/);
-  assert.match(ownerPortal, /PLATFORM OWNER/);
-  assert.match(ownerPortal, /current_platform_roles/);
-  assert.match(ownerPortal, /mfa\.getAuthenticatorAssuranceLevel/);
+  assert.match(ownerControlPlane, /PLATFORM OWNER/);
+  assert.match(ownerControlPlane, /current_platform_roles/);
+  assert.match(ownerControlPlane, /mfa\.getAuthenticatorAssuranceLevel/);
+  assert.match(ownerPortal, /platform_provision_institute/);
 });
 
 test("Phase 9 requires bounded control-plane reads instead of browser-wide materialization", () => {
