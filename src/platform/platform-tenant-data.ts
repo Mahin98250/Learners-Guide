@@ -32,6 +32,14 @@ function normalizeLimit(value: unknown) {
   return Math.min(Math.max(Math.trunc(numeric), 1), 100);
 }
 
+const STATUS_COUNTS_CACHE_TTL_MS = 5_000;
+let statusCountsCache: { value: Record<string, number>; expiresAt: number } | null = null;
+let statusCountsPromise: Promise<Record<string, number>> | null = null;
+
+export function invalidatePlatformInstituteStatusCounts() {
+  statusCountsCache = null;
+}
+
 export async function listPlatformInstitutes(
   params: PlatformInstituteDirectoryParams = {},
 ): Promise<PlatformInstitutePage> {
@@ -60,13 +68,31 @@ export async function listPlatformInstitutes(
 }
 
 export async function getPlatformInstituteStatusCounts(): Promise<Record<string, number>> {
-  const { data, error } = await supabase.rpc("platform_institute_status_counts");
-  if (error) throw error;
+  const now = Date.now();
+  if (statusCountsCache && statusCountsCache.expiresAt > now) {
+    return statusCountsCache.value;
+  }
 
-  const raw = (data ?? {}) as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.entries(raw).map(([key, value]) => [key, Number(value) || 0]),
-  );
+  if (statusCountsPromise) return statusCountsPromise;
+
+  statusCountsPromise = (async () => {
+    const { data, error } = await supabase.rpc("platform_institute_status_counts");
+    if (error) throw error;
+
+    const raw = (data ?? {}) as Record<string, unknown>;
+    const value = Object.fromEntries(
+      Object.entries(raw).map(([key, count]) => [key, Number(count) || 0]),
+    );
+    statusCountsCache = {
+      value,
+      expiresAt: Date.now() + STATUS_COUNTS_CACHE_TTL_MS,
+    };
+    return value;
+  })().finally(() => {
+    statusCountsPromise = null;
+  });
+
+  return statusCountsPromise;
 }
 
 export type PlatformInstituteDetail = {
