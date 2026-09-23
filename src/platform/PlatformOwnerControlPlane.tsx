@@ -143,14 +143,19 @@ export default function PlatformOwnerControlPlane() {
 
   useEffect(() => {
     if (authenticated !== true) return;
-    const timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(() => {
       setCursor(null);
-      await loadDirectory(null);
-      const nextCounts = await getPlatformInstituteStatusCounts().catch(() => null);
-      if (nextCounts) setCounts(nextCounts);
+      void loadDirectory(null);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [query, status, authenticated]);
+
+  useEffect(() => {
+    if (authenticated !== true) return;
+    void getPlatformInstituteStatusCounts().then(setCounts).catch((e) => {
+      setError(e instanceof Error ? e.message : "Unable to load institute status counts.");
+    });
+  }, [authenticated]);
 
   const openDetail = async (institute: PlatformInstitute) => {
     setSelected(institute);
@@ -185,7 +190,6 @@ export default function PlatformOwnerControlPlane() {
       setQuery("");
       setStatus("all");
       setCursor(null);
-      await loadDirectory(null);
     } catch (e) {
       if (errorIsUnauthorized(e)) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
