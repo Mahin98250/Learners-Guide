@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import PlatformOwnerPortal from "@/platform/PlatformOwnerPortal";
+import PlatformOwnerControlPlane from "@/platform/PlatformOwnerControlPlane";
 
 export const Route = createFileRoute("/owner")({
   ssr: false,
@@ -9,5 +9,5 @@ export const Route = createFileRoute("/owner")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
-  component: PlatformOwnerPortal,
+  component: PlatformOwnerControlPlane,
 });
