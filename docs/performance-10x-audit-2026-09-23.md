@@ -63,7 +63,11 @@ Observed source-size shift:
 ### 7. Login-shell critical path
 Tenant branding/domain resolution no longer blocks removal of the login/session loading shell. It still runs immediately and updates branding when it completes, but session restoration can finish independently.
 
-### 8. Notification badge query
+### 8. Parent secondary-data deferral
+The Parent portal keeps the dashboard metrics on a small summary payload, while full attendance, homework, timetable and fee records are fetched only when their corresponding section is opened. This reduces startup response payload and database/result materialization for common dashboard visits.
+
+### 9. Notification badge query
+
 The Admin notification badge previously selected every unread notification row just to calculate a count. It now requests an exact server-side count with `head: true`, avoiding row payload transfer.
 
 ## Existing optimizations retained
