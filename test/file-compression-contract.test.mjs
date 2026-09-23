@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const compression = fs.readFileSync("src/lg/fileCompression.ts", "utf8");
-const teacherHomework = fs.readFileSync("src/lg/teacherHomeworkApp.jsx", "utf8");
+const teacherHomework = fs.readFileSync("src/lg/TeacherHomeworkPage.jsx", "utf8");
 const teacherMaterials = fs.readFileSync("src/lg/teacherWorkflows.jsx", "utf8");
 
 test("unified compression detects the formats the teacher upload UI accepts", () => {
