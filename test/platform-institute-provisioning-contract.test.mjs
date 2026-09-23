@@ -19,7 +19,7 @@ test("Phase 3 provisioning is atomic and platform-owner MFA protected",()=>{
 test("Owner portal uses the single provisioning operation",()=>{
   assert.match(portal,/platform_provision_institute/);
   assert.match(portal,/Provision institute/);
-  assert.match(portal,/Custom portal hostname/);
+  assert.match(portal,/Custom domain/);
   assert.doesNotMatch(portal,/supabase\.from\("institutes"\)\.insert/);
 });
 
