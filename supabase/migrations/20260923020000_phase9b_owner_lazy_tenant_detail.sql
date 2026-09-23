@@ -1,14 +1,5 @@
 -- Phase 9B: bounded, on-demand Owner tenant details
 
-create index if not exists institute_domains_institute_created_id_idx
-  on public.institute_domains (institute_id, created_at desc, id desc);
-
-create index if not exists institute_feature_entitlements_institute_feature_idx
-  on public.institute_feature_entitlements (institute_id, feature_code);
-
-create index if not exists institute_memberships_institute_status_idx
-  on public.institute_memberships (institute_id, status);
-
 create or replace function public.platform_get_institute_detail(p_institute_id uuid)
 returns jsonb
 language plpgsql
