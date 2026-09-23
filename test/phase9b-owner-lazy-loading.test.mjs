@@ -25,6 +25,18 @@ test("Owner directory does not materialize institute collections through direct 
   assert.match(client, /platform_institute_status_counts/);
 });
 
+test("Fast Owner onboarding exposes the real institute creation flow", () => {
+  assert.match(controlPlane, /Create institute/);
+  assert.match(controlPlane, /platform_provision_institute/);
+  assert.match(controlPlane, /Custom domain/);
+  assert.doesNotMatch(controlPlane, /provisionTimezone|provisionLocale/);
+});
+
+test("Fast Owner status control uses the protected platform operation", () => {
+  assert.match(controlPlane, /changeInstituteStatus/);
+  assert.match(controlPlane, /platform_set_institute_status/);
+});
+
 test("Tenant details are loaded only on demand", () => {
   assert.match(controlPlane, /getPlatformInstituteDetail/);
   assert.match(controlPlane, /onClick=\{\(\) => void openDetail\(institute\)\}/);
