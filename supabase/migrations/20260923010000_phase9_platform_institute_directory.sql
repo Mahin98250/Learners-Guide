@@ -9,6 +9,9 @@ create extension if not exists pg_trgm;
 create index if not exists institutes_status_created_id_idx
   on public.institutes (status, created_at desc, id desc);
 
+create index if not exists institutes_created_id_idx
+  on public.institutes (created_at desc, id desc);
+
 create index if not exists institutes_name_trgm_idx
   on public.institutes using gin (lower(name) gin_trgm_ops);
 
