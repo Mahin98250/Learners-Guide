@@ -96,6 +96,21 @@ export default function PlatformOwnerLogin({
       if (unenrollError) throw unenrollError;
     }
 
+    // A previous interrupted enrollment can leave an unverified factor
+    // with the same friendly name. Remove only that stale factor so the
+    // authorized owner can restart MFA setup cleanly.
+    const staleFactor = (factors?.totp || []).find(
+      (factor: MfaFactor) =>
+        factor.status !== "verified" &&
+        String(factor.friendly_name || "").trim() === "Mahin Owner",
+    );
+    if (staleFactor) {
+      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+        factorId: staleFactor.id,
+      });
+      if (unenrollError) throw unenrollError;
+    }
+
     const { data: enrolled, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
