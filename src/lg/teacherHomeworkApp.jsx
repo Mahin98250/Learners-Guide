@@ -1,16 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { C, uid } from "@/lg/data/constants";
 import { supabase } from "@/lg/supabase";
 import { compressFile } from "@/lg/fileCompression";
 import { enqueuePdfCompressionJob } from "@/lg/pdfCompressionJobs";
 import { Card, Badge, Sec, GBtn, Shell, AppBar } from "@/lg/ui";
-import { NotifPanel } from "@/lg/panels";
 import { THHome, THSchedule, THAttendance } from "@/lg/teacher";
 import { loadTeacherBatches } from "@/lg/teacherScope";
-import { T6Materials } from "@/lg/teacherWorkflows";
-import { TTests, TTestResults } from "@/lg/teacherTests";
-import { TeacherAnnouncements } from "@/lg/TeacherAnnouncements";
 import { getCurrentInstituteContext } from "@/lg/tenant";
+
+const NotifPanel = lazy(() => import("@/lg/panels").then((module) => ({ default: module.NotifPanel })));
+const T6Materials = lazy(() => import("@/lg/teacherWorkflows").then((module) => ({ default: module.T6Materials })));
+const TTests = lazy(() => import("@/lg/teacherTests").then((module) => ({ default: module.TTests })));
+const TTestResults = lazy(() => import("@/lg/teacherTests").then((module) => ({ default: module.TTestResults })));
+const TeacherAnnouncements = lazy(() => import("@/lg/TeacherAnnouncements").then((module) => ({ default: module.TeacherAnnouncements })));
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const errText = (e) => e instanceof Error ? e.message : (e?.message || "Something went wrong. Please try again.");
@@ -311,8 +313,8 @@ export function TeacherAppWithHomeworkFiles({ user, onLogout }) {
 
   return <Shell>
     <AppBar title={teacher.name || "Teacher"} onLogout={onLogout} onBell={() => setShowNotif((v) => !v)} />
-    {showNotif && <NotifPanel user={user} onClose={() => setShowNotif(false)} />}
-    <div style={{ padding: "16px 16px 88px", maxWidth: 900, margin: "0 auto" }}>{content}</div>
+    {showNotif && <Suspense fallback={null}><NotifPanel user={user} onClose={() => setShowNotif(false)} /></Suspense>}
+    <div style={{ padding: "16px 16px 88px", maxWidth: 900, margin: "0 auto" }}><Suspense fallback={<div style={{ color: C.sub, fontSize: 13, padding: 20 }}>Loading section…</div>}>{content}</Suspense></div>
     <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 1000, background: "#fff", borderTop: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, paddingBottom: "env(safe-area-inset-bottom)" }}>
       {tabs.map((item) => <button key={item.key} onClick={() => setTab(item.key)} style={{ border: 0, background: "transparent", padding: "9px 3px", color: tab === item.key ? C.accent : C.sub, fontSize: 10, fontWeight: 800, cursor: "pointer" }}><div style={{ fontSize: 18 }}>{item.icon}</div>{item.label}</button>)}
     </nav>
