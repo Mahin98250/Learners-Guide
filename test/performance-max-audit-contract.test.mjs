@@ -60,3 +60,8 @@ test("Performance 10X: parent secondary data is loaded on-demand", () => {
   assert.doesNotMatch(source, /from\("fees"\)[\s\S]{0,260}Promise\.all/);
   assert.doesNotMatch(source, /from\("timetable_entries"\)[\s\S]{0,260}Promise\.all/);
 });
+test("Performance 10X: offline cache implementation is idle-loaded", () => {
+  const source = read("src/main.tsx");
+  assert.doesNotMatch(source, /import .*offlineMaterials/);
+  assert.match(source, /defer\(\(\) => \{\s*void import\("@\/lg\/offlineMaterials"\)/);
+});
