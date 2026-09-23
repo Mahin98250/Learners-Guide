@@ -82,6 +82,35 @@ export default function PlatformOwnerLogin({
       return;
     }
 
+    const staleUnverified =
+      (factors?.totp || []).find(
+        (factor: MfaFactor) =>
+          factor.status !== "verified" &&
+          String(factor.friendly_name || "").trim() === "Mahin Owner",
+      );
+
+    if (staleUnverified) {
+      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+        factorId: staleUnverified.id,
+      });
+      if (unenrollError) throw unenrollError;
+    }
+
+    // A previous interrupted enrollment can leave an unverified factor
+    // with the same friendly name. Remove only that stale factor so the
+    // authorized owner can restart MFA setup cleanly.
+    const staleFactor = (factors?.totp || []).find(
+      (factor: MfaFactor) =>
+        factor.status !== "verified" &&
+        String(factor.friendly_name || "").trim() === "Mahin Owner",
+    );
+    if (staleFactor) {
+      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+        factorId: staleFactor.id,
+      });
+      if (unenrollError) throw unenrollError;
+    }
+
     const { data: enrolled, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
@@ -311,7 +340,7 @@ export default function PlatformOwnerLogin({
                   }}
                 >
                   <img
-                    src={`data:image/svg+xml,${encodeURIComponent(enrollment.qrCode)}`}
+                    src={enrollment.qrCode.startsWith("data:") ? enrollment.qrCode : `data:image/svg+xml,${encodeURIComponent(enrollment.qrCode)}`}
                     alt="Owner MFA QR code"
                     width={220}
                     height={220}

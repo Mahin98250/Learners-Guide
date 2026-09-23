@@ -1,4 +1,4 @@
-export const LOGO_IMG_SRC=`${import.meta.env.BASE_URL || "/"}mahin-icon.svg`;
+export const LOGO_IMG_SRC=`${import.meta.env.BASE_URL || "/"}mahin-original-logo.png`;
 
 export function LGLogo({ size=80, showText=true, light=false }){
   const tc = light ? "#fff" : "#2d1b8e";
