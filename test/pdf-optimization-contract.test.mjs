@@ -55,7 +55,7 @@ test("The global overlay describes server-side completion", () => {
 test("Upload entry points enqueue PDFs after Storage + record creation", () => {
   for (const path of [
     "src/admin/HomeworkPage.tsx",
-    "src/lg/teacherHomeworkApp.jsx",
+    "src/lg/TeacherHomeworkPage.jsx",
     "src/lg/teacherWorkflows.jsx",
     "src/admin/MaterialsDriveV2.tsx",
     "src/admin/MaterialsDrive.tsx",
