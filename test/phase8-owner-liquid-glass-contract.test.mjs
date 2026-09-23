@@ -40,7 +40,7 @@ test("owner route uses the bounded control-plane entry point", () => {
 test("glass surfaces use translucency, blur, highlights and focus states", () => {
   assert.match(css, /rgba\(255,255,255,.58\)/);
   assert.match(css, /backdrop-filter:blur\(24px\) saturate\(165%\)/);
-  assert.match(css, /inset 0 1px 0 rgba\(255,255,255,.95)/);
+  assert.match(css, /inset 0 1px 0 rgba\(255,255,255,.95\)/);
   assert.match(css, /focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
 });
