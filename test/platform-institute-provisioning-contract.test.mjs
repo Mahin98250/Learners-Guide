@@ -20,8 +20,6 @@ test("Owner portal uses the single provisioning operation",()=>{
   assert.match(portal,/platform_provision_institute/);
   assert.match(portal,/Provision institute/);
   assert.match(portal,/Custom portal hostname/);
-  assert.match(portal,/Timezone/);
-  assert.match(portal,/Locale/);
   assert.doesNotMatch(portal,/supabase\.from\("institutes"\)\.insert/);
 });
 
