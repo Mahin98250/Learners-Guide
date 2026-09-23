@@ -54,6 +54,11 @@ export default function PlatformOwnerControlPlane() {
   const [detail, setDetail] = useState<PlatformInstituteDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [operationsOpen, setOperationsOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createSlug, setCreateSlug] = useState("");
+  const [createHostname, setCreateHostname] = useState("");
+  const [createWorking, setCreateWorking] = useState(false);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
     setDirectoryLoading(true);
@@ -162,6 +167,39 @@ export default function PlatformOwnerControlPlane() {
     }
   };
 
+  const createInstitute = async () => {
+    if (!createName.trim() || !createSlug.trim() || createWorking) return;
+    setCreateWorking(true);
+    setError("");
+    try {
+      const result = await supabase.rpc("platform_provision_institute", {
+        p_name: createName.trim(),
+        p_slug: createSlug.trim().toLowerCase(),
+        p_hostname: createHostname.trim().toLowerCase() || null,
+      });
+      if (result.error) throw result.error;
+      setCreateName("");
+      setCreateSlug("");
+      setCreateHostname("");
+      setCreateOpen(false);
+      setSearch("");
+      setQuery("");
+      setStatus("all");
+      setCursor(null);
+      await loadDirectory(null);
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to create institute.");
+    } finally {
+      setCreateWorking(false);
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     setAuthenticated(false);
@@ -221,6 +259,7 @@ export default function PlatformOwnerControlPlane() {
             <div style={{ opacity: .75 }}>Bounded, searchable institute operations for the multi-tenant platform.</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={() => setCreateOpen(true)} style={{ ...button(true), background: "#fff", color: "#3224a6" }}>＋ Create institute</button>
             <span style={{ fontSize: 12, opacity: .8 }}>{roles.join(" · ")}</span>
             <button onClick={() => void signOut()} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Sign out</button>
           </div>
@@ -311,6 +350,47 @@ export default function PlatformOwnerControlPlane() {
           <button style={button(true)} onClick={() => setOperationsOpen(true)}>Open full platform operations</button>
         </section>
       </div>
+
+      {createOpen && (
+        <div role="dialog" aria-modal="true" onClick={() => { if (!createWorking) setCreateOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1200 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(620px,100%)", background: "#fff", borderRadius: 24, padding: 24, boxShadow: "0 30px 80px rgba(15,23,42,.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.4 }}>INSTITUTE ONBOARDING</div>
+                <h2 style={{ margin: "5px 0 2px" }}>Create institute</h2>
+                <div style={{ fontSize: 12, color: "#64748b" }}>The platform will create the workspace and its baseline setup automatically.</div>
+              </div>
+              <button disabled={createWorking} style={button(false)} onClick={() => setCreateOpen(false)}>Close</button>
+            </div>
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 800, marginTop: 18 }}>
+              Institute name
+              <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="ABC Academy" style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} />
+            </label>
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 800, marginTop: 12 }}>
+              Portal slug
+              <input value={createSlug} onChange={(e) => setCreateSlug(e.target.value)} placeholder="abc-academy" style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} />
+            </label>
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 800, marginTop: 12 }}>
+              Custom domain <span style={{ fontWeight: 500, color: "#64748b" }}>(optional)</span>
+              <input value={createHostname} onChange={(e) => setCreateHostname(e.target.value)} placeholder="academy.com" style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} />
+            </label>
+
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: "#f8fafc", border: "1px solid #e7ebf2", fontSize: 11, color: "#64748b" }}>
+              New institutes start in <b>Trial</b>. A custom domain is optional and can be connected after creation.
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+              <button disabled={createWorking} style={button(false)} onClick={() => setCreateOpen(false)}>Cancel</button>
+              <button disabled={!createName.trim() || !createSlug.trim() || createWorking} style={button(true)} onClick={() => void createInstitute()}>
+                {createWorking ? "Creating…" : "Create institute"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <div role="dialog" aria-modal="true" onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1100 }}>
