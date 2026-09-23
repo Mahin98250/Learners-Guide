@@ -1,7 +1,7 @@
 import React,{lazy,Suspense,useEffect,useState}from"react";
 import {C}from"@/lg/data";
 import {supabase}from"@/lg/supabase";
-import {Card,Sec,Shell,AppBar}from"@/lg/ui";
+import {Card,Shell,AppBar}from"@/lg/ui";
 import {STHome,STTimetable}from"@/lg/student";
 import {getCurrentInstituteContext}from"@/lg/tenant";
 
