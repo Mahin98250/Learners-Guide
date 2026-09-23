@@ -48,3 +48,15 @@ test("Performance 10X: large unused binary asset is absent", () => {
   const treeUrl = "public/file_00000000451c82118020d2baea54f76b.png";
   assert.throws(() => fs.readFileSync(treeUrl));
 });
+
+test("Performance 10X: parent secondary data is loaded on-demand", () => {
+  const source = read("src/lg/parentWorkflows.jsx");
+  assert.match(source, /sectionLoadedRef/);
+  assert.match(source, /tab !== "attendance" && tab !== "homework" && tab !== "timetable" && tab !== "fees"/);
+  assert.match(source, /from\("attendance"\)[\s\S]{0,260}?select\("id,sid,date,status,by,created_at"\)/);
+  assert.match(source, /from\("homework"\)[\s\S]{0,260}?select\("id,batch_id,subject,desc,given,due,created_at,pdfname"\)/);
+  assert.match(source, /from\("timetable_entries"\)[\s\S]{0,260}?select\("id,batch_id,subject_name,start_time,end_time,status,day_of_week"\)/);
+  assert.match(source, /from\("fees"\)[\s\S]{0,220}?select\("id,sid,desc,amount,status,due"\)/);
+  assert.doesNotMatch(source, /from\("fees"\)[\s\S]{0,260}Promise\.all/);
+  assert.doesNotMatch(source, /from\("timetable_entries"\)[\s\S]{0,260}Promise\.all/);
+});
