@@ -12,11 +12,11 @@ must(/\.in\("id", ids\)/, "Student loading must use the complete linked-child ID
 must(/const selected = useMemo\(\(\) => children\.find\(c => String\(c\.id\) === String\(selectedId\)\)/, "Parent portal must derive one explicit selected child from the child collection");
 must(/setSelectedId\(e\.target\.value\)/, "Parent portal must allow switching the active child");
 must(/children\.length > 1/, "Parent portal must expose the child switcher only when multiple children exist");
-must(/childAttendance = attendance\.filter[\s\S]{0,120}?selected\?\.id/, "Attendance must be scoped to the selected child");
-must(/childFees = fees\.filter[\s\S]{0,120}?selected\?\.id/, "Fees must be scoped to the selected child");
-must(/childResults = results\.filter[\s\S]{0,120}?selected\?\.id/, "Results must be scoped to the selected child");
-must(/childHomework = homework\.filter[\s\S]{0,120}?childBatchIds/, "Homework must be scoped to the selected child's active batches");
-must(/childTimetable = timetable\.filter[\s\S]{0,120}?childBatchIds/, "Timetable must be scoped to the selected child's active batches");
-must(/childTests = tests\.filter[\s\S]{0,120}?childBatchIds/, "Tests must be scoped to the selected child's active batches");
+must(/childAttendance = useMemo\([\s\S]{0,260}?attendance\.filter[\s\S]{0,220}?selected\?\.id/, "Attendance must be scoped to the selected child");
+must(/childFees = useMemo\([\s\S]{0,260}?fees\.filter[\s\S]{0,220}?selected\?\.id/, "Fees must be scoped to the selected child");
+must(/childResults = useMemo\([\s\S]{0,260}?results\.filter[\s\S]{0,220}?selected\?\.id/, "Results must be scoped to the selected child");
+must(/childHomework = useMemo\([\s\S]{0,260}?homework\.filter[\s\S]{0,220}?childBatchIds/, "Homework must be scoped to the selected child's active batches");
+must(/childTimetable = useMemo\([\s\S]{0,260}?timetable\.filter[\s\S]{0,260}?childBatchIds/, "Timetable must be scoped to the selected child's active batches");
+must(/childTests = useMemo\([\s\S]{0,260}?tests\.filter[\s\S]{0,220}?childBatchIds/, "Tests must be scoped to the selected child's active batches");
 
 console.log("Parent multi-child contract checks passed.");
