@@ -10,6 +10,7 @@ const mutations=read("src/lg/data/mutations.js");
 const studentPortal=read("src/lg/studentPortal.jsx");
 const parentPortal=read("src/lg/parentWorkflows.jsx");
 const studentApp=read("src/lg/StudentAppFixed.jsx");
+const studentSecondary=read("src/lg/StudentSecondaryPages.jsx");
 const migration=read("supabase/migrations/20260923000000_phase6_performance_indexes.sql");
 
 test("Phase 6: shared reads are cached per tenant and authenticated user",()=>{
@@ -39,9 +40,9 @@ test("Phase 6: high-volume direct portal reads carry explicit institute filters"
   assert.match(parentPortal,/from\("students"\)[\s\S]*eq\("institute_id", instituteId\)/);
   assert.match(parentPortal,/from\("batch_students"\)[\s\S]*eq\("institute_id", instituteId\)/);
   assert.match(parentPortal,/from\("test_results"\)[\s\S]*eq\("institute_id", instituteId\)/);
-  assert.match(studentApp,/from\("material_folders"\)[\s\S]*eq\("institute_id",instituteId\)/);
-  assert.match(studentApp,/from\("materials"\)[\s\S]*eq\("institute_id",instituteId\)/);
-  assert.match(studentApp,/from\("homework"\)[\s\S]*eq\("institute_id",instituteId\)/);
+  assert.match(studentSecondary,/from\("material_folders"\)[\s\S]*eq\("institute_id",instituteId\)/);
+  assert.match(studentSecondary,/from\("materials"\)[\s\S]*eq\("institute_id",instituteId\)/);
+  assert.match(studentSecondary,/from\("homework"\)[\s\S]*eq\("institute_id",instituteId\)/);
 });
 
 test("Phase 6: users remains outside tenant-column assumptions",()=>{
