@@ -146,7 +146,7 @@ export default function PlatformOwnerControlPlane() {
     const timer = window.setTimeout(() => {
       setCursor(null);
       void loadDirectory(null);
-    }, 300);
+    }, 250);
     return () => window.clearTimeout(timer);
   }, [query, status, authenticated]);
 
@@ -190,6 +190,8 @@ export default function PlatformOwnerControlPlane() {
       setQuery("");
       setStatus("all");
       setCursor(null);
+      void loadDirectory(null);
+      void getPlatformInstituteStatusCounts().then(setCounts).catch(() => {});
     } catch (e) {
       if (errorIsUnauthorized(e)) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
