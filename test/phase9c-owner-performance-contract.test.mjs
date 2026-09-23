@@ -9,6 +9,7 @@ const controlPlane = read("src/platform/PlatformOwnerControlPlane.tsx");
 const client = read("src/platform/platform-tenant-data.ts");
 const directoryMigration = read("supabase/migrations/20260923010000_phase9_platform_institute_directory.sql");
 const detailMigration = read("supabase/migrations/20260923020000_phase9b_owner_lazy_tenant_detail.sql");
+const legacyPortal = read("src/platform/PlatformOwnerPortal.tsx");
 
 test("Owner search is debounced and stale responses cannot overwrite newer results", () => {
   assert.match(controlPlane, /setTimeout\(\(\) => \{/);
@@ -40,4 +41,8 @@ test("Directory and lazy-detail queries have scale-oriented indexes", () => {
 
 test("The heavy legacy Owner operations stay out of the initial control-plane bundle", () => {
   assert.match(controlPlane, /lazy\(\(\) => import\("@\/platform\/PlatformOwnerPortal"\)\)/);
+});
+
+test("The full Owner operations surface does not poll every 30 seconds in the background", () => {
+  assert.doesNotMatch(legacyPortal, /setInterval\(\(\) => void load\(true\), 30000\)/);
 });
