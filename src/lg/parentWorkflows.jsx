@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lg/supabase";
 import { Badge, Card, Shell, AppBar, Sec } from "@/lg/ui";
 import { relativeDate } from "@/lg/dateUtils";
@@ -50,22 +50,22 @@ export function ParentApp({ user, onLogout }) {
       setMemberships(memberships || []);
       const batchIds = [...new Set((memberships || []).map(m => String(m.batch_id)).filter(Boolean))];
 
-      const [tr, ar, fr, hw, test] = await Promise.all([
-        batchIds.length ? supabase.from("timetable_entries").select("id,batch_id,subject_name,start_time,end_time,status,day_of_week").eq("institute_id", instituteId).in("batch_id", batchIds).eq("status", "active") : Promise.resolve({ data: EMPTY, error: null }),
-        supabase.from("attendance").select("id,sid,date,status").eq("institute_id", instituteId).in("sid", ids).order("date", { ascending: false }),
-        supabase.from("fees").select("id,sid,desc,amount,status,due").eq("institute_id", instituteId).in("sid", ids).order("due"),
-        supabase.from("homework").select("id,batch_id,subject,desc,given,due,created_at,pdfname").eq("institute_id", instituteId).in("batch_id", batchIds).order("created_at", { ascending: false }),
-        batchIds.length ? supabase.from("tests").select("id,title,description,batch_id,subject,test_date,total_marks,status").eq("institute_id", instituteId).in("batch_id", batchIds).order("test_date") : Promise.resolve({ data: EMPTY, error: null })
+      const [ar, hw, test] = await Promise.all([
+        supabase.from("attendance").select("id,sid,status").eq("institute_id", instituteId).in("sid", ids).order("id", { ascending: false }),
+        batchIds.length
+          ? supabase.from("homework").select("id,batch_id").eq("institute_id", instituteId).in("batch_id", batchIds).order("id", { ascending: false })
+          : Promise.resolve({ data: EMPTY, error: null }),
+        batchIds.length
+          ? supabase.from("tests").select("id,title,description,batch_id,subject,test_date,total_marks,status").eq("institute_id", instituteId).in("batch_id", batchIds).order("test_date")
+          : Promise.resolve({ data: EMPTY, error: null }),
       ]);
-      if (tr.error) throw tr.error;
       if (ar.error) throw ar.error;
-      if (fr.error) throw fr.error;
       if (hw.error) throw hw.error;
       if (test.error) throw test.error;
 
-      setTimetable(tr.data || []);
+      setTimetable([]);
       setAttendance(ar.data || []);
-      setFees(fr.data || []);
+      setFees([]);
       setHomework(hw.data || []);
       setTests(test.data || []);
 
@@ -80,6 +80,93 @@ export function ParentApp({ user, onLogout }) {
   }, [user?.ref]);
 
   useEffect(() => { void load(); }, [load]);
+  const sectionLoadedRef = useRef(new Set());
+  const [sectionLoading, setSectionLoading] = useState(false);
+
+  const childBatchKey = useMemo(
+    () => [...childMemberships].map(m => String(m.batch_id)).filter(Boolean).sort().join(","),
+    [childMemberships],
+  );
+
+  useEffect(() => {
+    if (loading || !selected) return;
+    const key = `${tab}:${selected.id}:${childBatchKey}`;
+    if (tab !== "attendance" && tab !== "homework" && tab !== "timetable" && tab !== "fees") return;
+    if (sectionLoadedRef.current.has(key)) return;
+
+    let live = true;
+    const loadSection = async () => {
+      setSectionLoading(true);
+      setError("");
+      try {
+        const context = await getCurrentInstituteContext();
+        const instituteId = context.membership?.institute_id;
+        if (!instituteId) throw new Error("An active institute workspace must be selected.");
+
+        let data = [];
+        if (tab === "attendance") {
+          const response = await supabase
+            .from("attendance")
+            .select("id,sid,date,status,by,created_at")
+            .eq("institute_id", instituteId)
+            .eq("sid", String(selected.id))
+            .order("date", { ascending: false })
+            .order("created_at", { ascending: false });
+          if (response.error) throw response.error;
+          data = response.data || [];
+          if (live) {
+            const byId = new Map((data || []).map(row => [String(row.id), row]));
+            setAttendance(current => current.map(row => byId.get(String(row.id)) || row));
+          }
+        } else if (tab === "homework" && childBatchKey) {
+          const response = await supabase
+            .from("homework")
+            .select("id,batch_id,subject,desc,given,due,created_at,pdfname")
+            .eq("institute_id", instituteId)
+            .in("batch_id", childBatchKey.split(","))
+            .order("created_at", { ascending: false });
+          if (response.error) throw response.error;
+          data = response.data || [];
+          if (live) {
+            const byId = new Map((data || []).map(row => [String(row.id), row]));
+            setHomework(current => current.map(row => byId.get(String(row.id)) || row));
+          }
+        } else if (tab === "timetable" && childBatchKey) {
+          const response = await supabase
+            .from("timetable_entries")
+            .select("id,batch_id,subject_name,start_time,end_time,status,day_of_week")
+            .eq("institute_id", instituteId)
+            .in("batch_id", childBatchKey.split(","))
+            .eq("status", "active");
+          if (response.error) throw response.error;
+          if (live) setTimetable(response.data || []);
+          data = response.data || [];
+        } else if (tab === "fees") {
+          const response = await supabase
+            .from("fees")
+            .select("id,sid,desc,amount,status,due")
+            .eq("institute_id", instituteId)
+            .eq("sid", String(selected.id))
+            .order("due");
+          if (response.error) throw response.error;
+          if (live) setFees(response.data || []);
+          data = response.data || [];
+        } else {
+          sectionLoadedRef.current.add(key);
+          return;
+        }
+
+        if (live) sectionLoadedRef.current.add(key);
+      } catch (e) {
+        if (live) setError(e instanceof Error ? e.message : "Unable to load this section.");
+      } finally {
+        if (live) setSectionLoading(false);
+      }
+    };
+    void loadSection();
+    return () => { live = false; };
+  }, [loading, tab, selected?.id, childBatchKey]);
+
 
   const childMemberships = useMemo(
     () => memberships.filter(m => String(m.student_id) === String(selected?.id)),
@@ -146,7 +233,7 @@ export function ParentApp({ user, onLogout }) {
   ];
   const moreItems = [
     ["analytics", "📊", "Analytics", "Progress overview"], ["timetable", "🗓️", "Classes", "Today's schedule"],
-    ["tests", "📋", "Tests", `${upcomingTests.length} upcoming`], ["fees", "₹", "Fees", `${childFees.length} records`]
+    ["tests", "📋", "Tests", `${upcomingTests.length} upcoming`], ["fees", "₹", "Fees", "View fee records"]
   ];
 
   const content = loading ? <Card style={{ padding: 24, textAlign: "center", color: "#747c94" }}>Loading your child's dashboard…</Card> : error ?
