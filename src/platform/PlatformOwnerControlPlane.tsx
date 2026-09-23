@@ -53,6 +53,7 @@ export default function PlatformOwnerControlPlane() {
   const [selected, setSelected] = useState<PlatformInstitute | null>(null);
   const [detail, setDetail] = useState<PlatformInstituteDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [statusWorking, setStatusWorking] = useState(false);
   const [operationsOpen, setOperationsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -197,6 +198,32 @@ export default function PlatformOwnerControlPlane() {
       setError(e instanceof Error ? e.message : "Unable to create institute.");
     } finally {
       setCreateWorking(false);
+    }
+  };
+
+  const changeInstituteStatus = async (nextStatus: "trial" | "active" | "suspended" | "archived") => {
+    if (!selected || statusWorking || selected.status === nextStatus) return;
+    setStatusWorking(true);
+    setError("");
+    try {
+      const result = await supabase.rpc("platform_set_institute_status", {
+        p_institute_id: selected.id,
+        p_status: nextStatus,
+      });
+      if (result.error) throw result.error;
+      setSelected({ ...selected, status: nextStatus });
+      setDetail((current) => current ? { ...current, institute: { ...current.institute, status: nextStatus } } : current);
+      await loadDirectory(null);
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to change institute status.");
+    } finally {
+      setStatusWorking(false);
     }
   };
 
@@ -420,6 +447,28 @@ export default function PlatformOwnerControlPlane() {
                       <div style={{ fontSize: 22, fontWeight: 900, marginTop: 4 }}>{Number(value) || 0}</div>
                     </div>
                   ))}
+                </div>
+
+                <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <div>
+                      <b>Institute status</b>
+                      <div style={{ marginTop: 5, fontSize: 12, color: "#64748b" }}>Change the workspace lifecycle state from the fast control center.</div>
+                    </div>
+                    <select
+                      value={selected.status}
+                      disabled={statusWorking}
+                      onChange={(e) => void changeInstituteStatus(e.target.value as "trial" | "active" | "suspended" | "archived")}
+                      style={{ padding: 10, borderRadius: 10, border: "1px solid #d8dee9", fontWeight: 800 }}
+                      aria-label="Institute status"
+                    >
+                      <option value="trial">Trial</option>
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                  </div>
+                  {statusWorking && <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>Saving status…</div>}
                 </div>
 
                 <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
