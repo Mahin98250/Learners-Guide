@@ -82,6 +82,20 @@ export default function PlatformOwnerLogin({
       return;
     }
 
+    const staleUnverified =
+      (factors?.totp || []).find(
+        (factor: MfaFactor) =>
+          factor.status !== "verified" &&
+          String(factor.friendly_name || "").trim() === "Mahin Owner",
+      );
+
+    if (staleUnverified) {
+      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+        factorId: staleUnverified.id,
+      });
+      if (unenrollError) throw unenrollError;
+    }
+
     const { data: enrolled, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
