@@ -65,20 +65,16 @@ export default function PlatformOwnerControlPlane() {
     setDirectoryLoading(true);
     setError("");
     try {
-      const [page, nextCounts] = await Promise.all([
-        listPlatformInstitutes({
-          limit: 50,
-          cursor: next,
-          search: query,
-          status,
-        }),
-        getPlatformInstituteStatusCounts(),
-      ]);
+      const page = await listPlatformInstitutes({
+        limit: 50,
+        cursor: next,
+        search: query,
+        status,
+      });
       setInstitutes(page.items);
       setHasMore(page.has_more);
       setNextCursor(page.next_cursor);
       setCursor(next);
-      setCounts(nextCounts);
     } catch (e) {
       if (errorIsUnauthorized(e)) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
@@ -123,8 +119,7 @@ export default function PlatformOwnerControlPlane() {
         setAuthenticated(true);
         setAllowed(nextRoles.length > 0);
 
-        if (nextRoles.length) await loadDirectory();
-        else setLoading(false);
+        if (!nextRoles.length) setLoading(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unable to verify platform access.");
         setAuthenticated(false);
@@ -147,12 +142,15 @@ export default function PlatformOwnerControlPlane() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    if (authenticated !== true) return;
+    const timer = window.setTimeout(async () => {
       setCursor(null);
-      void loadDirectory(null);
+      await loadDirectory(null);
+      const nextCounts = await getPlatformInstituteStatusCounts().catch(() => null);
+      if (nextCounts) setCounts(nextCounts);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [query, status]);
+  }, [query, status, authenticated]);
 
   const openDetail = async (institute: PlatformInstitute) => {
     setSelected(institute);
@@ -239,7 +237,6 @@ export default function PlatformOwnerControlPlane() {
     setAuthenticated(true);
     setAllowed(nextRoles.length > 0);
     setLoading(true);
-    void loadDirectory();
   };
 
   if (authenticated === false) {
