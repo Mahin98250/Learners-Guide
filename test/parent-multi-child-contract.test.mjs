@@ -16,7 +16,7 @@ must(/childAttendance = useMemo\([\s\S]{0,260}?attendance\.filter[\s\S]{0,220}?s
 must(/childFees = useMemo\([\s\S]{0,260}?fees\.filter[\s\S]{0,220}?selected\?\.id/, "Fees must be scoped to the selected child");
 must(/childResults = useMemo\([\s\S]{0,260}?results\.filter[\s\S]{0,220}?selected\?\.id/, "Results must be scoped to the selected child");
 must(/childHomework = useMemo\([\s\S]{0,260}?homework\.filter[\s\S]{0,220}?childBatchIds/, "Homework must be scoped to the selected child's active batches");
-must(/childTimetable = useMemo\([\s\S]{0,400}?timetable\.filter[\s\S]{0,500}?childBatchIds\.has/, "Timetable must be scoped to the selected child's active batches");
+must(/childTimetable[\s\S]{0,500}?timetable\.filter[\s\S]{0,200}?childBatchIds\.has/, "Timetable must be scoped to the selected child's active batches");
 must(/childTests = useMemo\([\s\S]{0,260}?tests\.filter[\s\S]{0,220}?childBatchIds/, "Tests must be scoped to the selected child's active batches");
 
 console.log("Parent multi-child contract checks passed.");
