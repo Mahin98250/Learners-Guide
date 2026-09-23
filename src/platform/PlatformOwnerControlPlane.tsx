@@ -1,8 +1,9 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import PlatformOwnerLogin from "@/platform/PlatformOwnerLogin";
 import {
   getPlatformInstituteDetail,
   getPlatformInstituteStatusCounts,
+  invalidatePlatformInstituteStatusCounts,
   listPlatformInstitutes,
   type PlatformInstitute,
   type PlatformInstituteCursor,
@@ -60,8 +61,11 @@ export default function PlatformOwnerControlPlane() {
   const [createSlug, setCreateSlug] = useState("");
   const [createHostname, setCreateHostname] = useState("");
   const [createWorking, setCreateWorking] = useState(false);
+  const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
+    const requestId = directoryRequestRef.current + 1;
+    directoryRequestRef.current = requestId;
     setDirectoryLoading(true);
     setError("");
     try {
@@ -71,11 +75,16 @@ export default function PlatformOwnerControlPlane() {
         search: query,
         status,
       });
+
+      // A slower response for an older search/filter must never overwrite newer results.
+      if (requestId !== directoryRequestRef.current) return;
+
       setInstitutes(page.items);
       setHasMore(page.has_more);
       setNextCursor(page.next_cursor);
       setCursor(next);
     } catch (e) {
+      if (requestId !== directoryRequestRef.current) return;
       if (errorIsUnauthorized(e)) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
         setAuthenticated(false);
@@ -84,8 +93,10 @@ export default function PlatformOwnerControlPlane() {
       }
       setError(e instanceof Error ? e.message : "Unable to load the institute directory.");
     } finally {
-      setDirectoryLoading(false);
-      setLoading(false);
+      if (requestId === directoryRequestRef.current) {
+        setDirectoryLoading(false);
+        setLoading(false);
+      }
     }
   };
 
@@ -190,7 +201,7 @@ export default function PlatformOwnerControlPlane() {
       setQuery("");
       setStatus("all");
       setCursor(null);
-      void loadDirectory(null);
+      invalidatePlatformInstituteStatusCounts();
       void getPlatformInstituteStatusCounts().then(setCounts).catch(() => {});
     } catch (e) {
       if (errorIsUnauthorized(e)) {
@@ -217,7 +228,11 @@ export default function PlatformOwnerControlPlane() {
       if (result.error) throw result.error;
       setSelected({ ...selected, status: nextStatus });
       setDetail((current) => current ? { ...current, institute: { ...current.institute, status: nextStatus } } : current);
-      await loadDirectory(null);
+      invalidatePlatformInstituteStatusCounts();
+      await Promise.all([
+        loadDirectory(null),
+        getPlatformInstituteStatusCounts().then(setCounts),
+      ]);
     } catch (e) {
       if (errorIsUnauthorized(e)) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
