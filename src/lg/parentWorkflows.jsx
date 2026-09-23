@@ -81,18 +81,64 @@ export function ParentApp({ user, onLogout }) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const childMemberships = memberships.filter(m => String(m.student_id) === String(selected?.id));
-  const childBatchIds = new Set(childMemberships.map(m => String(m.batch_id)));
-  const childAttendance = attendance.filter(a => String(a.sid) === String(selected?.id));
-  const childFees = fees.filter(f => String(f.sid) === String(selected?.id));
-  const childTests = tests.filter(t => childBatchIds.has(String(t.batch_id)));
-  const childResults = results.filter(r => String(r.student_id) === String(selected?.id));
-  const childHomework = homework.filter(h => childBatchIds.has(String(h.batch_id)));
-  const childTimetable = timetable.filter(t => childBatchIds.has(String(t.batch_id))).sort((a,b) => { const ad=Number(a.day_of_week), bd=Number(b.day_of_week), today=todayDayNumber(); const ar=ad===today?0:1, br=bd===today?0:1; return ar-br || ad-bd || String(a.start_time||"").localeCompare(String(b.start_time||"")); });
-  const attendanceRate = childAttendance.length ? Math.round(childAttendance.filter(a => String(a.status).toLowerCase() === "present").length / childAttendance.length * 100) : null;
-  const upcomingTests = childTests.filter(t => !t.test_date || new Date(t.test_date) >= new Date());
-  const resultPercentages = childResults.map(r => percentage(r.marks, r.test?.total_marks)).filter(x => x != null);
-  const averagePercentage = resultPercentages.length ? Math.round(resultPercentages.reduce((a,b) => a+b, 0) / resultPercentages.length) : null;
+  const childMemberships = useMemo(
+    () => memberships.filter(m => String(m.student_id) === String(selected?.id)),
+    [memberships, selected?.id],
+  );
+  const childBatchIds = useMemo(
+    () => new Set(childMemberships.map(m => String(m.batch_id))),
+    [childMemberships],
+  );
+  const childAttendance = useMemo(
+    () => attendance.filter(a => String(a.sid) === String(selected?.id)),
+    [attendance, selected?.id],
+  );
+  const childFees = useMemo(
+    () => fees.filter(f => String(f.sid) === String(selected?.id)),
+    [fees, selected?.id],
+  );
+  const childTests = useMemo(
+    () => tests.filter(t => childBatchIds.has(String(t.batch_id))),
+    [tests, childBatchIds],
+  );
+  const childResults = useMemo(
+    () => results.filter(r => String(r.student_id) === String(selected?.id)),
+    [results, selected?.id],
+  );
+  const childHomework = useMemo(
+    () => homework.filter(h => childBatchIds.has(String(h.batch_id))),
+    [homework, childBatchIds],
+  );
+  const childTimetable = useMemo(
+    () => timetable
+      .filter(t => childBatchIds.has(String(t.batch_id)))
+      .sort((a,b) => {
+        const ad = Number(a.day_of_week), bd = Number(b.day_of_week), today = todayDayNumber();
+        const ar = ad === today ? 0 : 1, br = bd === today ? 0 : 1;
+        return ar - br || ad - bd || String(a.start_time || "").localeCompare(String(b.start_time || ""));
+      }),
+    [timetable, childBatchIds],
+  );
+  const attendanceRate = useMemo(
+    () => childAttendance.length
+      ? Math.round(childAttendance.filter(a => String(a.status).toLowerCase() === "present").length / childAttendance.length * 100)
+      : null,
+    [childAttendance],
+  );
+  const upcomingTests = useMemo(
+    () => childTests.filter(t => !t.test_date || new Date(t.test_date) >= new Date()),
+    [childTests],
+  );
+  const resultPercentages = useMemo(
+    () => childResults.map(r => percentage(r.marks, r.test?.total_marks)).filter(x => x != null),
+    [childResults],
+  );
+  const averagePercentage = useMemo(
+    () => resultPercentages.length
+      ? Math.round(resultPercentages.reduce((a,b) => a+b, 0) / resultPercentages.length)
+      : null,
+    [resultPercentages],
+  );
 
   const tabs = [
     { key: "home", icon: "🏠", label: "Home" }, { key: "attendance", icon: "✅", label: "Attendance" },
