@@ -127,20 +127,37 @@ export default function PlatformOwnerLogin({
       return;
     }
 
+    // Friendly names are unique in Supabase. A stale/interrupted factor can
+    // survive cleanup long enough to collide with a new "Mahin Owner" enroll.
+    // Pick the first available name, and retry with another name if a race
+    // creates the same factor between listFactors() and enroll().
+    const usedFriendlyNames = new Set(
+      [...(factors?.totp || []), ...(factors?.phone || [])]
+        .map((factor: MfaFactor) => String(factor.friendly_name || "").trim())
+        .filter(Boolean),
+    );
+    const getEnrollmentName = (attempt: number) => {
+      const base = "Mahin Owner";
+      if (attempt === 0 && !usedFriendlyNames.has(base)) return base;
+      let suffix = Math.max(2, attempt + 1);
+      while (usedFriendlyNames.has(`${base} ${suffix}`)) suffix += 1;
+      return `${base} ${suffix}`;
+    };
+
     let enrolled;
     let enrollError;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const friendlyName = getEnrollmentName(attempt);
       const result = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "Mahin Owner",
+        friendlyName,
       });
       enrolled = result.data;
       enrollError = result.error;
       if (!enrollError) break;
 
-      // A concurrent/interrupted enrollment may have appeared between the
-      // cleanup read and enroll. Reconcile once instead of creating another
-      // factor or surfacing the misleading duplicate-name error immediately.
+      // Reconcile a concurrent enrollment. If a verified factor appeared,
+      // challenge it instead of creating yet another factor.
       factors = await listMfaFactors();
       const existingVerified =
         (factors?.totp || []).find((factor: MfaFactor) => factor.status === "verified") ||
@@ -165,18 +182,14 @@ export default function PlatformOwnerLogin({
         return;
       }
 
-      const duplicateStaleFactors = (factors?.totp || []).filter(
-        (factor: MfaFactor) =>
-          factor.status !== "verified" &&
-          String(factor.friendly_name || "").trim() === "Mahin Owner",
-      );
-      for (const staleFactor of duplicateStaleFactors) {
-        const { error: unenrollError } = await supabase.auth.mfa.unenroll({
-          factorId: staleFactor.id,
-        });
-        if (unenrollError) throw unenrollError;
+      for (const factor of [...(factors?.totp || []), ...(factors?.phone || [])]) {
+        const name = String(factor.friendly_name || "").trim();
+        if (name) usedFriendlyNames.add(name);
       }
-      if (attempt === 1) break;
+
+      // Stop after the final retry; otherwise the next iteration selects a
+      // fresh friendly name rather than repeating the duplicate one.
+      if (attempt === 2) break;
     }
     if (enrollError || !enrolled) {
       throw enrollError || new Error("Unable to start Owner MFA enrollment.");

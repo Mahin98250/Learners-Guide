@@ -46,7 +46,7 @@ test("owner login cannot grant access before AAL2", () => {
 
 test("owner enrollment supports a TOTP authenticator", () => {
   assert.match(login, /factorType:\s*"totp"/);
-  assert.match(login, /friendlyName:\s*"Mahin Owner"/);
+  assert.match(login, /const base = "Mahin Owner"/);
   assert.match(login, /qr_code/);
   assert.match(login, /secret/);
 });
@@ -153,15 +153,20 @@ test("platform-level RLS membership helper requires AAL2", () => {
 });
 
 
-test("owner MFA reconciles stale duplicate factors before enrollment", () => {
+test("owner MFA reconciles stale factors and avoids duplicate friendly names", () => {
   assert.match(login, /const listMfaFactors = async \(\) =>/);
   assert.match(login, /factors = await listMfaFactors\(\);/);
   assert.match(login, /const staleFactors = \(factors\?\.totp \|\| \[\]\)\.filter/);
   assert.match(login, /for \(const staleFactor of staleFactors\)/);
-  assert.match(login, /for \(let attempt = 0; attempt < 2; attempt \+= 1\)/);
-  assert.match(login, /duplicateStaleFactors/);
+  assert.match(login, /const usedFriendlyNames = new Set/);
+  assert.match(login, /const getEnrollmentName = \(attempt: number\)/);
+  assert.match(login, /!usedFriendlyNames\.has\(base\)/);
+  assert.match(login, /for \(let attempt = 0; attempt < 3; attempt \+= 1\)/);
+  assert.match(login, /friendlyName,/);
+  assert.match(login, /usedFriendlyNames\.add\(name\)/);
   assert.doesNotMatch(login, /const staleUnverified/);
   assert.doesNotMatch(login, /const staleFactor = \(factors\?\.totp \|\| \[\]\)\.find/);
+  assert.doesNotMatch(login, /friendlyName: "Mahin Owner",/);
 });
 
 
