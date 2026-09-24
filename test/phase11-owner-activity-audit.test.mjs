@@ -34,5 +34,7 @@ test("Owner audit UI does not expose raw metadata or actor identities", () => {
   assert.match(controlPlane, /Raw metadata and actor identities are not returned to this interface/);
   assert.doesNotMatch(controlPlane, /actor_auth_id/);
   assert.doesNotMatch(controlPlane, /actor_person_id/);
-  assert.doesNotMatch(controlPlane, /metadata/);
+  assert.doesNotMatch(controlPlane, /event\.metadata/);
+  assert.doesNotMatch(controlPlane, /event\.actor_auth_id/);
+  assert.doesNotMatch(controlPlane, /event\.actor_person_id/);
 });
