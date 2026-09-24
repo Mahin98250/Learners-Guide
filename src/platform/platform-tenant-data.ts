@@ -166,3 +166,60 @@ export async function getPlatformInstituteOverview(
     },
   };
 }
+
+
+export type PlatformStorageInstitute = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  used_bytes: number;
+  study_materials_bytes: number;
+  homework_bytes: number;
+  quota_bytes: number | null;
+};
+
+export type PlatformStorageOverview = {
+  totals: {
+    institutes: number;
+    institutes_with_storage: number;
+    used_bytes: number;
+    study_materials_bytes: number;
+    homework_bytes: number;
+    configured_quota_bytes: number;
+  };
+  institutes: PlatformStorageInstitute[];
+};
+
+export async function getPlatformStorageOverview(): Promise<PlatformStorageOverview> {
+  const { data, error } = await supabase.rpc("platform_get_storage_overview");
+  if (error) throw error;
+
+  const raw = (data ?? {}) as Partial<PlatformStorageOverview>;
+  const totals = (raw.totals ?? {}) as Partial<PlatformStorageOverview["totals"]>;
+  const rows = Array.isArray(raw.institutes) ? raw.institutes : [];
+
+  return {
+    totals: {
+      institutes: Number(totals.institutes) || 0,
+      institutes_with_storage: Number(totals.institutes_with_storage) || 0,
+      used_bytes: Number(totals.used_bytes) || 0,
+      study_materials_bytes: Number(totals.study_materials_bytes) || 0,
+      homework_bytes: Number(totals.homework_bytes) || 0,
+      configured_quota_bytes: Number(totals.configured_quota_bytes) || 0,
+    },
+    institutes: rows.map((row) => {
+      const item = (row ?? {}) as Partial<PlatformStorageInstitute>;
+      return {
+        id: String(item.id ?? ""),
+        name: String(item.name ?? ""),
+        slug: String(item.slug ?? ""),
+        status: String(item.status ?? ""),
+        used_bytes: Number(item.used_bytes) || 0,
+        study_materials_bytes: Number(item.study_materials_bytes) || 0,
+        homework_bytes: Number(item.homework_bytes) || 0,
+        quota_bytes: item.quota_bytes == null ? null : Number(item.quota_bytes) || null,
+      };
+    }),
+  };
+}
