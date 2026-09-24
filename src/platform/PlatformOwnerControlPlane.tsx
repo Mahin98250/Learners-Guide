@@ -8,6 +8,8 @@ import {
   type PlatformInstitute,
   type PlatformInstituteCursor,
   type PlatformInstituteOverview,
+  type PlatformStorageOverview,
+  getPlatformStorageOverview,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
 
@@ -116,6 +118,8 @@ export default function PlatformOwnerControlPlane() {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
+  const [storageOverview, setStorageOverview] = useState<PlatformStorageOverview | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -207,6 +211,10 @@ export default function PlatformOwnerControlPlane() {
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (authenticated === true && activeSection === "storage") void loadStorageOverview();
+  }, [authenticated, activeSection]);
 
   useEffect(() => {
     if (authenticated !== true) return;
@@ -311,6 +319,24 @@ export default function PlatformOwnerControlPlane() {
       getPlatformInstituteStatusCounts().then(setCounts),
     ]);
     setLastRefreshedAt(new Date().toISOString());
+  };
+
+  const loadStorageOverview = async () => {
+    setStorageLoading(true);
+    setError("");
+    try {
+      setStorageOverview(await getPlatformStorageOverview());
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to load platform storage.");
+    } finally {
+      setStorageLoading(false);
+    }
   };
 
   const signOut = async () => {
@@ -646,6 +672,79 @@ export default function PlatformOwnerControlPlane() {
             )}
           </div>
         </div>
+      )}
+
+      {activeSection === "storage" && (
+        <section className="owner-storage-page" style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(16px,4vw,42px) 60px" }}>
+          <div className="owner-storage-heading" style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM STORAGE</div>
+              <h2 style={{ margin: "5px 0", fontSize: 28 }}>Storage overview</h2>
+              <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Read-only storage usage across all institutes. Individual files and users are never exposed.</p>
+            </div>
+            <button style={button(true)} onClick={() => void loadStorageOverview()} disabled={storageLoading}>{storageLoading ? "Refreshing…" : "↻ Refresh storage"}</button>
+          </div>
+
+          {error && <div role="alert" style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
+
+          {storageLoading && !storageOverview ? (
+            <div className="owner-section-placeholder" style={{ margin: "24px 0 0" }}><div className="owner-placeholder-icon">▣</div><h2>Loading storage…</h2><p>Calculating aggregate storage usage from study materials and homework.</p></div>
+          ) : storageOverview ? (
+            <>
+              <div className="owner-storage-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginTop: 20 }}>
+                {[
+                  ["Used storage", formatBytes(storageOverview.totals.used_bytes)],
+                  ["Study materials", formatBytes(storageOverview.totals.study_materials_bytes)],
+                  ["Homework files", formatBytes(storageOverview.totals.homework_bytes)],
+                  ["Institutes using storage", String(storageOverview.totals.institutes_with_storage)],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 18, padding: 17, boxShadow: "0 12px 30px rgba(50,58,100,.06)" }}>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b", letterSpacing: .7 }}>{label}</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, marginTop: 7, color: "#172554" }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="owner-storage-summary" style={{ marginTop: 14, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                  <div><b>Platform quota</b><div style={{ color: "#64748b", fontSize: 12, marginTop: 3 }}>Sum of institute quotas that are configured.</div></div>
+                  <strong>{storageOverview.totals.configured_quota_bytes > 0 ? formatBytes(storageOverview.totals.configured_quota_bytes) : "Not configured"}</strong>
+                </div>
+                {storageOverview.totals.configured_quota_bytes > 0 && (
+                  <div style={{ marginTop: 12, height: 10, borderRadius: 999, background: "#eef2ff", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: Math.min(100, (storageOverview.totals.used_bytes / storageOverview.totals.configured_quota_bytes) * 100) + "%", background: "#4f46e5", borderRadius: 999 }} />
+                  </div>
+                )}
+              </div>
+
+              <div className="owner-storage-table" style={{ marginTop: 14, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, overflow: "hidden" }}>
+                <div style={{ padding: 18, borderBottom: "1px solid #eef1f6" }}>
+                  <b>Institute storage usage</b><div style={{ color: "#64748b", fontSize: 12, marginTop: 3 }}>Up to 100 institutes, ordered by storage used.</div>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
+                    <thead><tr style={{ textAlign: "left", background: "#f8fafc" }}>
+                      {["Institute", "Status", "Used", "Study materials", "Homework", "Quota"].map((heading) => <th key={heading} style={{ padding: 12, fontSize: 10, color: "#64748b" }}>{heading}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {storageOverview.institutes.map((item) => (
+                        <tr key={item.id} style={{ borderTop: "1px solid #eef1f6" }}>
+                          <td style={{ padding: 13 }}><b>{item.name}</b><div style={{ fontSize: 10, color: "#94a3b8" }}>{item.slug}</div></td>
+                          <td style={{ padding: 13 }}><span style={{ ...statusTone(item.status), padding: "5px 8px", borderRadius: 999, fontSize: 9, fontWeight: 900, textTransform: "uppercase" }}>{item.status}</span></td>
+                          <td style={{ padding: 13, fontWeight: 900 }}>{formatBytes(item.used_bytes)}</td>
+                          <td style={{ padding: 13, color: "#475569" }}>{formatBytes(item.study_materials_bytes)}</td>
+                          <td style={{ padding: 13, color: "#475569" }}>{formatBytes(item.homework_bytes)}</td>
+                          <td style={{ padding: 13, color: "#475569" }}>{formatBytes(item.quota_bytes)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!storageOverview.institutes.length && <div style={{ padding: 28, color: "#64748b" }}>No institute storage data is available yet.</div>}
+              </div>
+            </>
+          ) : null}
+        </section>
       )}
 
       {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "settings" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
