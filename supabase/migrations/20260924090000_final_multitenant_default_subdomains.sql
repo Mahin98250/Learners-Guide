@@ -158,13 +158,7 @@ begin
   select i.id,i.name,i.slug,i.status,d.id,d.hostname,d.verification_token
   from public.institutes i
   left join public.institute_domains d
-    on d.id = (
-      select id
-      from public.institute_domains
-      where institute_id=i.id
-      order by is_primary desc, created_at asc
-      limit 1
-    )
+    on d.id = v_domain_id
   where i.id=v_id;
 end;
 $function$;
