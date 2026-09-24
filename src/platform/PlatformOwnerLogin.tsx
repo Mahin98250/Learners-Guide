@@ -54,9 +54,14 @@ export default function PlatformOwnerLogin({
       return;
     }
 
-    const { data: factors, error: factorsError } =
-      await supabase.auth.mfa.listFactors();
-    if (factorsError) throw factorsError;
+    const listMfaFactors = async () => {
+      const { data: nextFactors, error: nextFactorsError } =
+        await supabase.auth.mfa.listFactors();
+      if (nextFactorsError) throw nextFactorsError;
+      return nextFactors;
+    };
+
+    let factors = await listMfaFactors();
 
     const verifiedFactor =
       (factors?.totp || []).find((factor: MfaFactor) => factor.status === "verified") ||
@@ -82,41 +87,101 @@ export default function PlatformOwnerLogin({
       return;
     }
 
-    const staleUnverified =
-      (factors?.totp || []).find(
-        (factor: MfaFactor) =>
-          factor.status !== "verified" &&
-          String(factor.friendly_name || "").trim() === "Mahin Owner",
-      );
-
-    if (staleUnverified) {
-      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
-        factorId: staleUnverified.id,
-      });
-      if (unenrollError) throw unenrollError;
-    }
-
-    // A previous interrupted enrollment can leave an unverified factor
-    // with the same friendly name. Remove only that stale factor so the
-    // authorized owner can restart MFA setup cleanly.
-    const staleFactor = (factors?.totp || []).find(
+    // Supabase can retain an interrupted, unverified factor. Remove every
+    // stale "Mahin Owner" enrollment, then re-read factors before enrolling.
+    const staleFactors = (factors?.totp || []).filter(
       (factor: MfaFactor) =>
         factor.status !== "verified" &&
         String(factor.friendly_name || "").trim() === "Mahin Owner",
     );
-    if (staleFactor) {
+
+    for (const staleFactor of staleFactors) {
       const { error: unenrollError } = await supabase.auth.mfa.unenroll({
         factorId: staleFactor.id,
       });
       if (unenrollError) throw unenrollError;
     }
 
-    const { data: enrolled, error: enrollError } =
-      await supabase.auth.mfa.enroll({
+    factors = await listMfaFactors();
+
+    const verifiedAfterCleanup =
+      (factors?.totp || []).find((factor: MfaFactor) => factor.status === "verified") ||
+      (factors?.phone || []).find((factor: MfaFactor) => factor.status === "verified");
+
+    if (aal?.nextLevel === "aal2" && verifiedAfterCleanup) {
+      const { data: nextChallenge, error: challengeError } =
+        await supabase.auth.mfa.challenge({ factorId: verifiedAfterCleanup.id });
+      if (challengeError) throw challengeError;
+
+      setEnrollment(null);
+      setCode("");
+      setChallenge({
+        factorId: verifiedAfterCleanup.id,
+        challengeId: String(nextChallenge?.id || ""),
+        factorType: String(verifiedAfterCleanup.factor_type || "totp"),
+        label:
+          String(verifiedAfterCleanup.friendly_name || "").trim() ||
+          (verifiedAfterCleanup.factor_type === "phone"
+            ? "your phone"
+            : "your authenticator app"),
+      });
+      return;
+    }
+
+    let enrolled;
+    let enrollError;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = await supabase.auth.mfa.enroll({
         factorType: "totp",
         friendlyName: "Mahin Owner",
       });
-    if (enrollError) throw enrollError;
+      enrolled = result.data;
+      enrollError = result.error;
+      if (!enrollError) break;
+
+      // A concurrent/interrupted enrollment may have appeared between the
+      // cleanup read and enroll. Reconcile once instead of creating another
+      // factor or surfacing the misleading duplicate-name error immediately.
+      factors = await listMfaFactors();
+      const existingVerified =
+        (factors?.totp || []).find((factor: MfaFactor) => factor.status === "verified") ||
+        (factors?.phone || []).find((factor: MfaFactor) => factor.status === "verified");
+      if (existingVerified && aal?.nextLevel === "aal2") {
+        const { data: nextChallenge, error: challengeError } =
+          await supabase.auth.mfa.challenge({ factorId: existingVerified.id });
+        if (challengeError) throw challengeError;
+
+        setEnrollment(null);
+        setCode("");
+        setChallenge({
+          factorId: existingVerified.id,
+          challengeId: String(nextChallenge?.id || ""),
+          factorType: String(existingVerified.factor_type || "totp"),
+          label:
+            String(existingVerified.friendly_name || "").trim() ||
+            (existingVerified.factor_type === "phone"
+              ? "your phone"
+              : "your authenticator app"),
+        });
+        return;
+      }
+
+      const duplicateStaleFactors = (factors?.totp || []).filter(
+        (factor: MfaFactor) =>
+          factor.status !== "verified" &&
+          String(factor.friendly_name || "").trim() === "Mahin Owner",
+      );
+      for (const staleFactor of duplicateStaleFactors) {
+        const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+          factorId: staleFactor.id,
+        });
+        if (unenrollError) throw unenrollError;
+      }
+      if (attempt === 1) break;
+    }
+    if (enrollError || !enrolled) {
+      throw enrollError || new Error("Unable to start Owner MFA enrollment.");
+    }
 
     const { data: nextChallenge, error: challengeError } =
       await supabase.auth.mfa.challenge({ factorId: enrolled.id });
