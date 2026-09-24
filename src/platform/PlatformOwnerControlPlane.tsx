@@ -177,12 +177,15 @@ export default function PlatformOwnerControlPlane() {
     void getPlatformInstituteStatusCounts().then(setCounts).catch((e) => {
       setError(e instanceof Error ? e.message : "Unable to load institute status counts.");
     });
-    void supabase.from("platform_settings").select("*").eq("id", 1).maybeSingle().then(({ data, error: rpcError }) => {
-      if (rpcError) throw rpcError;
-      setPlatformSettings((data || null) as PlatformSettings | null);
-    }).catch((e) => {
-      setError(e instanceof Error ? e.message : "Unable to load platform settings.");
-    });
+    void (async () => {
+      try {
+        const { data, error: rpcError } = await supabase.from("platform_settings").select("*").eq("id", 1).maybeSingle();
+        if (rpcError) throw rpcError;
+        setPlatformSettings((data || null) as PlatformSettings | null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unable to load platform settings.");
+      }
+    })();
   }, [authenticated]);
 
   const openDetail = async (institute: PlatformInstitute) => {
