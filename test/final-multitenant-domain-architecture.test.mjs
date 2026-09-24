@@ -31,3 +31,26 @@ test("Owner can enable automatic default subdomains from platform settings", () 
   assert.match(portal, /default_subdomains_enabled/);
   assert.match(portal, /Enable automatic institute subdomains/);
 });
+
+const recovery = fs.readFileSync(
+  new URL("../supabase/functions/password-recovery-request/index.ts", import.meta.url),
+  "utf8"
+);
+const pdfJobs = fs.readFileSync(
+  new URL("../supabase/functions/pdf-compression-jobs/index.ts", import.meta.url),
+  "utf8"
+);
+
+test("runtime recovery redirects are tenant-aware and reject legacy host coupling", () => {
+  assert.match(recovery, /PUBLIC_APP_ORIGIN/);
+  assert.match(recovery, /institute_domains/);
+  assert.match(recovery, /tls_status/);
+  assert.match(recovery, /resetPasswordForEmail\(email, \{ redirectTo: recoveryOrigin \+ "\/" \}\)/);
+  assert.doesNotMatch(recovery, /mahin\.vercel\.app/);
+});
+
+test("PDF compression worker uses explicit infrastructure configuration", () => {
+  assert.match(pdfJobs, /PDF_COMPRESSION_RASTER_WORKER_URL/);
+  assert.match(pdfJobs, /structural fallback will be used/);
+  assert.doesNotMatch(pdfJobs, /mahin\.vercel\.app/);
+});
