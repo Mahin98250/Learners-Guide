@@ -24,8 +24,11 @@ test("owner OAuth returns to the owner route using the configured app base", () 
   assert.match(login, /prompt:\s*"select_account"/);
 });
 
-test("owner panel is pinned to the authorized Google email", () => {
-  assert.match(login, /patelmahin140@gmail\.com/);
+test("owner authorization stays server-side while the login screen does not expose the email", () => {
+  assert.doesNotMatch(login, /patelmahin140@gmail\.com/);
+  assert.doesNotMatch(login, /AUTHORIZED GOOGLE ACCOUNT/);
+  assert.match(login, /current_platform_roles/);
+  assert.match(login, /login_hint: normalizedEmail/);
   assert.match(
     migration,
     /lower\(coalesce\(auth\.jwt\(\)\s*->>\s*'email',\s*''\)\)\s*=\s*'patelmahin140@gmail\.com'/i,
