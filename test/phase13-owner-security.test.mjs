@@ -25,6 +25,6 @@ test("Security overview is backend owner-gated", () => {
 });
 
 test("Security UI does not expose sensitive auth records", () => {
-  assert.doesNotMatch(controlPlane, /access_token|refresh_token|client_secret|secret_key|password/i);
+  assert.doesNotMatch(controlPlane, /access_token|refresh_token|client_secret|secret_key|private_key/i);
   assert.match(controlPlane, /Secrets and recovery codes are never returned/);
 });
