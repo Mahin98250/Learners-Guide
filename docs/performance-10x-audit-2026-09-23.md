@@ -90,3 +90,16 @@ No optimization here changes tenant authorization boundaries. Any future optimiz
 ## Verification
 
 This document records source-level audit findings. Browser-level Core Web Vitals, network waterfall, bundle gzip/brotli transfer sizes, and device-specific TTFB/FCP/LCP should be measured against a deployed build before claiming numeric real-world latency targets.
+## Phase 11 — regression guardrails
+
+The production build now has an automated performance budget check in CI. It measures raw, gzip and Brotli sizes for generated JavaScript and CSS assets and protects the HTML/PWA shell from large regressions.
+
+Current guardrails:
+- dist/index.html ≤ 4 KiB
+- dist/manifest.webmanifest ≤ 1 KiB
+- largest JavaScript chunk ≤ 700 KiB raw
+- total JavaScript ≤ 2 MiB gzip
+- total CSS ≤ 350 KiB gzip
+- HTML data-URI payload ≤ 4 KiB
+
+These are regression ceilings, not claimed real-world latency measurements. The deployed-browser validation called out below remains the source of truth for Core Web Vitals, TTFB, FCP and LCP.

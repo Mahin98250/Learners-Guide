@@ -11,7 +11,8 @@
     "lint:eslint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"test/**/*.test.mjs\""
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "performance:budget": "node scripts/performance-budget.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

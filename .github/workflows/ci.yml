@@ -44,6 +44,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Performance budget
+        run: npm run performance:budget
+
       # Formatting is intentionally last so tests and build validate the
       # committed source instead of a CI-mutated working tree.
       - name: Format changed source files
