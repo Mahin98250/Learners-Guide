@@ -23,7 +23,7 @@ test("performance audit passes a small valid build and reports compressed sizes"
       path.join(tempDir, "index.html"),
       "<!doctype html><html><head></head><body><div id="root"></div></body></html>",
     );
-    await writeFile(path.join(tempDir, "manifest.webmanifest"), "{"name":"Mahin"}");
+    await writeFile(path.join(tempDir, "manifest.webmanifest"), '{"name":"Mahin"}');
     await writeFile(path.join(tempDir, "assets", "app.js"), "console.log('ok');");
     await writeFile(path.join(tempDir, "assets", "app.css"), "body{margin:0}");
     const result = await auditBuild(tempDir);
