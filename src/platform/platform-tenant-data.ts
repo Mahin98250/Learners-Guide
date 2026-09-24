@@ -484,3 +484,81 @@ export async function getPlatformAuditActivity(
       : null,
   };
 }
+
+
+export type PlatformDomain = {
+  id: string;
+  institute_id: string;
+  institute_name: string;
+  institute_slug: string | null;
+  hostname: string;
+  domain_type: string;
+  status: string;
+  verification_method: string | null;
+  verified_at: string | null;
+  tls_status: string;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getPlatformDomains(): Promise<PlatformDomain[]> {
+  const { data, error } = await supabase.rpc("platform_get_domains");
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []).map((row) => {
+    const item = (row ?? {}) as Partial<PlatformDomain>;
+    return {
+      id: String(item.id ?? ""),
+      institute_id: String(item.institute_id ?? ""),
+      institute_name: String(item.institute_name ?? "Unknown institute"),
+      institute_slug: item.institute_slug == null ? null : String(item.institute_slug),
+      hostname: String(item.hostname ?? ""),
+      domain_type: String(item.domain_type ?? "custom"),
+      status: String(item.status ?? "pending"),
+      verification_method: item.verification_method == null ? null : String(item.verification_method),
+      verified_at: item.verified_at == null ? null : String(item.verified_at),
+      tls_status: String(item.tls_status ?? "pending"),
+      is_primary: item.is_primary === true,
+      created_at: String(item.created_at ?? ""),
+      updated_at: String(item.updated_at ?? ""),
+    };
+  });
+}
+
+export async function registerPlatformDomain(instituteId: string, hostname: string) {
+  const { data, error } = await supabase.rpc("register_institute_domain", {
+    p_institute_id: instituteId,
+    p_hostname: hostname.trim().toLowerCase(),
+    p_domain_type: "custom",
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row as { domain_id: string; hostname: string; verification_token: string; status: string };
+}
+
+export async function verifyPlatformDomain(domainId: string) {
+  const { data, error } = await supabase.rpc("platform_record_domain_dns_verified", { p_domain_id: domainId });
+  if (error) throw error;
+  return data;
+}
+
+export async function setPlatformDomainTls(domainId: string, tlsStatus: "pending" | "provisioning" | "active" | "failed") {
+  const { data, error } = await supabase.rpc("platform_set_domain_tls_status", {
+    p_domain_id: domainId,
+    p_tls_status: tlsStatus,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function setPlatformPrimaryDomain(domainId: string) {
+  const { data, error } = await supabase.rpc("platform_set_primary_domain", { p_domain_id: domainId });
+  if (error) throw error;
+  return data;
+}
+
+export async function disablePlatformDomain(domainId: string) {
+  const { data, error } = await supabase.rpc("platform_disable_domain", { p_domain_id: domainId });
+  if (error) throw error;
+  return data;
+}

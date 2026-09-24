@@ -16,6 +16,13 @@ import {
   getPlatformAnalytics,
   type PlatformAuditOverview,
   getPlatformAuditActivity,
+  type PlatformDomain,
+  getPlatformDomains,
+  registerPlatformDomain,
+  verifyPlatformDomain,
+  setPlatformDomainTls,
+  setPlatformPrimaryDomain,
+  disablePlatformDomain,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
 
@@ -137,6 +144,13 @@ export default function PlatformOwnerControlPlane() {
   const [auditCategory, setAuditCategory] = useState("all");
   const [auditSearch, setAuditSearch] = useState("");
   const [auditQuery, setAuditQuery] = useState("");
+  const [domains, setDomains] = useState<PlatformDomain[]>([]);
+  const [domainsLoading, setDomainsLoading] = useState(false);
+  const [domainWorking, setDomainWorking] = useState("");
+  const [domainOpen, setDomainOpen] = useState(false);
+  const [domainInstitute, setDomainInstitute] = useState("");
+  const [domainHostname, setDomainHostname] = useState("");
+  const [domainToken, setDomainToken] = useState<string | null>(null);
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -244,6 +258,10 @@ export default function PlatformOwnerControlPlane() {
   useEffect(() => {
     if (authenticated === true && activeSection === "activity") void loadAuditActivity(false);
   }, [authenticated, activeSection, auditDays, auditCategory, auditQuery]);
+
+  useEffect(() => {
+    if (authenticated === true && activeSection === "domains") void loadDomains();
+  }, [authenticated, activeSection]);
 
   useEffect(() => {
     if (authenticated !== true) return;
@@ -408,6 +426,69 @@ export default function PlatformOwnerControlPlane() {
       setError(e instanceof Error ? e.message : "Unable to load platform activity and audit history.");
     } finally {
       setAuditLoading(false);
+    }
+  };
+
+  const loadDomains = async () => {
+    setDomainsLoading(true);
+    setError("");
+    try {
+      setDomains(await getPlatformDomains());
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to load platform domains.");
+    } finally {
+      setDomainsLoading(false);
+    }
+  };
+
+  const registerDomain = async () => {
+    if (!domainInstitute || !domainHostname.trim() || domainWorking) return;
+    setDomainWorking("register");
+    setError("");
+    try {
+      const result = await registerPlatformDomain(domainInstitute, domainHostname);
+      setDomainToken(result.verification_token);
+      setDomainHostname("");
+      await loadDomains();
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to register domain.");
+    } finally {
+      setDomainWorking("");
+    }
+  };
+
+  const runDomainAction = async (domain: PlatformDomain, action: "verify" | "tls" | "primary" | "disable") => {
+    if (domainWorking) return;
+    setDomainWorking(action + ":" + domain.id);
+    setError("");
+    try {
+      if (action === "verify") await verifyPlatformDomain(domain.id);
+      if (action === "tls") await setPlatformDomainTls(domain.id, "active");
+      if (action === "primary") await setPlatformPrimaryDomain(domain.id);
+      if (action === "disable") await disablePlatformDomain(domain.id);
+      await loadDomains();
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to update domain.");
+    } finally {
+      setDomainWorking("");
     }
   };
 
@@ -1193,7 +1274,88 @@ export default function PlatformOwnerControlPlane() {
         </section>
       )}
 
-      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && activeSection !== "activity" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
+      {activeSection === "domains" && (
+        <section className="owner-domains-page" style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(16px,4vw,42px) 60px" }}>
+          <div className="owner-domains-heading" style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM HOSTING</div>
+              <h2 style={{ margin: "5px 0", fontSize: 28 }}>Domains</h2>
+              <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Manage tenant portal hostnames, DNS verification, TLS state and primary routing. Domain actions are protected by Owner MFA.</p>
+            </div>
+            <button type="button" style={button(true)} onClick={() => { setDomainOpen(true); setDomainToken(null); }}>＋ Add custom domain</button>
+          </div>
+
+          {error && <div role="alert" style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
+
+          {domainsLoading ? (
+            <div className="owner-section-placeholder" style={{ marginTop: 24 }}><div className="owner-placeholder-icon">◎</div><h2>Loading domains…</h2><p>Checking tenant hostname and TLS state.</p></div>
+          ) : (
+            <>
+              <div className="owner-domain-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginTop: 20 }}>
+                {[
+                  ["Total domains", domains.length],
+                  ["Verified", domains.filter(d => d.status === "verified").length],
+                  ["TLS active", domains.filter(d => d.tls_status === "active").length],
+                  ["Primary", domains.filter(d => d.is_primary).length],
+                ].map(([label,value]) => <div key={String(label)} style={{ background:"#fff", border:"1px solid #e7ebf2", borderRadius:18, padding:16 }}><div style={{fontSize:10,fontWeight:900,color:"#64748b",letterSpacing:.6}}>{label}</div><div style={{fontSize:25,fontWeight:900,marginTop:6,color:"#172554"}}>{Number(value)}</div></div>)}
+              </div>
+
+              <section className="owner-domain-table" style={{ marginTop:14, background:"#fff", border:"1px solid #e7ebf2", borderRadius:20, overflow:"hidden" }}>
+                <div style={{padding:18,borderBottom:"1px solid #eef1f6"}}><b>Tenant domains</b><div style={{marginTop:3,color:"#64748b",fontSize:12}}>Default subdomains and custom domains are shown together. Verification tokens are only shown immediately after registration.</div></div>
+                {domains.length ? <div className="owner-domain-table-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Institute","Hostname","Type","Status","TLS","Primary","Actions"].map(h=><th key={h} style={{textAlign:"left",padding:"11px 14px",fontSize:9,color:"#64748b",letterSpacing:.06,textTransform:"uppercase",borderBottom:"1px solid #eef1f6"}}>{h}</th>)}</tr></thead><tbody>{domains.map(d=>{
+                  const busy=domainWorking.includes(d.id);
+                  return <tr key={d.id}>
+                    <td><strong>{d.institute_name}</strong><div style={{fontSize:10,color:"#8a94a8"}}>{d.institute_slug || "—"}</div></td>
+                    <td><code>{d.hostname}</code></td>
+                    <td>{d.domain_type.replaceAll("_"," ")}</td>
+                    <td><span className="owner-domain-badge" data-tone={d.status}>{d.status}</span></td>
+                    <td><span className="owner-domain-badge" data-tone={d.tls_status}>{d.tls_status}</span></td>
+                    <td>{d.is_primary ? "✓ Primary" : "—"}</td>
+                    <td><div className="owner-domain-actions">
+                      {d.status === "pending" && <button style={button(false)} disabled={busy} onClick={() => void runDomainAction(d,"verify")}>{busy ? "Working…" : "Record DNS verified"}</button>}
+                      {d.status === "verified" && d.tls_status !== "active" && <button style={button(false)} disabled={busy} onClick={() => void runDomainAction(d,"tls")}>{busy ? "Working…" : "Set TLS active"}</button>}
+                      {d.status === "verified" && d.tls_status === "active" && !d.is_primary && <button style={button(false)} disabled={busy} onClick={() => void runDomainAction(d,"primary")}>{busy ? "Working…" : "Set primary"}</button>}
+                      {!d.is_primary && d.status !== "disabled" && <button style={{...button(false),color:"#b42318"}} disabled={busy} onClick={() => void runDomainAction(d,"disable")}>{busy ? "Working…" : "Disable"}</button>}
+                    </div></td>
+                  </tr>;
+                })}</tbody></table></div> : <div className="owner-domain-empty"><div className="owner-placeholder-icon">◎</div><h3>No domains registered</h3><p>Register a custom hostname for an institute, or enable automatic subdomains in Platform Settings for future tenant provisioning.</p></div>}
+              </section>
+            </>
+          )}
+        </section>
+      )}
+
+      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && activeSection !== "activity" && activeSection !== "domains" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
+
+      {domainOpen && (
+        <div role="dialog" aria-modal="true" onClick={() => { if (!domainWorking) setDomainOpen(false); }} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.55)", display:"grid", placeItems:"center", padding:18, zIndex:1300 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width:"min(560px,100%)", background:"#fff", borderRadius:24, padding:24 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", gap:14, alignItems:"start" }}>
+              <div><b>DOMAIN REGISTRATION</b><h2 style={{ margin:"5px 0" }}>Add custom domain</h2><div style={{ fontSize:12, color:"#64748b" }}>Register the hostname first, then add the DNS TXT record before recording verification.</div></div>
+              <button type="button" style={button(false)} onClick={() => setDomainOpen(false)}>Close</button>
+            </div>
+            <label style={{ display:"block", fontSize:12, fontWeight:800, marginTop:16 }}>Institute
+              <select value={domainInstitute} onChange={(e) => setDomainInstitute(e.target.value)} style={{ width:"100%", boxSizing:"border-box", marginTop:5, padding:11, borderRadius:11, border:"1px solid #d8dee9" }}>
+                <option value="">Choose institute</option>
+                {institutes.map((institute) => <option key={institute.id} value={institute.id}>{institute.name}</option>)}
+              </select>
+            </label>
+            <label style={{ display:"block", fontSize:12, fontWeight:800, marginTop:12 }}>Hostname
+              <input value={domainHostname} onChange={(e) => setDomainHostname(e.target.value)} placeholder="portal.example.org" style={{ width:"100%", boxSizing:"border-box", marginTop:5, padding:11, borderRadius:11, border:"1px solid #d8dee9" }} />
+            </label>
+            {domainToken && <div style={{ marginTop:14, padding:14, borderRadius:14, background:"#f8fafc", border:"1px solid #e7ebf2" }}>
+              <b style={{ fontSize:12 }}>DNS TXT verification</b>
+              <div style={{ marginTop:5, fontSize:11, color:"#64748b", lineHeight:1.5 }}>Create a TXT record for <code>_mahin-verification</code> on the registered hostname with this value:</div>
+              <code style={{ display:"block", marginTop:9, padding:10, borderRadius:10, background:"#fff", border:"1px solid #e7ebf2", wordBreak:"break-all" }}>{domainToken}</code>
+              <div style={{ marginTop:8, fontSize:10, color:"#8a94a8" }}>Keep this token private. After DNS propagation, close this dialog and use “Record DNS verified” from the domain list.</div>
+            </div>}
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:18 }}>
+              <button type="button" style={button(false)} onClick={() => setDomainOpen(false)}>Done</button>
+              <button type="button" style={button(true)} disabled={!domainInstitute || !domainHostname.trim() || !!domainWorking} onClick={() => void registerDomain()}>{domainWorking === "register" ? "Registering…" : "Register domain"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {settingsOpen && platformSettings && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
