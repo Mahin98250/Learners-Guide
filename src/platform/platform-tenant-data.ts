@@ -562,3 +562,32 @@ export async function disablePlatformDomain(domainId: string) {
   if (error) throw error;
   return data;
 }
+
+
+export type PlatformSecurityOverview = {
+  owner_access_granted: boolean;
+  owner_membership_present: boolean;
+  mfa_required: boolean;
+  backend_owner_gate: boolean;
+  audit_logging_enabled: boolean;
+  domain_tls_active: number;
+  domain_tls_failed: number;
+  registered_domains: number;
+};
+
+export async function getPlatformSecurityOverview(): Promise<PlatformSecurityOverview> {
+  const { data, error } = await supabase.rpc("platform_get_security_overview");
+  if (error) throw error;
+
+  const raw = (data ?? {}) as Partial<PlatformSecurityOverview>;
+  return {
+    owner_access_granted: raw.owner_access_granted === true,
+    owner_membership_present: raw.owner_membership_present === true,
+    mfa_required: raw.mfa_required !== false,
+    backend_owner_gate: raw.backend_owner_gate !== false,
+    audit_logging_enabled: raw.audit_logging_enabled === true,
+    domain_tls_active: Number(raw.domain_tls_active) || 0,
+    domain_tls_failed: Number(raw.domain_tls_failed) || 0,
+    registered_domains: Number(raw.registered_domains) || 0,
+  };
+}

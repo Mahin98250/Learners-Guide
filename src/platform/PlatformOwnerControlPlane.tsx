@@ -18,6 +18,8 @@ import {
   getPlatformAuditActivity,
   type PlatformDomain,
   getPlatformDomains,
+  type PlatformSecurityOverview,
+  getPlatformSecurityOverview,
   registerPlatformDomain,
   verifyPlatformDomain,
   setPlatformDomainTls,
@@ -151,6 +153,10 @@ export default function PlatformOwnerControlPlane() {
   const [domainInstitute, setDomainInstitute] = useState("");
   const [domainHostname, setDomainHostname] = useState("");
   const [domainToken, setDomainToken] = useState<string | null>(null);
+  const [securityOverview, setSecurityOverview] = useState<PlatformSecurityOverview | null>(null);
+  const [securityFactors, setSecurityFactors] = useState<{ id: string; factor_type: string; status: string; friendly_name: string | null }[]>([]);
+  const [securityAal, setSecurityAal] = useState<{ current: string | null; next: string | null }>({ current: null, next: null });
+  const [securityLoading, setSecurityLoading] = useState(false);
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -261,6 +267,10 @@ export default function PlatformOwnerControlPlane() {
 
   useEffect(() => {
     if (authenticated === true && activeSection === "domains") void loadDomains();
+  }, [authenticated, activeSection]);
+
+  useEffect(() => {
+    if (authenticated === true && activeSection === "security") void loadSecurity();
   }, [authenticated, activeSection]);
 
   useEffect(() => {
@@ -489,6 +499,45 @@ export default function PlatformOwnerControlPlane() {
       setError(e instanceof Error ? e.message : "Unable to update domain.");
     } finally {
       setDomainWorking("");
+    }
+  };
+
+  const loadSecurity = async () => {
+    setSecurityLoading(true);
+    setError("");
+    try {
+      const [overviewResult, aalResult, factorsResult] = await Promise.all([
+        getPlatformSecurityOverview(),
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+        supabase.auth.mfa.listFactors(),
+      ]);
+      setSecurityOverview(overviewResult);
+      setSecurityAal({
+        current: aalResult.data?.currentLevel ? String(aalResult.data.currentLevel) : null,
+        next: aalResult.data?.nextLevel ? String(aalResult.data.nextLevel) : null,
+      });
+      if (aalResult.error) throw aalResult.error;
+      if (factorsResult.error) throw factorsResult.error;
+      const factors = [
+        ...(factorsResult.data?.totp || []),
+        ...(factorsResult.data?.phone || []),
+      ].map((factor: { id?: string; factor_type?: string; status?: string; friendly_name?: string | null }) => ({
+        id: String(factor.id || ""),
+        factor_type: String(factor.factor_type || "unknown"),
+        status: String(factor.status || "unknown"),
+        friendly_name: factor.friendly_name == null ? null : String(factor.friendly_name),
+      }));
+      setSecurityFactors(factors);
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to load platform security.");
+    } finally {
+      setSecurityLoading(false);
     }
   };
 
@@ -1325,7 +1374,72 @@ export default function PlatformOwnerControlPlane() {
         </section>
       )}
 
-      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && activeSection !== "activity" && activeSection !== "domains" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
+      {activeSection === "security" && (
+        <section className="owner-security-page" style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(16px,4vw,42px) 60px" }}>
+          <div className="owner-security-heading" style={{ display:"flex", justifyContent:"space-between", gap:16, alignItems:"start", flexWrap:"wrap" }}>
+            <div>
+              <div style={{ fontSize:11, fontWeight:900, color:"#4f46e5", letterSpacing:1.2 }}>PLATFORM PROTECTION</div>
+              <h2 style={{ margin:"5px 0", fontSize:28 }}>Security</h2>
+              <p style={{ margin:0, color:"#64748b", fontSize:13 }}>Monitor Owner access, MFA assurance, backend authorization and platform security signals. This page does not expose secrets or individual account data.</p>
+            </div>
+            <button type="button" style={button(true)} onClick={() => void loadSecurity()} disabled={securityLoading}>{securityLoading ? "Checking…" : "Refresh security"}</button>
+          </div>
+
+          {error && <div role="alert" style={{ marginTop:14, padding:12, borderRadius:12, background:"#fff1f2", color:"#b42318", border:"1px solid #fecdd3" }}>{error}</div>}
+
+          {securityLoading && !securityOverview ? (
+            <div className="owner-section-placeholder" style={{ marginTop:24 }}><div className="owner-placeholder-icon">🔐</div><h2>Checking security…</h2><p>Verifying the current Owner session and platform protection controls.</p></div>
+          ) : securityOverview && (
+            <>
+              <div className="owner-security-banner" style={{ marginTop:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:14, flexWrap:"wrap", background:"#fff", border:"1px solid #e7ebf2", borderRadius:20, padding:18 }}>
+                <div>
+                  <div style={{ fontSize:10, fontWeight:900, color:"#64748b", letterSpacing:.8 }}>OWNER ACCESS STATE</div>
+                  <div style={{ marginTop:5, fontSize:22, fontWeight:900 }}>{securityOverview.owner_access_granted ? "Protected & authorized" : "Verification required"}</div>
+                  <div style={{ marginTop:4, fontSize:11, color:"#64748b" }}>Backend owner gate: {securityOverview.backend_owner_gate ? "Active" : "Not active"}</div>
+                </div>
+                <div className="owner-security-status" data-tone={securityOverview.owner_access_granted && securityAal.current === "aal2" ? "healthy" : "attention"}>{securityOverview.owner_access_granted && securityAal.current === "aal2" ? "SECURE SESSION" : "ACTION REQUIRED"}</div>
+              </div>
+
+              <div className="owner-security-grid">
+                {[
+                  ["MFA policy", securityOverview.mfa_required ? "Required" : "Optional", securityOverview.mfa_required],
+                  ["Current assurance", securityAal.current?.toUpperCase() || "—", securityAal.current === "aal2"],
+                  ["Owner membership", securityOverview.owner_membership_present ? "Present" : "Missing", securityOverview.owner_membership_present],
+                  ["Audit logging", securityOverview.audit_logging_enabled ? "Available" : "Unavailable", securityOverview.audit_logging_enabled],
+                  ["TLS-active domains", securityOverview.domain_tls_active, securityOverview.domain_tls_failed === 0],
+                  ["TLS failures", securityOverview.domain_tls_failed, securityOverview.domain_tls_failed === 0],
+                ].map(([label,value,ok]) => <div key={String(label)} className="owner-security-card"><div style={{fontSize:10,fontWeight:900,color:"#64748b",letterSpacing:.5}}>{label}</div><div style={{fontSize:21,fontWeight:900,marginTop:7}}>{String(value)}</div><span className="owner-security-chip" data-tone={ok ? "healthy" : "attention"}>{ok ? "OK" : "Attention"}</span></div>)}
+              </div>
+
+              <section className="owner-security-detail" style={{ marginTop:14, background:"#fff", border:"1px solid #e7ebf2", borderRadius:20, padding:18 }}>
+                <div style={{fontWeight:900}}>MFA factors</div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:4}}>Only factor type, verification state and friendly name are shown. Secrets and recovery codes are never returned.</div>
+                <div className="owner-security-factor-list">
+                  {securityFactors.length ? securityFactors.map((factor) => <div key={factor.id} className="owner-security-factor">
+                    <div><strong>{factor.friendly_name || (factor.factor_type === "totp" ? "Authenticator app" : factor.factor_type)}</strong><span>{factor.factor_type.toUpperCase()}</span></div>
+                    <span className="owner-security-chip" data-tone={factor.status === "verified" ? "healthy" : "attention"}>{factor.status}</span>
+                  </div>) : <div className="owner-security-empty">No MFA factor is currently registered for this session.</div>}
+                </div>
+                <div style={{ marginTop:14, padding:12, borderRadius:12, background:"#f8fafc", color:"#64748b", fontSize:11, lineHeight:1.5 }}>
+                  The Owner login flow requires AAL2 before the control plane is unlocked. MFA enrollment and verification are handled through the dedicated Owner sign-in flow.
+                </div>
+              </section>
+
+              <section className="owner-security-detail" style={{ marginTop:14, background:"#fff", border:"1px solid #e7ebf2", borderRadius:20, padding:18 }}>
+                <div style={{fontWeight:900}}>Security architecture</div>
+                <div className="owner-security-architecture">
+                  <div><b>Google OAuth</b><span>Password login is not exposed on the Owner panel.</span></div>
+                  <div><b>Backend authorization</b><span>Owner RPCs check the platform-owner access gate server-side.</span></div>
+                  <div><b>Audit trail</b><span>Platform operations are recorded for operational review.</span></div>
+                  <div><b>Domain protection</b><span>{securityOverview.registered_domains} registered domain{securityOverview.registered_domains === 1 ? "" : "s"} · {securityOverview.domain_tls_active} TLS-active.</span></div>
+                </div>
+              </section>
+            </>
+          )}
+        </section>
+      )}
+
+            {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && activeSection !== "activity" && activeSection !== "domains" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
 
       {domainOpen && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!domainWorking) setDomainOpen(false); }} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.55)", display:"grid", placeItems:"center", padding:18, zIndex:1300 }}>
