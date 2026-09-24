@@ -223,3 +223,68 @@ export async function getPlatformStorageOverview(): Promise<PlatformStorageOverv
     }),
   };
 }
+
+
+export type PlatformHealthCheck = {
+  key: string;
+  label: string;
+  status: "healthy" | "degraded" | "attention";
+  message: string;
+  detail: string;
+};
+
+export type PlatformSystemHealth = {
+  overall: "healthy" | "degraded" | "attention";
+  checked_at: string;
+  summary: {
+    institutes: number;
+    active_institutes: number;
+    registered_domains: number;
+    primary_domains: number;
+    storage_buckets: number;
+    audit_events: number;
+  };
+  configuration: {
+    default_app_domain: string | null;
+    automatic_subdomains_enabled: boolean;
+  };
+  checks: PlatformHealthCheck[];
+};
+
+export async function getPlatformSystemHealth(): Promise<PlatformSystemHealth> {
+  const { data, error } = await supabase.rpc("platform_get_system_health");
+  if (error) throw error;
+
+  const raw = (data ?? {}) as Partial<PlatformSystemHealth>;
+  const summary = (raw.summary ?? {}) as Partial<PlatformSystemHealth["summary"]>;
+  const configuration = (raw.configuration ?? {}) as Partial<PlatformSystemHealth["configuration"]>;
+  const checks = Array.isArray(raw.checks) ? raw.checks : [];
+
+  return {
+    overall: raw.overall === "attention" || raw.overall === "degraded" ? raw.overall : "healthy",
+    checked_at: String(raw.checked_at ?? new Date().toISOString()),
+    summary: {
+      institutes: Number(summary.institutes) || 0,
+      active_institutes: Number(summary.active_institutes) || 0,
+      registered_domains: Number(summary.registered_domains) || 0,
+      primary_domains: Number(summary.primary_domains) || 0,
+      storage_buckets: Number(summary.storage_buckets) || 0,
+      audit_events: Number(summary.audit_events) || 0,
+    },
+    configuration: {
+      default_app_domain: configuration.default_app_domain == null ? null : String(configuration.default_app_domain),
+      automatic_subdomains_enabled: configuration.automatic_subdomains_enabled === true,
+    },
+    checks: checks.map((row) => {
+      const item = (row ?? {}) as Partial<PlatformHealthCheck>;
+      const status = item.status === "attention" || item.status === "degraded" ? item.status : "healthy";
+      return {
+        key: String(item.key ?? ""),
+        label: String(item.label ?? ""),
+        status,
+        message: String(item.message ?? ""),
+        detail: String(item.detail ?? ""),
+      };
+    }),
+  };
+}
