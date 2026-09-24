@@ -46,6 +46,23 @@ function errorIsUnauthorized(error: unknown) {
     /jwt|unauthorized/i.test(String((error as { message?: string } | null)?.message || ""));
 }
 
+function formatPercent(value: number) {
+  return Number.isFinite(value) ? `${Math.round(value)}%` : "0%";
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
+function statusTone(status: string) {
+  if (status === "active") return { background: "#ecfdf3", color: "#067647" };
+  if (status === "trial") return { background: "#eff8ff", color: "#175cd3" };
+  if (status === "suspended") return { background: "#fffaeb", color: "#b54708" };
+  if (status === "archived") return { background: "#f2f4f7", color: "#475467" };
+  return { background: "#fef3f2", color: "#b42318" };
+}
+
 export default function PlatformOwnerControlPlane() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -72,6 +89,7 @@ export default function PlatformOwnerControlPlane() {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsWorking, setSettingsWorking] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -94,6 +112,7 @@ export default function PlatformOwnerControlPlane() {
       setHasMore(page.has_more);
       setNextCursor(page.next_cursor);
       setCursor(next);
+      setLastRefreshedAt(new Date().toISOString());
     } catch (e) {
       if (requestId !== directoryRequestRef.current) return;
       if (errorIsUnauthorized(e)) {
@@ -259,6 +278,15 @@ export default function PlatformOwnerControlPlane() {
     finally { setSettingsWorking(false); }
   };
 
+  const refreshCommandCenter = async () => {
+    setError("");
+    await Promise.allSettled([
+      loadDirectory(null),
+      getPlatformInstituteStatusCounts().then(setCounts),
+    ]);
+    setLastRefreshedAt(new Date().toISOString());
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     setAuthenticated(false);
@@ -329,6 +357,49 @@ export default function PlatformOwnerControlPlane() {
           ))}
         </section>
 
+        <section style={{ marginTop: 16, display: "grid", gridTemplateColumns: "minmax(0,1.5fr) minmax(280px,1fr)", gap: 12 }}>
+          <div style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM PULSE</div>
+                <h2 style={{ margin: "5px 0 2px", fontSize: 20 }}>Command center</h2>
+                <div style={{ fontSize: 12, color: "#64748b" }}>A quick operational view built from platform-level aggregates.</div>
+              </div>
+              <button style={button(false)} onClick={() => void refreshCommandCenter()} disabled={directoryLoading}>↻ Refresh all</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginTop: 15 }}>
+              <div style={{ padding: 13, borderRadius: 14, background: "#f8fafc" }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b" }}>ACTIVE SHARE</div>
+                <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4 }}>{formatPercent((Number(counts.total) || 0) ? ((Number(counts.active) || 0) / (Number(counts.total) || 1)) * 100 : 0)}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>of all institutes</div>
+              </div>
+              <div style={{ padding: 13, borderRadius: 14, background: "#f8fafc" }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b" }}>TRIAL SHARE</div>
+                <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4 }}>{formatPercent((Number(counts.total) || 0) ? ((Number(counts.trial) || 0) / (Number(counts.total) || 1)) * 100 : 0)}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>currently in trial</div>
+              </div>
+              <div style={{ padding: 13, borderRadius: 14, background: "#f8fafc" }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b" }}>ATTENTION QUEUE</div>
+                <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4 }}>{(Number(counts.suspended) || 0) + (Number(counts.archived) || 0)}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>suspended + archived</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+            <div style={{ fontSize: 11, fontWeight: 900, color: "#64748b", letterSpacing: 1 }}>QUICK FILTERS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+              {(["all", "active", "trial", "suspended", "archived"] as const).map((nextStatus) => (
+                <button key={nextStatus} onClick={() => { setStatus(nextStatus); setCursor(null); }} style={{ ...button(status !== nextStatus), textTransform: "capitalize", padding: "9px 12px" }}>
+                  {nextStatus}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #eef1f6", fontSize: 11, color: "#64748b" }}>
+              Last refreshed: <b style={{ color: "#24324a" }}>{formatDateTime(lastRefreshedAt)}</b>
+            </div>
+          </div>
+        </section>
+
         <section style={{ marginTop: 16, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, overflow: "hidden" }}>
           <div style={{ padding: 18, borderBottom: "1px solid #eef1f6", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <input
@@ -366,7 +437,7 @@ export default function PlatformOwnerControlPlane() {
                   <tr key={institute.id} style={{ borderTop: "1px solid #eef1f6" }}>
                     <td style={{ padding: 13, fontWeight: 900 }}>{institute.name}</td>
                     <td style={{ padding: 13, fontSize: 12, color: "#64748b" }}>{institute.slug}</td>
-                    <td style={{ padding: 13 }}><span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>{institute.status}</span></td>
+                    <td style={{ padding: 13 }}><span style={{ ...statusTone(institute.status), display: "inline-flex", padding: "5px 9px", borderRadius: 999, fontSize: 10, fontWeight: 900, textTransform: "uppercase" }}>{institute.status}</span></td>
                     <td style={{ padding: 13, fontSize: 12, color: "#64748b" }}>{new Date(institute.created_at).toLocaleString()}</td>
                     <td style={{ padding: 13 }}><button style={button(false)} onClick={() => void openOverview(institute)}>View health</button></td>
                   </tr>
@@ -437,15 +508,52 @@ export default function PlatformOwnerControlPlane() {
               <div>
                 <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.4 }}>READ-ONLY INSTITUTE HEALTH</div>
                 <h2 style={{ margin: "5px 0 2px" }}>{selected.name}</h2>
-                <div style={{ fontSize: 12, color: "#64748b" }}>{selected.slug} · {selected.status}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>{selected.slug} · {selected.status} · created {formatDateTime(selected.created_at)}</div>
               </div>
-              <button style={button(false)} onClick={() => setSelected(null)}>Close</button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button style={button(false)} onClick={() => void navigator.clipboard?.writeText(selected.slug)}>Copy slug</button>
+                <button style={button(false)} onClick={() => setSelected(null)}>Close</button>
+              </div>
             </div>
             {overviewLoading && <div style={{ padding: 28, color: "#64748b" }}>Loading institute health…</div>}
             {overview && (
               <div style={{ marginTop: 18 }}>
                 <div style={{ padding: 13, borderRadius: 14, background: "#f8fafc", border: "1px solid #e7ebf2", fontSize: 12 }}>
                   <b>Monitoring only.</b> The platform owner can see institute health, but cannot edit students, teachers, admin roles, or institute-managed records here.
+                </div>
+                <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10 }}>
+                  {[
+                    ["People", overview.people.total_active > 0 ? "Configured" : "No active members"],
+                    ["Admin coverage", overview.people.admin_portals > 0 ? "Admin portal present" : "Needs admin portal"],
+                    ["Storage", overview.storage.limit_bytes ? "Quota configured" : "Quota not configured"],
+                    ["Content", (overview.activity.materials + overview.activity.homework + overview.activity.tests) > 0 ? "Content is present" : "No tracked content yet"],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ padding: 13, borderRadius: 14, border: "1px solid #e7ebf2", background: "#fff" }}>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b" }}>{label}</div>
+                      <div style={{ marginTop: 5, fontSize: 14, fontWeight: 900 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 14, padding: 16, borderRadius: 16, border: "1px solid #e7ebf2" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div><b>Content footprint</b><div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>Tracked activity records across the institute.</div></div>
+                    <strong>{overview.activity.materials + overview.activity.homework + overview.activity.tests + overview.activity.announcements}</strong>
+                  </div>
+                  {[
+                    ["Study materials", overview.activity.materials],
+                    ["Homework", overview.activity.homework],
+                    ["Tests", overview.activity.tests],
+                    ["Announcements", overview.activity.announcements],
+                  ].map(([label, value]) => {
+                    const total = overview.activity.materials + overview.activity.homework + overview.activity.tests + overview.activity.announcements;
+                    const width = total ? Math.max(3, (Number(value) / total) * 100) : 0;
+                    return (
+                      <div key={String(label)} style={{ marginTop: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b" }}><span>{label}</span><b style={{ color: "#24324a" }}>{Number(value)}</b></div>
+                        <div style={{ height: 7, marginTop: 5, borderRadius: 999, background: "#edf0f5", overflow: "hidden" }}><div style={{ height: "100%", width: width + "%", background: "#4f46e5", borderRadius: 999 }} /></div>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 10 }}>
                   {[
