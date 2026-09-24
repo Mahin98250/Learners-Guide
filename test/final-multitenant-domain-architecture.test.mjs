@@ -10,6 +10,10 @@ const portal = fs.readFileSync(
   new URL("../src/platform/PlatformOwnerPortal.tsx", import.meta.url),
   "utf8"
 );
+const controlPlane = fs.readFileSync(
+  new URL("../src/platform/PlatformOwnerControlPlane.tsx", import.meta.url),
+  "utf8"
+);
 
 test("final multi-tenant provisioning creates platform-managed default subdomains when enabled", () => {
   assert.match(migration, /default_subdomains_enabled/);
@@ -54,4 +58,17 @@ test("PDF compression worker uses explicit infrastructure configuration", () => 
   assert.match(pdfJobs, /PDF_COMPRESSION_RASTER_WORKER_URL/);
   assert.match(pdfJobs, /structural fallback will be used/);
   assert.doesNotMatch(pdfJobs, /mahin\.vercel\.app/);
+});
+
+
+test("primary Owner control plane exposes platform domain settings and tenant domain lifecycle controls", () => {
+  assert.match(controlPlane, /platform_settings/);
+  assert.match(controlPlane, /platform_update_settings/);
+  assert.match(controlPlane, /default_subdomains_enabled/);
+  assert.match(controlPlane, /register_institute_domain/);
+  assert.match(controlPlane, /platform_record_domain_dns_verified/);
+  assert.match(controlPlane, /platform_set_domain_tls_status/);
+  assert.match(controlPlane, /platform_set_primary_domain/);
+  assert.match(controlPlane, /platform_disable_domain/);
+  assert.match(controlPlane, /Add custom domain/);
 });
