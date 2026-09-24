@@ -61,14 +61,15 @@ test("PDF compression worker uses explicit infrastructure configuration", () => 
 });
 
 
-test("primary Owner control plane exposes platform domain settings and tenant domain lifecycle controls", () => {
-  assert.match(controlPlane, /platform_settings/);
-  assert.match(controlPlane, /platform_update_settings/);
-  assert.match(controlPlane, /default_subdomains_enabled/);
-  assert.match(controlPlane, /register_institute_domain/);
-  assert.match(controlPlane, /platform_record_domain_dns_verified/);
-  assert.match(controlPlane, /platform_set_domain_tls_status/);
-  assert.match(controlPlane, /platform_set_primary_domain/);
-  assert.match(controlPlane, /platform_disable_domain/);
-  assert.match(controlPlane, /Add custom domain/);
+test("platform domain lifecycle controls remain in the dedicated platform operations surface", () => {
+  assert.doesNotMatch(controlPlane, /register_institute_domain/);
+  assert.doesNotMatch(controlPlane, /platform_record_domain_dns_verified/);
+  assert.doesNotMatch(controlPlane, /platform_set_domain_tls_status/);
+  assert.doesNotMatch(controlPlane, /platform_set_primary_domain/);
+  assert.doesNotMatch(controlPlane, /platform_disable_domain/);
+  assert.match(portal, /register_institute_domain/);
+  assert.match(portal, /platform_record_domain_dns_verified/);
+  assert.match(portal, /platform_set_domain_tls_status/);
+  assert.match(portal, /platform_set_primary_domain/);
+  assert.match(portal, /platform_disable_domain/);
 });

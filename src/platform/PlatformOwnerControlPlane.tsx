@@ -1,21 +1,18 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PlatformOwnerLogin from "@/platform/PlatformOwnerLogin";
 import {
-  getPlatformInstituteDetail,
+  getPlatformInstituteOverview,
   getPlatformInstituteStatusCounts,
   invalidatePlatformInstituteStatusCounts,
   listPlatformInstitutes,
   type PlatformInstitute,
   type PlatformInstituteCursor,
-  type PlatformInstituteDetail,
+  type PlatformInstituteOverview,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
 
-type PlatformDomain = PlatformInstituteDetail["domains"][number];
 type PlatformSettings = { product_name: string; legal_name: string; public_website_url: string; default_app_domain: string; support_email: string; default_timezone: string; settings: Record<string, unknown> };
 import "./owner-liquid-glass.css";
-
-const LegacyOperations = lazy(() => import("@/platform/PlatformOwnerPortal"));
 
 const shell = {
   minHeight: "100vh",
@@ -33,6 +30,16 @@ const button = (primary = true) => ({
   background: primary ? "#4f46e5" : "#e8ecf5",
   color: primary ? "#fff" : "#24324a",
 });
+
+function formatBytes(bytes: number | null) {
+  if (bytes == null) return "Not configured";
+  if (bytes < 1024) return bytes + " B";
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let index = -1;
+  do { value /= 1024; index += 1; } while (value >= 1024 && index < units.length - 1);
+  return value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2) + " " + units[index];
+}
 
 function errorIsUnauthorized(error: unknown) {
   return Number((error as { status?: number } | null)?.status) === 401 ||
@@ -55,10 +62,8 @@ export default function PlatformOwnerControlPlane() {
   const [directoryLoading, setDirectoryLoading] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<PlatformInstitute | null>(null);
-  const [detail, setDetail] = useState<PlatformInstituteDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [statusWorking, setStatusWorking] = useState(false);
-  const [operationsOpen, setOperationsOpen] = useState(false);
+  const [overview, setOverview] = useState<PlatformInstituteOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createSlug, setCreateSlug] = useState("");
@@ -67,11 +72,6 @@ export default function PlatformOwnerControlPlane() {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsWorking, setSettingsWorking] = useState(false);
-  const [domainOpen, setDomainOpen] = useState(false);
-  const [domainHostname, setDomainHostname] = useState("");
-  const [domainWorking, setDomainWorking] = useState("");
-  const [domainNotice, setDomainNotice] = useState("");
-  const [domainVerificationToken, setDomainVerificationToken] = useState("");
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -188,17 +188,17 @@ export default function PlatformOwnerControlPlane() {
     })();
   }, [authenticated]);
 
-  const openDetail = async (institute: PlatformInstitute) => {
+  const openOverview = async (institute: PlatformInstitute) => {
     setSelected(institute);
-    setDetail(null);
-    setDetailLoading(true);
+    setOverview(null);
+    setOverviewLoading(true);
     setError("");
     try {
-      setDetail(await getPlatformInstituteDetail(institute.id));
+      setOverview(await getPlatformInstituteOverview(institute.id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to load institute details.");
+      setError(e instanceof Error ? e.message : "Unable to load institute overview.");
     } finally {
-      setDetailLoading(false);
+      setOverviewLoading(false);
     }
   };
 
@@ -236,36 +236,6 @@ export default function PlatformOwnerControlPlane() {
     }
   };
 
-  const changeInstituteStatus = async (nextStatus: "trial" | "active" | "suspended" | "archived") => {
-    if (!selected || statusWorking || selected.status === nextStatus) return;
-    setStatusWorking(true);
-    setError("");
-    try {
-      const result = await supabase.rpc("platform_set_institute_status", {
-        p_institute_id: selected.id,
-        p_status: nextStatus,
-      });
-      if (result.error) throw result.error;
-      setSelected({ ...selected, status: nextStatus });
-      setDetail((current) => current ? { ...current, institute: { ...current.institute, status: nextStatus } } : current);
-      invalidatePlatformInstituteStatusCounts();
-      await Promise.all([
-        loadDirectory(null),
-        getPlatformInstituteStatusCounts().then(setCounts),
-      ]);
-    } catch (e) {
-      if (errorIsUnauthorized(e)) {
-        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-        setAuthenticated(false);
-        setAllowed(false);
-        return;
-      }
-      setError(e instanceof Error ? e.message : "Unable to change institute status.");
-    } finally {
-      setStatusWorking(false);
-    }
-  };
-
   const savePlatformSettings = async () => {
     if (!platformSettings || settingsWorking) return;
     setSettingsWorking(true); setError("");
@@ -287,44 +257,6 @@ export default function PlatformOwnerControlPlane() {
       setSettingsOpen(false);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save platform settings."); }
     finally { setSettingsWorking(false); }
-  };
-
-  const refreshSelected = async () => {
-    if (!selected) return;
-    setDetail(await getPlatformInstituteDetail(selected.id));
-  };
-
-  const registerDomain = async () => {
-    if (!selected || !domainHostname.trim() || domainWorking) return;
-    setDomainWorking("register"); setDomainNotice(""); setDomainVerificationToken(""); setError("");
-    try {
-      const result = await supabase.rpc("register_institute_domain", {
-        p_institute_id: selected.id, p_hostname: domainHostname.trim().toLowerCase(), p_domain_type: "custom",
-      });
-      if (result.error) throw result.error;
-      const row = Array.isArray(result.data) ? result.data[0] : result.data;
-      setDomainHostname(""); setDomainOpen(false);
-      setDomainVerificationToken(String(row?.verification_token || ""));
-      setDomainNotice("Custom domain registered. Give the domain owner the verification token below, then complete DNS verification.");
-      await refreshSelected();
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to register domain."); }
-    finally { setDomainWorking(""); }
-  };
-
-  const domainAction = async (domain: PlatformDomain, action: "verify" | "tls" | "primary" | "disable") => {
-    if (domainWorking) return;
-    setDomainWorking(action); setError(""); setDomainNotice("");
-    try {
-      let result;
-      if (action === "verify") result = await supabase.rpc("platform_record_domain_dns_verified", { p_domain_id: domain.id });
-      else if (action === "tls") result = await supabase.rpc("platform_set_domain_tls_status", { p_domain_id: domain.id, p_tls_status: "active" });
-      else if (action === "primary") result = await supabase.rpc("platform_set_primary_domain", { p_domain_id: domain.id });
-      else result = await supabase.rpc("platform_disable_domain", { p_domain_id: domain.id });
-      if (result.error) throw result.error;
-      await refreshSelected();
-      setDomainNotice(action === "disable" ? "Domain disabled." : "Domain updated successfully.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to update domain."); }
-    finally { setDomainWorking(""); }
   };
 
   const signOut = async () => {
@@ -357,20 +289,6 @@ export default function PlatformOwnerControlPlane() {
     );
   }
 
-  if (operationsOpen) {
-    return (
-      <Suspense
-        fallback={
-          <main style={{ ...shell, display: "grid", placeItems: "center" }}>
-            Loading full platform operations…
-          </main>
-        }
-      >
-        <LegacyOperations />
-      </Suspense>
-    );
-  }
-
   if (loading) {
     return <main className="owner-liquid-glass owner-state-card" style={{ ...shell, display: "grid", placeItems: "center" }}>Loading tenant directory…</main>;
   }
@@ -381,8 +299,8 @@ export default function PlatformOwnerControlPlane() {
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.6, opacity: .72 }}>PLATFORM OWNER · CONTROL PLANE</div>
-            <h1 style={{ margin: "5px 0", fontSize: "clamp(28px,4vw,40px)" }}>Tenant Directory</h1>
-            <div style={{ opacity: .75 }}>Bounded, searchable institute operations for the multi-tenant platform.</div>
+            <h1 style={{ margin: "5px 0", fontSize: "clamp(28px,4vw,40px)" }}>Institute Overview</h1>
+            <div style={{ opacity: .75 }}>Monitor institute health without changing institute-managed data.</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => setSettingsOpen(true)} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Platform settings</button>
@@ -440,7 +358,7 @@ export default function PlatformOwnerControlPlane() {
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
               <thead>
                 <tr style={{ textAlign: "left", background: "#f8fafc" }}>
-                  {["Institute", "Slug", "Status", "Created", "Details"].map((heading) => <th key={heading} style={{ padding: 12, fontSize: 11, color: "#64748b" }}>{heading}</th>)}
+                  {["Institute", "Slug", "Status", "Created", "Overview"].map((heading) => <th key={heading} style={{ padding: 12, fontSize: 11, color: "#64748b" }}>{heading}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -450,7 +368,7 @@ export default function PlatformOwnerControlPlane() {
                     <td style={{ padding: 13, fontSize: 12, color: "#64748b" }}>{institute.slug}</td>
                     <td style={{ padding: 13 }}><span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>{institute.status}</span></td>
                     <td style={{ padding: 13, fontSize: 12, color: "#64748b" }}>{new Date(institute.created_at).toLocaleString()}</td>
-                    <td style={{ padding: 13 }}><button style={button(false)} onClick={() => void openDetail(institute)}>Open</button></td>
+                    <td style={{ padding: 13 }}><button style={button(false)} onClick={() => void openOverview(institute)}>View health</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -468,14 +386,7 @@ export default function PlatformOwnerControlPlane() {
           </div>
         </section>
 
-        <section style={{ marginTop: 16, padding: 18, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: "#2563eb", letterSpacing: 1 }}>LAZY OPERATIONS</div>
-          <h2 style={{ margin: "4px 0" }}>Advanced platform controls</h2>
-          <p style={{ margin: "6px 0 14px", color: "#64748b", fontSize: 13 }}>
-            Provisioning, domains, entitlements, administrator invitations, messaging, audit and platform settings are loaded only when you open the full operations surface.
-          </p>
-          <button style={button(true)} onClick={() => setOperationsOpen(true)}>Open full platform operations</button>
-        </section>
+
       </div>
 
       {createOpen && (
@@ -521,87 +432,70 @@ export default function PlatformOwnerControlPlane() {
 
       {selected && (
         <div role="dialog" aria-modal="true" onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1100 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(760px,100%)", maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 24, padding: 24, boxShadow: "0 30px 80px rgba(15,23,42,.25)" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(820px,100%)", maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 24, padding: 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "start" }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.4 }}>TENANT DETAIL · ON DEMAND</div>
+                <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.4 }}>READ-ONLY INSTITUTE HEALTH</div>
                 <h2 style={{ margin: "5px 0 2px" }}>{selected.name}</h2>
                 <div style={{ fontSize: 12, color: "#64748b" }}>{selected.slug} · {selected.status}</div>
               </div>
               <button style={button(false)} onClick={() => setSelected(null)}>Close</button>
             </div>
-
-            {detailLoading && <div style={{ padding: 28, color: "#64748b" }}>Loading tenant details…</div>}
-
-            {detail && (
+            {overviewLoading && <div style={{ padding: 28, color: "#64748b" }}>Loading institute health…</div>}
+            {overview && (
               <div style={{ marginTop: 18 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
+                <div style={{ padding: 13, borderRadius: 14, background: "#f8fafc", border: "1px solid #e7ebf2", fontSize: 12 }}>
+                  <b>Monitoring only.</b> The platform owner can see institute health, but cannot edit students, teachers, admin roles, or institute-managed records here.
+                </div>
+                <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 10 }}>
                   {[
-                    ["Members", detail.membership_count],
-                    ["Active members", detail.active_membership_count],
-                    ["Domains", detail.domains.length],
-                    ["Entitlements", detail.entitlements.length],
+                    ["Students", overview.people.students],
+                    ["Teachers", overview.people.teachers],
+                    ["Admin portals", overview.people.admin_portals],
+                    ["Active members", overview.people.total_active],
                   ].map(([label, value]) => (
-                    <div key={String(label)} style={{ padding: 14, borderRadius: 14, background: "#f8fafc", border: "1px solid #e7ebf2" }}>
+                    <div key={String(label)} style={{ padding: 15, borderRadius: 16, background: "#f8fafc", border: "1px solid #e7ebf2" }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b" }}>{label}</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, marginTop: 4 }}>{Number(value) || 0}</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, marginTop: 5 }}>{Number(value)}</div>
                     </div>
                   ))}
                 </div>
-
-                <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                    <div>
-                      <b>Institute status</b>
-                      <div style={{ marginTop: 5, fontSize: 12, color: "#64748b" }}>Change the workspace lifecycle state from the fast control center.</div>
-                    </div>
-                    <select
-                      value={selected.status}
-                      disabled={statusWorking}
-                      onChange={(e) => void changeInstituteStatus(e.target.value as "trial" | "active" | "suspended" | "archived")}
-                      style={{ padding: 10, borderRadius: 10, border: "1px solid #d8dee9", fontWeight: 800 }}
-                      aria-label="Institute status"
-                    >
-                      <option value="trial">Trial</option>
-                      <option value="active">Active</option>
-                      <option value="suspended">Suspended</option>
-                      <option value="archived">Archived</option>
-                    </select>
+                <div style={{ marginTop: 14, padding: 16, borderRadius: 16, border: "1px solid #e7ebf2" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div><b>Storage</b><div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>Tracked study-material and homework file usage.</div></div>
+                    <strong>{formatBytes(overview.storage.used_bytes)} / {formatBytes(overview.storage.limit_bytes)}</strong>
                   </div>
-                  {statusWorking && <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>Saving status…</div>}
+                  <div style={{ height: 10, borderRadius: 999, background: "#e8ecf5", marginTop: 12, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: overview.storage.limit_bytes ? String(Math.min(100, overview.storage.used_bytes / overview.storage.limit_bytes * 100)) + "%" : "0%", background: "#4f46e5" }} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginTop: 12 }}>
+                    <div><div style={{ fontSize: 10, color: "#64748b" }}>Study materials</div><b>{formatBytes(overview.storage.tracked_sources.study_materials_bytes)}</b></div>
+                    <div><div style={{ fontSize: 10, color: "#64748b" }}>Homework files</div><b>{formatBytes(overview.storage.tracked_sources.homework_bytes)}</b></div>
+                  </div>
                 </div>
-
-                <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><b>Domains</b><button style={button(true)} onClick={() => { setDomainNotice(""); setDomainVerificationToken(""); setDomainOpen(true); }}>＋ Add custom domain</button></div>
-                  {domainNotice && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#f0fdf4", color: "#166534", fontSize: 11 }}>{domainNotice}{domainVerificationToken && <div style={{ marginTop: 7, fontFamily: "monospace", wordBreak: "break-all", padding: 8, background: "#fff", borderRadius: 8 }}>{domainVerificationToken}</div>}</div>}
-                  {detail.domains.length ? detail.domains.map((domain) => (
-                    <div key={domain.id} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eef1f6" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", flexWrap: "wrap" }}>
-                        <div style={{ fontSize: 12 }}><strong>{domain.hostname}</strong><div style={{ marginTop: 4, color: "#64748b" }}>{domain.domain_type === "default_subdomain" ? "Platform subdomain" : "Custom domain"} · {domain.status} · TLS {domain.tls_status}{domain.is_primary ? " · primary" : ""}</div></div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {domain.status === "pending" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "verify")}>Record DNS verified</button>}
-                          {domain.status === "verified" && domain.tls_status !== "active" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "tls")}>Mark TLS active</button>}
-                          {domain.status === "verified" && !domain.is_primary && domain.tls_status !== "failed" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "primary")}>Make primary</button>}
-                          {!domain.is_primary && domain.status !== "disabled" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "disable")}>Disable</button>}
-                        </div>
+                <div style={{ marginTop: 14, padding: 16, borderRadius: 16, border: "1px solid #e7ebf2" }}>
+                  <b>Institute activity</b>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 10, marginTop: 12 }}>
+                    {[
+                      ["Study materials", overview.activity.materials],
+                      ["Homework", overview.activity.homework],
+                      ["Tests", overview.activity.tests],
+                      ["Announcements", overview.activity.announcements],
+                      ["Attendance records", overview.activity.attendance_records],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} style={{ padding: 12, borderRadius: 12, background: "#f8fafc" }}>
+                        <div style={{ fontSize: 10, color: "#64748b" }}>{label}</div>
+                        <b style={{ fontSize: 20 }}>{Number(value)}</b>
                       </div>
-                    </div>
-                  )) : <div style={{ marginTop: 8, color: "#64748b", fontSize: 12 }}>No domains registered.</div>}
-                </div>
-
-                <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
-                  <b>Feature entitlements</b>
-                  {detail.entitlements.length ? detail.entitlements.map((item) => (
-                    <div key={item.feature_code} style={{ display: "flex", justifyContent: "space-between", marginTop: 9, paddingTop: 9, borderTop: "1px solid #eef1f6", fontSize: 12 }}>
-                      <span>{item.feature_code}</span><strong>{item.enabled ? "Enabled" : "Disabled"}</strong>
-                    </div>
-                  )) : <div style={{ marginTop: 8, color: "#64748b", fontSize: 12 }}>No explicit entitlement overrides.</div>}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       )}
+
       {settingsOpen && platformSettings && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(680px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
@@ -614,17 +508,6 @@ export default function PlatformOwnerControlPlane() {
             <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 15, padding: 12, borderRadius: 12, background: "#f8fafc", fontSize: 12 }}><input type="checkbox" checked={platformSettings.settings.default_subdomains_enabled === true} onChange={(e) => setPlatformSettings({...platformSettings,settings:{...platformSettings.settings,default_subdomains_enabled:e.target.checked}})} /><span><b>Enable automatic institute subdomains</b><br/><span style={{ color: "#64748b" }}>New institutes get slug + default app domain automatically.</span></span></label>
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#fffbeb", color: "#92400e", fontSize: 11 }}>Enable this only after wildcard DNS and TLS are configured for the platform domain.</div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}><button disabled={settingsWorking} style={button(false)} onClick={() => setSettingsOpen(false)}>Cancel</button><button disabled={settingsWorking} style={button(true)} onClick={() => void savePlatformSettings()}>{settingsWorking ? "Saving…" : "Save settings"}</button></div>
-          </div>
-        </div>
-      )}
-
-      {domainOpen && selected && (
-        <div role="dialog" aria-modal="true" onClick={() => { if (!domainWorking) setDomainOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1400 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}><div><b>ADD CUSTOM DOMAIN</b><h2 style={{ margin: "5px 0" }}>Connect a domain</h2></div><button style={button(false)} onClick={() => setDomainOpen(false)}>Close</button></div>
-            <label style={{ display: "block", marginTop: 18, fontSize: 12, fontWeight: 800 }}>Hostname<input autoFocus value={domainHostname} onChange={(e) => setDomainHostname(e.target.value)} placeholder="academy.com" style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} /></label>
-            <div style={{ marginTop: 12, padding: 12, background: "#f8fafc", borderRadius: 12, fontSize: 11, color: "#64748b" }}>Register the domain, configure DNS verification, then record verification and activate TLS after the certificate is ready.</div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}><button style={button(false)} onClick={() => setDomainOpen(false)}>Cancel</button><button disabled={!domainHostname.trim() || !!domainWorking} style={button(true)} onClick={() => void registerDomain()}>{domainWorking === "register" ? "Registering…" : "Register domain"}</button></div>
           </div>
         </div>
       )}

@@ -39,8 +39,9 @@ test("Directory and lazy-detail queries have scale-oriented indexes", () => {
   assert.match(performanceMigration, /institute_memberships_institute_status_idx/);
 });
 
-test("The heavy legacy Owner operations stay out of the initial control-plane bundle", () => {
-  assert.match(controlPlane, /lazy\(\(\) => import\("@\/platform\/PlatformOwnerPortal"\)\)/);
+test("The initial Owner control plane does not load the legacy institute operations surface", () => {
+  assert.doesNotMatch(controlPlane, /PlatformOwnerPortal/);
+  assert.doesNotMatch(controlPlane, /lazy\(\(\) => import\("@\/platform\/PlatformOwnerPortal"\)\)/);
 });
 
 test("The full Owner operations surface does not poll every 30 seconds in the background", () => {
