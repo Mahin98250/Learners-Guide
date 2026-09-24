@@ -95,7 +95,7 @@ export async function getPlatformInstituteStatusCounts(): Promise<Record<string,
   return statusCountsPromise;
 }
 
-export type PlatformInstituteDetail = {
+export type PlatformInstituteOverview = {
   institute: {
     id: string;
     name: string;
@@ -103,45 +103,66 @@ export type PlatformInstituteDetail = {
     status: string;
     created_at: string;
   };
-  settings: Record<string, unknown> | null;
-  domains: Array<{
-    id: string;
-    hostname: string;
-    domain_type: string;
-    status: string;
-    tls_status: string;
-    is_primary: boolean;
-    verified_at: string | null;
-    created_at: string;
-  }>;
-  entitlements: Array<{
-    feature_code: string;
-    enabled: boolean;
-  }>;
-  membership_count: number;
-  active_membership_count: number;
+  people: {
+    students: number;
+    teachers: number;
+    admin_portals: number;
+    total_active: number;
+  };
+  activity: {
+    materials: number;
+    homework: number;
+    tests: number;
+    announcements: number;
+    attendance_records: number;
+  };
+  storage: {
+    used_bytes: number;
+    limit_bytes: number | null;
+    tracked_sources: {
+      study_materials_bytes: number;
+      homework_bytes: number;
+    };
+  };
 };
 
-export async function getPlatformInstituteDetail(
+export async function getPlatformInstituteOverview(
   instituteId: string,
-): Promise<PlatformInstituteDetail> {
-  const { data, error } = await supabase.rpc("platform_get_institute_detail", {
+): Promise<PlatformInstituteOverview> {
+  const { data, error } = await supabase.rpc("platform_get_institute_overview", {
     p_institute_id: instituteId,
   });
 
   if (error) throw error;
 
-  const raw = (data ?? {}) as Partial<PlatformInstituteDetail>;
+  const raw = (data ?? {}) as Partial<PlatformInstituteOverview>;
+  const people = (raw.people ?? {}) as Partial<PlatformInstituteOverview["people"]>;
+  const activity = (raw.activity ?? {}) as Partial<PlatformInstituteOverview["activity"]>;
+  const storage = (raw.storage ?? {}) as Partial<PlatformInstituteOverview["storage"]>;
+  const tracked = (storage.tracked_sources ?? {}) as Partial<PlatformInstituteOverview["storage"]["tracked_sources"]>;
+
   return {
-    institute: raw.institute as PlatformInstituteDetail["institute"],
-    settings: raw.settings ?? null,
-    domains: Array.isArray(raw.domains)
-      ? (raw.domains as PlatformInstituteDetail["domains"])
-      : [],
-    entitlements: Array.isArray(raw.entitlements)
-      ? (raw.entitlements as PlatformInstituteDetail["entitlements"])
-      : [],
-    membership_count: Number(raw.membership_count) || 0,
-    active_membership_count: Number(raw.active_membership_count) || 0,
+    institute: raw.institute as PlatformInstituteOverview["institute"],
+    people: {
+      students: Number(people.students) || 0,
+      teachers: Number(people.teachers) || 0,
+      admin_portals: Number(people.admin_portals) || 0,
+      total_active: Number(people.total_active) || 0,
+    },
+    activity: {
+      materials: Number(activity.materials) || 0,
+      homework: Number(activity.homework) || 0,
+      tests: Number(activity.tests) || 0,
+      announcements: Number(activity.announcements) || 0,
+      attendance_records: Number(activity.attendance_records) || 0,
+    },
+    storage: {
+      used_bytes: Number(storage.used_bytes) || 0,
+      limit_bytes: storage.limit_bytes == null ? null : Number(storage.limit_bytes) || null,
+      tracked_sources: {
+        study_materials_bytes: Number(tracked.study_materials_bytes) || 0,
+        homework_bytes: Number(tracked.homework_bytes) || 0,
+      },
+    },
   };
 }
