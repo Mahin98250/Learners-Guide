@@ -31,7 +31,11 @@ const button = (primary = true) => ({
   color: primary ? "#fff" : "#24324a",
 });
 
-const OWNER_NAV = [
+type OwnerNavItem = { key: string; icon: string; label: string };
+
+type OwnerNavGroup = { group: string; items: OwnerNavItem[] };
+
+const OWNER_NAV: OwnerNavGroup[] = [
   { group: "Overview", items: [
     { key: "dashboard", icon: "⌂", label: "Dashboard" },
     { key: "institutes", icon: "🏫", label: "Institutes" },
