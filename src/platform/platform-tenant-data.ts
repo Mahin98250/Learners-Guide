@@ -389,3 +389,98 @@ export async function getPlatformAnalytics(
     }),
   };
 }
+
+
+export type PlatformAuditCategoryCount = {
+  category: string;
+  count: number;
+};
+
+export type PlatformAuditEvent = {
+  id: string;
+  institute_id: string | null;
+  institute_name: string;
+  institute_slug: string | null;
+  action: string;
+  category: string;
+  entity_type: string | null;
+  summary: string | null;
+  created_at: string;
+};
+
+export type PlatformAuditCursor = {
+  created_at: string;
+  id: string;
+};
+
+export type PlatformAuditOverview = {
+  range_days: number;
+  range_start: string;
+  total_events: number;
+  last_24h_events: number;
+  institutes_with_activity: number;
+  categories: PlatformAuditCategoryCount[];
+  events: PlatformAuditEvent[];
+  has_more: boolean;
+  next_cursor: PlatformAuditCursor | null;
+};
+
+export type PlatformAuditActivityParams = {
+  days?: number;
+  category?: string;
+  search?: string;
+  limit?: number;
+  cursor?: PlatformAuditCursor | null;
+};
+
+export async function getPlatformAuditActivity(
+  params: PlatformAuditActivityParams = {},
+): Promise<PlatformAuditOverview> {
+  const { data, error } = await supabase.rpc("platform_get_audit_activity", {
+    p_days: params.days ?? 30,
+    p_category: params.category && params.category !== "all" ? params.category : null,
+    p_search: String(params.search ?? "").trim() || null,
+    p_limit: params.limit ?? 50,
+    p_cursor_created_at: params.cursor?.created_at ?? null,
+    p_cursor_id: params.cursor?.id ?? null,
+  });
+  if (error) throw error;
+
+  const raw = (data ?? {}) as Partial<PlatformAuditOverview>;
+  const categories = Array.isArray(raw.categories) ? raw.categories : [];
+  const events = Array.isArray(raw.events) ? raw.events : [];
+  const nextCursor = raw.next_cursor as Partial<PlatformAuditCursor> | null | undefined;
+
+  return {
+    range_days: Number(raw.range_days) || params.days || 30,
+    range_start: String(raw.range_start ?? new Date().toISOString()),
+    total_events: Number(raw.total_events) || 0,
+    last_24h_events: Number(raw.last_24h_events) || 0,
+    institutes_with_activity: Number(raw.institutes_with_activity) || 0,
+    categories: categories.map((row) => {
+      const item = (row ?? {}) as Partial<PlatformAuditCategoryCount>;
+      return {
+        category: String(item.category ?? ""),
+        count: Number(item.count) || 0,
+      };
+    }),
+    events: events.map((row) => {
+      const item = (row ?? {}) as Partial<PlatformAuditEvent>;
+      return {
+        id: String(item.id ?? ""),
+        institute_id: item.institute_id == null ? null : String(item.institute_id),
+        institute_name: String(item.institute_name ?? "Platform"),
+        institute_slug: item.institute_slug == null ? null : String(item.institute_slug),
+        action: String(item.action ?? ""),
+        category: String(item.category ?? "other"),
+        entity_type: item.entity_type == null ? null : String(item.entity_type),
+        summary: item.summary == null ? null : String(item.summary),
+        created_at: String(item.created_at ?? ""),
+      };
+    }),
+    has_more: raw.has_more === true,
+    next_cursor: nextCursor?.created_at && nextCursor?.id
+      ? { created_at: String(nextCursor.created_at), id: String(nextCursor.id) }
+      : null,
+  };
+}

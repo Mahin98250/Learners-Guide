@@ -14,6 +14,8 @@ import {
   getPlatformSystemHealth,
   type PlatformAnalyticsOverview,
   getPlatformAnalytics,
+  type PlatformAuditOverview,
+  getPlatformAuditActivity,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
 
@@ -129,6 +131,12 @@ export default function PlatformOwnerControlPlane() {
   const [analyticsOverview, setAnalyticsOverview] = useState<PlatformAnalyticsOverview | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsDays, setAnalyticsDays] = useState(30);
+  const [auditOverview, setAuditOverview] = useState<PlatformAuditOverview | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditDays, setAuditDays] = useState(30);
+  const [auditCategory, setAuditCategory] = useState("all");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditQuery, setAuditQuery] = useState("");
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -232,6 +240,10 @@ export default function PlatformOwnerControlPlane() {
   useEffect(() => {
     if (authenticated === true && activeSection === "analytics") void loadAnalytics(analyticsDays);
   }, [authenticated, activeSection, analyticsDays]);
+
+  useEffect(() => {
+    if (authenticated === true && activeSection === "activity") void loadAuditActivity(false);
+  }, [authenticated, activeSection, auditDays, auditCategory, auditQuery]);
 
   useEffect(() => {
     if (authenticated !== true) return;
@@ -374,6 +386,31 @@ export default function PlatformOwnerControlPlane() {
     }
   };
 
+  const loadAuditActivity = async (append = false) => {
+    setAuditLoading(true);
+    setError("");
+    try {
+      const next = await getPlatformAuditActivity({
+        days: auditDays,
+        category: auditCategory,
+        search: auditQuery,
+        limit: 50,
+        cursor: append ? auditOverview?.next_cursor ?? null : null,
+      });
+      setAuditOverview((current) => append && current ? { ...next, events: [...current.events, ...next.events] } : next);
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to load platform activity and audit history.");
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   const loadStorageOverview = async () => {
     setStorageLoading(true);
     setError("");
@@ -445,6 +482,10 @@ export default function PlatformOwnerControlPlane() {
     security: { title: "Security", description: "Review platform security controls and owner protection." },
   };
   const currentSectionCopy = sectionCopy[activeSection] ?? sectionCopy.dashboard;
+  const auditCategoryOptions = Array.from(new Set([
+    "platform", "institute", "domain", "membership", "admin", "feature",
+    ...(auditOverview?.categories ?? []).map((item) => item.category),
+  ])).filter(Boolean);
 
   return (
     <main className="owner-liquid-glass" style={shell}>
@@ -1031,7 +1072,128 @@ export default function PlatformOwnerControlPlane() {
         </section>
       )}
 
-      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
+      {activeSection === "activity" && (
+        <section className="owner-audit-page" style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(16px,4vw,42px) 60px" }}>
+          <div className="owner-audit-heading" style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM OPERATIONS</div>
+              <h2 style={{ margin: "5px 0", fontSize: 28 }}>Activity & audit</h2>
+              <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Platform-scoped audit history with institute context. Individual users, metadata and file contents are intentionally not exposed.</p>
+            </div>
+            <div className="owner-audit-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {[7, 30, 90].map((days) => (
+                <button key={days} type="button" onClick={() => setAuditDays(days)} disabled={auditLoading} style={{ ...button(days !== auditDays), minHeight: 42, padding: "9px 12px" }}>{days}d</button>
+              ))}
+              <button style={button(true)} onClick={() => void loadAuditActivity(false)} disabled={auditLoading}>{auditLoading ? "Refreshing…" : "↻ Refresh activity"}</button>
+            </div>
+          </div>
+
+          {error && <div role="alert" style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
+
+          {auditLoading && !auditOverview ? (
+            <div className="owner-section-placeholder" style={{ marginTop: 24 }}><div className="owner-placeholder-icon">☷</div><h2>Loading audit history…</h2><p>Preparing secure platform events for the selected period.</p></div>
+          ) : auditOverview ? (
+            <>
+              <div className="owner-audit-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginTop: 20 }}>
+                {[
+                  ["Events", auditOverview.total_events],
+                  ["Last 24 hours", auditOverview.last_24h_events],
+                  ["Institutes touched", auditOverview.institutes_with_activity],
+                  ["Action categories", auditOverview.categories.length],
+                ].map(([label, value]) => (
+                  <div key={String(label)} style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 18, padding: 16 }}>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b", letterSpacing: .6 }}>{label}</div>
+                    <div style={{ fontSize: 25, fontWeight: 900, marginTop: 6, color: "#172554" }}>{Number(value)}</div>
+                  </div>
+                ))}
+              </div>
+
+              <section className="owner-audit-filter-card" style={{ marginTop: 14, padding: 16, borderRadius: 20, background: "#fff", border: "1px solid #e7ebf2" }}>
+                <div className="owner-audit-filter-grid">
+                  <label>
+                    <span>Search events</span>
+                    <input
+                      value={auditSearch}
+                      onChange={(e) => setAuditSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") setAuditQuery(auditSearch.trim()); }}
+                      placeholder="Action, institute, entity or summary…"
+                      aria-label="Search platform audit events"
+                    />
+                  </label>
+                  <label>
+                    <span>Action category</span>
+                    <select value={auditCategory} onChange={(e) => setAuditCategory(e.target.value)}>
+                      <option value="all">All categories</option>
+                      {auditCategoryOptions.map((category) => <option key={category} value={category}>{category.replaceAll("_", " ")}</option>)}
+                    </select>
+                  </label>
+                  <button type="button" style={{ ...button(false), alignSelf: "end", minHeight: 44 }} onClick={() => setAuditQuery(auditSearch.trim())}>Apply filters</button>
+                </div>
+                <div className="owner-audit-scope-note">Scope: <b>platform</b> · Window: <b>last {auditOverview.range_days} days</b> · Raw metadata and actor identities are not returned to this interface.</div>
+              </section>
+
+              <div className="owner-audit-layout" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(260px,.35fr)", gap: 14, marginTop: 14 }}>
+                <section className="owner-audit-events" style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, overflow: "hidden" }}>
+                  <div className="owner-audit-events-head" style={{ padding: 18, borderBottom: "1px solid #eef1f6" }}>
+                    <div><b>Event stream</b><div style={{ marginTop: 3, color: "#64748b", fontSize: 12 }}>Newest platform events first. Audit records are read-only here.</div></div>
+                  </div>
+
+                  {auditOverview.events.length ? (
+                    <div className="owner-audit-event-list">
+                      {auditOverview.events.map((event) => (
+                        <article className="owner-audit-event" key={event.id}>
+                          <div className="owner-audit-event-time">{formatDateTime(event.created_at)}</div>
+                          <div className="owner-audit-event-main">
+                            <div className="owner-audit-event-top">
+                              <span className="owner-audit-badge">{event.category}</span>
+                              <strong>{event.action.replaceAll(".", " · ")}</strong>
+                            </div>
+                            <div className="owner-audit-event-summary">{event.summary || "No summary recorded."}</div>
+                            <div className="owner-audit-event-meta">
+                              <span>{event.institute_name}</span>
+                              <span>{event.entity_type || "platform event"}</span>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="owner-audit-empty">
+                      <div className="owner-placeholder-icon">☷</div>
+                      <h3>No platform events found</h3>
+                      <p>No audit records match the selected window and filters. New platform operations that write to the audit log will appear here automatically.</p>
+                    </div>
+                  )}
+
+                  {auditOverview.has_more && (
+                    <div className="owner-audit-load-more">
+                      <button type="button" style={button(false)} onClick={() => void loadAuditActivity(true)} disabled={auditLoading}>{auditLoading ? "Loading more…" : "Load more events"}</button>
+                    </div>
+                  )}
+                </section>
+
+                <aside className="owner-audit-category-card" style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: "#64748b", letterSpacing: 1 }}>ACTIVITY MIX</div>
+                  <h3 style={{ margin: "5px 0 2px", fontSize: 19 }}>Event categories</h3>
+                  <div style={{ marginTop: 12 }}>
+                    {auditOverview.categories.length ? auditOverview.categories.map((item) => {
+                      const share = auditOverview.total_events ? Math.round((item.count / auditOverview.total_events) * 100) : 0;
+                      return (
+                        <div className="owner-audit-category-row" key={item.category}>
+                          <div><span>{item.category}</span><b>{item.count}</b></div>
+                          <div className="owner-audit-progress"><span style={{ width: Math.min(100, share) + "%" }} /></div>
+                        </div>
+                      );
+                    }) : <div className="owner-audit-no-categories">No categories in this period.</div>}
+                  </div>
+                </aside>
+              </div>
+            </>
+          ) : null}
+        </section>
+      )}
+
+      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && activeSection !== "activity" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
 
       {settingsOpen && platformSettings && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
