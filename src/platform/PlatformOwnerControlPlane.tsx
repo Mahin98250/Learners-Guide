@@ -10,6 +10,9 @@ import {
   type PlatformInstituteDetail,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
+
+type PlatformDomain = PlatformInstituteDetail["domains"][number];
+type PlatformSettings = { product_name: string; legal_name: string; public_website_url: string; default_app_domain: string; support_email: string; default_timezone: string; settings: Record<string, unknown> };
 import "./owner-liquid-glass.css";
 
 const LegacyOperations = lazy(() => import("@/platform/PlatformOwnerPortal"));
@@ -61,6 +64,13 @@ export default function PlatformOwnerControlPlane() {
   const [createSlug, setCreateSlug] = useState("");
   const [createHostname, setCreateHostname] = useState("");
   const [createWorking, setCreateWorking] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsWorking, setSettingsWorking] = useState(false);
+  const [domainOpen, setDomainOpen] = useState(false);
+  const [domainHostname, setDomainHostname] = useState("");
+  const [domainWorking, setDomainWorking] = useState("");
+  const [domainNotice, setDomainNotice] = useState("");
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -166,6 +176,12 @@ export default function PlatformOwnerControlPlane() {
     void getPlatformInstituteStatusCounts().then(setCounts).catch((e) => {
       setError(e instanceof Error ? e.message : "Unable to load institute status counts.");
     });
+    void supabase.rpc("platform_get_settings").then(({ data, error: rpcError }) => {
+      if (rpcError) throw rpcError;
+      setPlatformSettings((data || null) as PlatformSettings | null);
+    }).catch((e) => {
+      setError(e instanceof Error ? e.message : "Unable to load platform settings.");
+    });
   }, [authenticated]);
 
   const openDetail = async (institute: PlatformInstitute) => {
@@ -246,6 +262,65 @@ export default function PlatformOwnerControlPlane() {
     }
   };
 
+  const savePlatformSettings = async () => {
+    if (!platformSettings || settingsWorking) return;
+    setSettingsWorking(true); setError("");
+    try {
+      const domain = platformSettings.default_app_domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+      const enabled = platformSettings.settings.default_subdomains_enabled === true;
+      if (enabled && !domain) throw new Error("A platform default app domain is required before automatic subdomains can be enabled.");
+      const result = await supabase.rpc("platform_update_settings", {
+        p_product_name: platformSettings.product_name.trim(),
+        p_legal_name: platformSettings.legal_name.trim(),
+        p_public_website_url: platformSettings.public_website_url.trim(),
+        p_default_app_domain: domain || null,
+        p_support_email: platformSettings.support_email.trim().toLowerCase(),
+        p_default_timezone: platformSettings.default_timezone.trim() || "Asia/Kolkata",
+        p_settings: platformSettings.settings,
+      });
+      if (result.error) throw result.error;
+      setPlatformSettings(result.data as PlatformSettings);
+      setSettingsOpen(false);
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to save platform settings."); }
+    finally { setSettingsWorking(false); }
+  };
+
+  const refreshSelected = async () => {
+    if (!selected) return;
+    setDetail(await getPlatformInstituteDetail(selected.id));
+  };
+
+  const registerDomain = async () => {
+    if (!selected || !domainHostname.trim() || domainWorking) return;
+    setDomainWorking("register"); setDomainNotice(""); setError("");
+    try {
+      const result = await supabase.rpc("register_institute_domain", {
+        p_institute_id: selected.id, p_hostname: domainHostname.trim().toLowerCase(), p_domain_type: "custom",
+      });
+      if (result.error) throw result.error;
+      setDomainHostname(""); setDomainOpen(false);
+      setDomainNotice("Custom domain registered. The verification token is available from the registration response and should be given to the domain owner.");
+      await refreshSelected();
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to register domain."); }
+    finally { setDomainWorking(""); }
+  };
+
+  const domainAction = async (domain: PlatformDomain, action: "verify" | "tls" | "primary" | "disable") => {
+    if (domainWorking) return;
+    setDomainWorking(action); setError(""); setDomainNotice("");
+    try {
+      let result;
+      if (action === "verify") result = await supabase.rpc("platform_record_domain_dns_verified", { p_domain_id: domain.id });
+      else if (action === "tls") result = await supabase.rpc("platform_set_domain_tls_status", { p_domain_id: domain.id, p_tls_status: "active" });
+      else if (action === "primary") result = await supabase.rpc("platform_set_primary_domain", { p_domain_id: domain.id });
+      else result = await supabase.rpc("platform_disable_domain", { p_domain_id: domain.id });
+      if (result.error) throw result.error;
+      await refreshSelected();
+      setDomainNotice(action === "disable" ? "Domain disabled." : "Domain updated successfully.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to update domain."); }
+    finally { setDomainWorking(""); }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     setAuthenticated(false);
@@ -304,6 +379,7 @@ export default function PlatformOwnerControlPlane() {
             <div style={{ opacity: .75 }}>Bounded, searchable institute operations for the multi-tenant platform.</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={() => setSettingsOpen(true)} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Platform settings</button>
             <button onClick={() => setCreateOpen(true)} style={{ ...button(true), background: "#fff", color: "#3224a6" }}>＋ Create institute</button>
             <span style={{ fontSize: 12, opacity: .8 }}>{roles.join(" · ")}</span>
             <button onClick={() => void signOut()} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Sign out</button>
@@ -424,7 +500,7 @@ export default function PlatformOwnerControlPlane() {
             </label>
 
             <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: "#f8fafc", border: "1px solid #e7ebf2", fontSize: 11, color: "#64748b" }}>
-              New institutes start in <b>Trial</b>. A custom domain is optional and can be connected after creation.
+              New institutes start in <b>Trial</b>. {platformSettings?.settings.default_subdomains_enabled && platformSettings.default_app_domain ? <>Automatic portal: <b>{createSlug.trim().toLowerCase() || "your-slug"}.{platformSettings.default_app_domain}</b>.</> : <>Automatic subdomains are currently disabled; configure them in Platform settings.</>}{" "}A custom domain is optional and can be connected now or later.
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
@@ -490,10 +566,19 @@ export default function PlatformOwnerControlPlane() {
                 </div>
 
                 <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
-                  <b>Domains</b>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><b>Domains</b><button style={button(true)} onClick={() => { setDomainNotice(""); setDomainOpen(true); }}>＋ Add custom domain</button></div>
+                  {domainNotice && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#f0fdf4", color: "#166534", fontSize: 11 }}>{domainNotice}</div>}
                   {detail.domains.length ? detail.domains.map((domain) => (
-                    <div key={domain.id} style={{ marginTop: 9, paddingTop: 9, borderTop: "1px solid #eef1f6", fontSize: 12 }}>
-                      <strong>{domain.hostname}</strong> · {domain.status} · TLS {domain.tls_status}{domain.is_primary ? " · primary" : ""}
+                    <div key={domain.id} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eef1f6" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 12 }}><strong>{domain.hostname}</strong><div style={{ marginTop: 4, color: "#64748b" }}>{domain.domain_type === "default_subdomain" ? "Platform subdomain" : "Custom domain"} · {domain.status} · TLS {domain.tls_status}{domain.is_primary ? " · primary" : ""}</div></div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {domain.status === "pending" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "verify")}>Record DNS verified</button>}
+                          {domain.status === "verified" && domain.tls_status !== "active" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "tls")}>Mark TLS active</button>}
+                          {domain.status === "verified" && !domain.is_primary && domain.tls_status !== "failed" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "primary")}>Make primary</button>}
+                          {!domain.is_primary && domain.status !== "disabled" && <button disabled={!!domainWorking} style={button(false)} onClick={() => void domainAction(domain, "disable")}>Disable</button>}
+                        </div>
+                      </div>
                     </div>
                   )) : <div style={{ marginTop: 8, color: "#64748b", fontSize: 12 }}>No domains registered.</div>}
                 </div>
@@ -511,6 +596,33 @@ export default function PlatformOwnerControlPlane() {
           </div>
         </div>
       )}
+      {settingsOpen && platformSettings && (
+        <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(680px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}><div><b>PLATFORM CONFIGURATION</b><h2 style={{ margin: "5px 0" }}>Platform settings</h2><div style={{ fontSize: 12, color: "#64748b" }}>Configure the platform namespace used for automatic tenant subdomains.</div></div><button disabled={settingsWorking} style={button(false)} onClick={() => setSettingsOpen(false)}>Close</button></div>
+            {(["product_name","legal_name","public_website_url","default_app_domain","support_email","default_timezone"] as const).map((key) => (
+              <label key={key} style={{ display: "block", fontSize: 12, fontWeight: 800, marginTop: 12 }}>{key.replaceAll("_"," ")}
+                <input value={platformSettings[key] || ""} onChange={(e) => setPlatformSettings({...platformSettings,[key]:e.target.value})} style={{ width: "100%", boxSizing: "border-box", padding: 11, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} />
+              </label>
+            ))}
+            <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 15, padding: 12, borderRadius: 12, background: "#f8fafc", fontSize: 12 }}><input type="checkbox" checked={platformSettings.settings.default_subdomains_enabled === true} onChange={(e) => setPlatformSettings({...platformSettings,settings:{...platformSettings.settings,default_subdomains_enabled:e.target.checked}})} /><span><b>Enable automatic institute subdomains</b><br/><span style={{ color: "#64748b" }}>New institutes get slug + default app domain automatically.</span></span></label>
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#fffbeb", color: "#92400e", fontSize: 11 }}>Enable this only after wildcard DNS and TLS are configured for the platform domain.</div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}><button disabled={settingsWorking} style={button(false)} onClick={() => setSettingsOpen(false)}>Cancel</button><button disabled={settingsWorking} style={button(true)} onClick={() => void savePlatformSettings()}>{settingsWorking ? "Saving…" : "Save settings"}</button></div>
+          </div>
+        </div>
+      )}
+
+      {domainOpen && selected && (
+        <div role="dialog" aria-modal="true" onClick={() => { if (!domainWorking) setDomainOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1400 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}><div><b>ADD CUSTOM DOMAIN</b><h2 style={{ margin: "5px 0" }}>Connect a domain</h2></div><button style={button(false)} onClick={() => setDomainOpen(false)}>Close</button></div>
+            <label style={{ display: "block", marginTop: 18, fontSize: 12, fontWeight: 800 }}>Hostname<input autoFocus value={domainHostname} onChange={(e) => setDomainHostname(e.target.value)} placeholder="academy.com" style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} /></label>
+            <div style={{ marginTop: 12, padding: 12, background: "#f8fafc", borderRadius: 12, fontSize: 11, color: "#64748b" }}>Register the domain, configure DNS verification, then record verification and activate TLS after the certificate is ready.</div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}><button style={button(false)} onClick={() => setDomainOpen(false)}>Cancel</button><button disabled={!domainHostname.trim() || !!domainWorking} style={button(true)} onClick={() => void registerDomain()}>{domainWorking === "register" ? "Registering…" : "Register domain"}</button></div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }
