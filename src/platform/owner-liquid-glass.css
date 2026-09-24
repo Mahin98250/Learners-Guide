@@ -529,3 +529,40 @@
   .owner-domain-stats{grid-template-columns:1fr!important}
   .owner-domain-actions{grid-template-columns:1fr}
 }
+
+
+/* Owner security */
+.owner-security-page{isolation:isolate}
+.owner-security-banner,.owner-security-card,.owner-security-detail{box-shadow:0 12px 34px rgba(50,58,100,.07),inset 0 1px 0 rgba(255,255,255,.92)!important}
+.owner-security-status{display:inline-flex;align-items:center;padding:9px 12px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.08em;white-space:nowrap}
+.owner-security-status[data-tone="healthy"],.owner-security-chip[data-tone="healthy"]{background:#ecfdf3;color:#067647}
+.owner-security-status[data-tone="attention"],.owner-security-chip[data-tone="attention"]{background:#fffaeb;color:#b54708}
+.owner-security-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:14px}
+.owner-security-card{position:relative;background:#fff;border:1px solid #e7ebf2;border-radius:18px;padding:15px;min-height:105px}
+.owner-security-chip{display:inline-flex;margin-top:9px;padding:4px 7px;border-radius:999px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+.owner-security-factor-list{display:grid;gap:8px;margin-top:14px}
+.owner-security-factor{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 12px;border:1px solid #eef1f6;border-radius:13px;background:#fbfcfe}
+.owner-security-factor>div{display:grid;gap:3px;min-width:0}
+.owner-security-factor strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.owner-security-factor span{font-size:8px;color:#8a94a8;font-weight:900;letter-spacing:.08em}
+.owner-security-empty{padding:20px;border-radius:13px;background:#f8fafc;color:#64748b;font-size:11px;text-align:center}
+.owner-security-architecture{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.owner-security-architecture>div{padding:12px;border:1px solid #eef1f6;border-radius:13px;background:#fbfcfe}
+.owner-security-architecture b{display:block;font-size:11px}
+.owner-security-architecture span{display:block;margin-top:4px;font-size:10px;line-height:1.45;color:#64748b}
+@media(max-width:1100px){.owner-security-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){
+  .owner-security-page{padding:18px 12px 42px!important}
+  .owner-security-heading h2{font-size:25px!important}
+  .owner-security-heading p{line-height:1.5}
+  .owner-security-heading>button{width:100%;min-height:44px}
+  .owner-security-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .owner-security-card{min-height:96px;padding:13px;border-radius:16px}
+  .owner-security-banner{padding:15px!important}
+  .owner-security-factor{align-items:flex-start}
+  .owner-security-architecture{grid-template-columns:1fr}
+}
+@media(max-width:430px){
+  .owner-security-grid{grid-template-columns:1fr}
+  .owner-security-factor{flex-direction:column}
+}
