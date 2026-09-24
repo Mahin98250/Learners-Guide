@@ -288,3 +288,104 @@ export async function getPlatformSystemHealth(): Promise<PlatformSystemHealth> {
     }),
   };
 }
+
+
+export type PlatformAnalyticsTrendPoint = {
+  day: string;
+  study_materials: number;
+  homework: number;
+  tests: number;
+  announcements: number;
+  attendance: number;
+  total_activity: number;
+};
+
+export type PlatformAnalyticsInstitute = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  active_members: number;
+  students: number;
+  teachers: number;
+  activity_events: number;
+  content_created: number;
+  last_activity_at: string | null;
+};
+
+export type PlatformAnalyticsOverview = {
+  range_days: number;
+  range_start: string;
+  summary: {
+    institutes: number;
+    active_institutes: number;
+    new_institutes: number;
+    active_members: number;
+    students: number;
+    teachers: number;
+    activity_events: number;
+    content_created: number;
+    attendance_records: number;
+    engaged_institutes: number;
+  };
+  trend: PlatformAnalyticsTrendPoint[];
+  institutes: PlatformAnalyticsInstitute[];
+};
+
+export async function getPlatformAnalytics(
+  days = 30,
+): Promise<PlatformAnalyticsOverview> {
+  const { data, error } = await supabase.rpc("platform_get_analytics", {
+    p_days: days,
+  });
+  if (error) throw error;
+
+  const raw = (data ?? {}) as Partial<PlatformAnalyticsOverview>;
+  const summary = (raw.summary ?? {}) as Partial<PlatformAnalyticsOverview["summary"]>;
+  const trend = Array.isArray(raw.trend) ? raw.trend : [];
+  const institutes = Array.isArray(raw.institutes) ? raw.institutes : [];
+
+  return {
+    range_days: Number(raw.range_days) || days,
+    range_start: String(raw.range_start ?? new Date().toISOString()),
+    summary: {
+      institutes: Number(summary.institutes) || 0,
+      active_institutes: Number(summary.active_institutes) || 0,
+      new_institutes: Number(summary.new_institutes) || 0,
+      active_members: Number(summary.active_members) || 0,
+      students: Number(summary.students) || 0,
+      teachers: Number(summary.teachers) || 0,
+      activity_events: Number(summary.activity_events) || 0,
+      content_created: Number(summary.content_created) || 0,
+      attendance_records: Number(summary.attendance_records) || 0,
+      engaged_institutes: Number(summary.engaged_institutes) || 0,
+    },
+    trend: trend.map((row) => {
+      const item = (row ?? {}) as Partial<PlatformAnalyticsTrendPoint>;
+      return {
+        day: String(item.day ?? ""),
+        study_materials: Number(item.study_materials) || 0,
+        homework: Number(item.homework) || 0,
+        tests: Number(item.tests) || 0,
+        announcements: Number(item.announcements) || 0,
+        attendance: Number(item.attendance) || 0,
+        total_activity: Number(item.total_activity) || 0,
+      };
+    }),
+    institutes: institutes.map((row) => {
+      const item = (row ?? {}) as Partial<PlatformAnalyticsInstitute>;
+      return {
+        id: String(item.id ?? ""),
+        name: String(item.name ?? ""),
+        slug: String(item.slug ?? ""),
+        status: String(item.status ?? ""),
+        active_members: Number(item.active_members) || 0,
+        students: Number(item.students) || 0,
+        teachers: Number(item.teachers) || 0,
+        activity_events: Number(item.activity_events) || 0,
+        content_created: Number(item.content_created) || 0,
+        last_activity_at: item.last_activity_at == null ? null : String(item.last_activity_at),
+      };
+    }),
+  };
+}
