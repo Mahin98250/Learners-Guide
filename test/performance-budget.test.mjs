@@ -21,7 +21,7 @@ test("performance audit passes a small valid build and reports compressed sizes"
     await mkdir(path.join(tempDir, "assets"), { recursive: true });
     await writeFile(
       path.join(tempDir, "index.html"),
-      "<!doctype html><html><head></head><body><div id="root"></div></body></html>",
+      '<!doctype html><html><head></head><body><div id="root"></div></body></html>',
     );
     await writeFile(path.join(tempDir, "manifest.webmanifest"), '{"name":"Mahin"}');
     await writeFile(path.join(tempDir, "assets", "app.js"), "console.log('ok');");
