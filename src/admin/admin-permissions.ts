@@ -6,6 +6,7 @@ export type AdminNavPermission =
   | "students.manage"
   | "teachers.manage"
   | "people.read"
+  | "people.manage"
   | "academics.manage"
   | "attendance.read"
   | "attendance.manage"
