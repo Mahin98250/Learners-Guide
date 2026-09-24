@@ -31,6 +31,26 @@ const button = (primary = true) => ({
   color: primary ? "#fff" : "#24324a",
 });
 
+const OWNER_NAV = [
+  { group: "Overview", items: [
+    { key: "dashboard", icon: "⌂", label: "Dashboard" },
+    { key: "institutes", icon: "🏫", label: "Institutes" },
+  ]},
+  { group: "Platform", items: [
+    { key: "analytics", icon: "↗", label: "Analytics" },
+    { key: "storage", icon: "▣", label: "Storage" },
+    { key: "domains", icon: "◎", label: "Domains" },
+  ]},
+  { group: "Management", items: [
+    { key: "activity", icon: "☷", label: "Activity & Audit" },
+    { key: "health", icon: "♥", label: "System Health" },
+  ]},
+  { group: "Configuration", items: [
+    { key: "settings", icon: "⚙", label: "Platform Settings" },
+    { key: "security", icon: "🔐", label: "Security" },
+  ]},
+] as const;
+
 function formatBytes(bytes: number | null) {
   if (bytes == null) return "Not configured";
   if (bytes < 1024) return bytes + " B";
@@ -89,6 +109,8 @@ export default function PlatformOwnerControlPlane() {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsWorking, setSettingsWorking] = useState(false);
+  const [activeSection, setActiveSection] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const directoryRequestRef = useRef(0);
 
@@ -321,8 +343,26 @@ export default function PlatformOwnerControlPlane() {
     return <main className="owner-liquid-glass owner-state-card" style={{ ...shell, display: "grid", placeItems: "center" }}>Loading tenant directory…</main>;
   }
 
+  const selectSection = (key: string) => {
+    setActiveSection(key);
+    setSidebarOpen(false);
+    if (key === "settings") setSettingsOpen(true);
+  };
+
+  const activeNav = OWNER_NAV.flatMap((group) => group.items).find((item) => item.key === activeSection);
+
   return (
     <main className="owner-liquid-glass" style={shell}>
+      <button type="button" className="owner-sidebar-toggle" onClick={() => setSidebarOpen((open) => !open)} aria-label={sidebarOpen ? "Close owner navigation" : "Open owner navigation"} aria-expanded={sidebarOpen}>{sidebarOpen ? "×" : "☰"}</button>
+      <div className={`owner-sidebar-backdrop ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+      <aside className={`owner-sidebar ${sidebarOpen ? "open" : ""}`}>
+        <div className="owner-sidebar-brand"><div className="owner-sidebar-logo">LG</div><div><strong>Platform Owner</strong><span>Control Center</span></div></div>
+        <nav className="owner-sidebar-nav" aria-label="Owner navigation">
+          {OWNER_NAV.map((group) => <div className="owner-sidebar-group" key={group.group}><div className="owner-sidebar-label">{group.group}</div>{group.items.map((item) => <button type="button" key={item.key} className={`owner-sidebar-item ${activeSection === item.key ? "active" : ""}`} onClick={() => selectSection(item.key)}><span className="owner-sidebar-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}</div>)}
+        </nav>
+        <div className="owner-sidebar-footer"><div className="owner-sidebar-status"><span className="owner-online-dot" /> Platform secured</div><button type="button" className="owner-sidebar-signout" onClick={() => void signOut()}>↪ <span>Sign out</span></button></div>
+      </aside>
+      <div className="owner-main-shell">
       <header style={{ padding: "25px clamp(16px,4vw,42px) 20px", background: "linear-gradient(135deg,#17124d,#3224a6)", color: "#fff" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <div>
@@ -339,7 +379,7 @@ export default function PlatformOwnerControlPlane() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "22px clamp(16px,4vw,42px) 60px" }}>
+      {activeSection === "dashboard" || activeSection === "institutes" ? <div style={{ maxWidth: 1280, margin: "0 auto", padding: "22px clamp(16px,4vw,42px) 60px" }}>
         {error && <div role="alert" style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
 
         <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
@@ -458,7 +498,7 @@ export default function PlatformOwnerControlPlane() {
         </section>
 
 
-      </div>
+      </div> : null}
 
       {createOpen && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!createWorking) setCreateOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1200 }}>
@@ -604,6 +644,8 @@ export default function PlatformOwnerControlPlane() {
         </div>
       )}
 
+      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "settings" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
+
       {settingsOpen && platformSettings && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(680px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
@@ -620,6 +662,7 @@ export default function PlatformOwnerControlPlane() {
         </div>
       )}
 
+      </div>
     </main>
   );
 }
