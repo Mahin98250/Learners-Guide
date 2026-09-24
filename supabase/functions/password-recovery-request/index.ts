@@ -8,7 +8,76 @@ const normalizeId = (value: unknown) => normalize(value).replace(/[^a-z0-9]/g, "
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const genericMessage = "If the account details match an active account with a verified recovery email, a password reset link has been sent. Check the recovery email inbox and spam folder.";
 const deliveryError = "We could not send the recovery email right now. Please try again in a few minutes or contact the institute administrator.";
-const PRODUCTION_SITE_URL = "https://mahin.vercel.app/";
+const configuredOrigin = () => {
+  const value = String(Deno.env.get("PUBLIC_APP_ORIGIN") || "").trim();
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+};
+
+const normalizeHost = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\.$/, "");
+
+const requestOrigin = (req: Request) => {
+  const origin = String(req.headers.get("Origin") || "").trim();
+  const referer = String(req.headers.get("Referer") || "").trim();
+  try {
+    if (origin) return new URL(origin).origin;
+    if (referer) return new URL(referer).origin;
+  } catch {
+    // Fall through to the configured platform origin.
+  }
+  return "";
+};
+
+async function resolveRecoveryOrigin(req: Request, admin: ReturnType<typeof createClient>) {
+  const fallback = configuredOrigin();
+  const candidate = requestOrigin(req);
+
+  let candidateUrl: URL | null = null;
+  if (candidate) {
+    try {
+      candidateUrl = new URL(candidate);
+    } catch {
+      candidateUrl = null;
+    }
+  }
+
+  const { data: platformSettings } = await admin
+    .from("platform_settings")
+    .select("default_app_domain")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const defaultHost = normalizeHost(platformSettings?.default_app_domain);
+
+  if (candidateUrl) {
+    const host = normalizeHost(candidateUrl.hostname);
+    const isDefaultHost = Boolean(defaultHost && host === defaultHost);
+
+    let isVerifiedTenantHost = false;
+    if (!isDefaultHost) {
+      const { data: domain } = await admin
+        .from("institute_domains")
+        .select("hostname,status,tls_status")
+        .eq("hostname", host)
+        .maybeSingle();
+
+      isVerifiedTenantHost =
+        domain?.status === "verified" &&
+        ["active", "provisioning"].includes(String(domain?.tls_status || ""));
+    }
+
+    if (isDefaultHost || isVerifiedTenantHost) {
+      return candidateUrl.origin;
+    }
+  }
+
+  if (fallback) return fallback;
+  return defaultHost ? "https://" + defaultHost : "";
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -79,10 +148,12 @@ Deno.serve(async (req) => {
     if (!emailPattern.test(email) || !confirmed) return json({ message: genericMessage });
 
     const publicClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    // Use the configured production Site URL rather than a path that may not be
-    // present in Supabase's redirect allow-list. The app root detects the
-    // recovery session and routes it to /reset-password safely.
-    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: PRODUCTION_SITE_URL });
+    // Keep the recovery redirect on the verified tenant host when the request
+    // came from an institute portal. Fall back to the configured platform origin
+    // so a stale or untrusted Origin header cannot become an open redirect.
+    const recoveryOrigin = await resolveRecoveryOrigin(req, admin);
+    if (!recoveryOrigin) return json({ error: deliveryError }, 502);
+    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo: recoveryOrigin + "/" });
     if (resetError) {
       console.error("password-recovery-request reset error", resetError.message || resetError);
       return json({ error: deliveryError }, 502);

@@ -7,7 +7,7 @@ const MIN_PDF_BYTES = 256 * 1024;
 const TMP_BUCKET = "pdf-compression-tmp";
 const STRUCTURAL_ENGINE = "cantoo-pdf-lib-structural-v1";
 const RASTER_ENGINE = "sharp-pdf-raster-v1";
-const DEFAULT_RASTER_WORKER_URL = "https://mahin.vercel.app/api/pdf-compression-worker";
+const getRasterWorkerUrl = () => Deno.env.get("PDF_COMPRESSION_RASTER_WORKER_URL")?.trim() || "";
 const allowedBuckets = new Set(["homework", "materials"]);
 const allowedProfiles = new Set(["recommended", "extreme", "less"]);
 
@@ -93,8 +93,11 @@ async function runRasterWorker(
   inputTempPath: string,
   outputTempPath: string,
 ): Promise<RasterWorkerResult | null> {
-  const workerUrl =
-    Deno.env.get("PDF_COMPRESSION_RASTER_WORKER_URL")?.trim() || DEFAULT_RASTER_WORKER_URL;
+  const workerUrl = getRasterWorkerUrl();
+  if (!workerUrl) {
+    console.warn("pdf-compression: raster worker URL is not configured; structural fallback will be used.");
+    return null;
+  }
 
   try {
     const { data: signedInput, error: inputSignError } = await admin.storage
