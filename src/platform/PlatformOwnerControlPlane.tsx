@@ -31,7 +31,11 @@ const button = (primary = true) => ({
   color: primary ? "#fff" : "#24324a",
 });
 
-const OWNER_NAV = [
+type OwnerNavItem = { key: string; icon: string; label: string };
+
+type OwnerNavGroup = { group: string; items: OwnerNavItem[] };
+
+const OWNER_NAV: OwnerNavGroup[] = [
   { group: "Overview", items: [
     { key: "dashboard", icon: "⌂", label: "Dashboard" },
     { key: "institutes", icon: "🏫", label: "Institutes" },
@@ -363,14 +367,14 @@ export default function PlatformOwnerControlPlane() {
         <div className="owner-sidebar-footer"><div className="owner-sidebar-status"><span className="owner-online-dot" /> Platform secured</div><button type="button" className="owner-sidebar-signout" onClick={() => void signOut()}>↪ <span>Sign out</span></button></div>
       </aside>
       <div className="owner-main-shell">
-      <header style={{ padding: "25px clamp(16px,4vw,42px) 20px", background: "linear-gradient(135deg,#17124d,#3224a6)", color: "#fff" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+      <header className="owner-header" style={{ padding: "25px clamp(16px,4vw,42px) 20px", background: "linear-gradient(135deg,#17124d,#3224a6)", color: "#fff" }}>
+        <div className="owner-header-inner" style={{ maxWidth: 1280, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.6, opacity: .72 }}>PLATFORM OWNER · CONTROL PLANE</div>
             <h1 style={{ margin: "5px 0", fontSize: "clamp(28px,4vw,40px)" }}>Institute Overview</h1>
             <div style={{ opacity: .75 }}>Monitor institute health without changing institute-managed data.</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="owner-header-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => setSettingsOpen(true)} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Platform settings</button>
             <button onClick={() => setCreateOpen(true)} style={{ ...button(true), background: "#fff", color: "#3224a6" }}>＋ Create institute</button>
             <span style={{ fontSize: 12, opacity: .8 }}>{roles.join(" · ")}</span>
@@ -379,10 +383,10 @@ export default function PlatformOwnerControlPlane() {
         </div>
       </header>
 
-      {activeSection === "dashboard" || activeSection === "institutes" ? <div style={{ maxWidth: 1280, margin: "0 auto", padding: "22px clamp(16px,4vw,42px) 60px" }}>
+      {activeSection === "dashboard" || activeSection === "institutes" ? <div className="owner-dashboard" style={{ maxWidth: 1280, margin: "0 auto", padding: "22px clamp(16px,4vw,42px) 60px" }}>
         {error && <div role="alert" style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
 
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
+        <section className="owner-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
           {[
             ["Total", counts.total],
             ["Active", counts.active],
@@ -397,8 +401,8 @@ export default function PlatformOwnerControlPlane() {
           ))}
         </section>
 
-        <section style={{ marginTop: 16, display: "grid", gridTemplateColumns: "minmax(0,1.5fr) minmax(280px,1fr)", gap: 12 }}>
-          <div style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+        <section className="owner-pulse-grid" style={{ marginTop: 16, display: "grid", gridTemplateColumns: "minmax(0,1.5fr) minmax(280px,1fr)", gap: 12 }}>
+          <div className="owner-pulse-card" style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM PULSE</div>
@@ -425,7 +429,7 @@ export default function PlatformOwnerControlPlane() {
               </div>
             </div>
           </div>
-          <div style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+          <div className="owner-filter-card" style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
             <div style={{ fontSize: 11, fontWeight: 900, color: "#64748b", letterSpacing: 1 }}>QUICK FILTERS</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
               {(["all", "active", "trial", "suspended", "archived"] as const).map((nextStatus) => (
@@ -440,8 +444,8 @@ export default function PlatformOwnerControlPlane() {
           </div>
         </section>
 
-        <section style={{ marginTop: 16, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, overflow: "hidden" }}>
-          <div style={{ padding: 18, borderBottom: "1px solid #eef1f6", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <section className="owner-directory" style={{ marginTop: 16, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, overflow: "hidden" }}>
+          <div className="owner-directory-toolbar" style={{ padding: 18, borderBottom: "1px solid #eef1f6", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -465,8 +469,8 @@ export default function PlatformOwnerControlPlane() {
 
           {directoryLoading && <div style={{ padding: 12, fontSize: 12, color: "#64748b" }}>Loading bounded results…</div>}
 
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+          <div className="owner-directory-table-wrap" style={{ overflowX: "auto" }}>
+            <table className="owner-directory-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
               <thead>
                 <tr style={{ textAlign: "left", background: "#f8fafc" }}>
                   {["Institute", "Slug", "Status", "Created", "Overview"].map((heading) => <th key={heading} style={{ padding: 12, fontSize: 11, color: "#64748b" }}>{heading}</th>)}
@@ -488,7 +492,7 @@ export default function PlatformOwnerControlPlane() {
 
           {!institutes.length && <div style={{ padding: 28, color: "#64748b" }}>No institutes match the current search.</div>}
 
-          <div style={{ padding: 14, borderTop: "1px solid #eef1f6", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+          <div className="owner-pagination" style={{ padding: 14, borderTop: "1px solid #eef1f6", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 12, color: "#64748b" }}>Showing up to 50 tenants per page · server-side search/filtering</span>
             <div style={{ display: "flex", gap: 8 }}>
               <button style={button(false)} disabled={!cursor || directoryLoading} onClick={() => void loadDirectory(null)}>First page</button>
