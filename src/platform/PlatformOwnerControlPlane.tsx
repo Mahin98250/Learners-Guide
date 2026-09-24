@@ -1327,6 +1327,36 @@ export default function PlatformOwnerControlPlane() {
 
       {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && activeSection !== "activity" && activeSection !== "domains" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
 
+      {domainOpen && (
+        <div role="dialog" aria-modal="true" onClick={() => { if (!domainWorking) setDomainOpen(false); }} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.55)", display:"grid", placeItems:"center", padding:18, zIndex:1300 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width:"min(560px,100%)", background:"#fff", borderRadius:24, padding:24 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", gap:14, alignItems:"start" }}>
+              <div><b>DOMAIN REGISTRATION</b><h2 style={{ margin:"5px 0" }}>Add custom domain</h2><div style={{ fontSize:12, color:"#64748b" }}>Register the hostname first, then add the DNS TXT record before recording verification.</div></div>
+              <button type="button" style={button(false)} onClick={() => setDomainOpen(false)}>Close</button>
+            </div>
+            <label style={{ display:"block", fontSize:12, fontWeight:800, marginTop:16 }}>Institute
+              <select value={domainInstitute} onChange={(e) => setDomainInstitute(e.target.value)} style={{ width:"100%", boxSizing:"border-box", marginTop:5, padding:11, borderRadius:11, border:"1px solid #d8dee9" }}>
+                <option value="">Choose institute</option>
+                {institutes.map((institute) => <option key={institute.id} value={institute.id}>{institute.name}</option>)}
+              </select>
+            </label>
+            <label style={{ display:"block", fontSize:12, fontWeight:800, marginTop:12 }}>Hostname
+              <input value={domainHostname} onChange={(e) => setDomainHostname(e.target.value)} placeholder="portal.example.org" style={{ width:"100%", boxSizing:"border-box", marginTop:5, padding:11, borderRadius:11, border:"1px solid #d8dee9" }} />
+            </label>
+            {domainToken && <div style={{ marginTop:14, padding:14, borderRadius:14, background:"#f8fafc", border:"1px solid #e7ebf2" }}>
+              <b style={{ fontSize:12 }}>DNS TXT verification</b>
+              <div style={{ marginTop:5, fontSize:11, color:"#64748b", lineHeight:1.5 }}>Create a TXT record for <code>_mahin-verification</code> on the registered hostname with this value:</div>
+              <code style={{ display:"block", marginTop:9, padding:10, borderRadius:10, background:"#fff", border:"1px solid #e7ebf2", wordBreak:"break-all" }}>{domainToken}</code>
+              <div style={{ marginTop:8, fontSize:10, color:"#8a94a8" }}>Keep this token private. After DNS propagation, close this dialog and use “Record DNS verified” from the domain list.</div>
+            </div>}
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:18 }}>
+              <button type="button" style={button(false)} onClick={() => setDomainOpen(false)}>Done</button>
+              <button type="button" style={button(true)} disabled={!domainInstitute || !domainHostname.trim() || !!domainWorking} onClick={() => void registerDomain()}>{domainWorking === "register" ? "Registering…" : "Register domain"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {settingsOpen && platformSettings && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(680px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
