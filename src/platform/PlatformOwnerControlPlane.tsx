@@ -31,6 +31,16 @@ const button = (primary = true) => ({
   color: primary ? "#fff" : "#24324a",
 });
 
+function formatBytes(bytes: number | null) {
+  if (bytes == null) return "Not configured";
+  if (bytes < 1024) return bytes + " B";
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let index = -1;
+  do { value /= 1024; index += 1; } while (value >= 1024 && index < units.length - 1);
+  return value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2) + " " + units[index];
+}
+
 function errorIsUnauthorized(error: unknown) {
   return Number((error as { status?: number } | null)?.status) === 401 ||
     /jwt|unauthorized/i.test(String((error as { message?: string } | null)?.message || ""));
@@ -62,11 +72,6 @@ export default function PlatformOwnerControlPlane() {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsWorking, setSettingsWorking] = useState(false);
-  const [domainOpen, setDomainOpen] = useState(false);
-  const [domainHostname, setDomainHostname] = useState("");
-  const [domainWorking, setDomainWorking] = useState("");
-  const [domainNotice, setDomainNotice] = useState("");
-  const [domainVerificationToken, setDomainVerificationToken] = useState("");
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -363,7 +368,7 @@ export default function PlatformOwnerControlPlane() {
                     <td style={{ padding: 13, fontSize: 12, color: "#64748b" }}>{institute.slug}</td>
                     <td style={{ padding: 13 }}><span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>{institute.status}</span></td>
                     <td style={{ padding: 13, fontSize: 12, color: "#64748b" }}>{new Date(institute.created_at).toLocaleString()}</td>
-                    <td style={{ padding: 13 }}><button style={button(false)} onClick={() => void openOverview(institute)}>Open</button></td>
+                    <td style={{ padding: 13 }}><button style={button(false)} onClick={() => void openOverview(institute)}>View health</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -503,17 +508,6 @@ export default function PlatformOwnerControlPlane() {
             <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 15, padding: 12, borderRadius: 12, background: "#f8fafc", fontSize: 12 }}><input type="checkbox" checked={platformSettings.settings.default_subdomains_enabled === true} onChange={(e) => setPlatformSettings({...platformSettings,settings:{...platformSettings.settings,default_subdomains_enabled:e.target.checked}})} /><span><b>Enable automatic institute subdomains</b><br/><span style={{ color: "#64748b" }}>New institutes get slug + default app domain automatically.</span></span></label>
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#fffbeb", color: "#92400e", fontSize: 11 }}>Enable this only after wildcard DNS and TLS are configured for the platform domain.</div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}><button disabled={settingsWorking} style={button(false)} onClick={() => setSettingsOpen(false)}>Cancel</button><button disabled={settingsWorking} style={button(true)} onClick={() => void savePlatformSettings()}>{settingsWorking ? "Saving…" : "Save settings"}</button></div>
-          </div>
-        </div>
-      )}
-
-      {domainOpen && selected && (
-        <div role="dialog" aria-modal="true" onClick={() => { if (!domainWorking) setDomainOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1400 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px,100%)", background: "#fff", borderRadius: 24, padding: 24 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}><div><b>ADD CUSTOM DOMAIN</b><h2 style={{ margin: "5px 0" }}>Connect a domain</h2></div><button style={button(false)} onClick={() => setDomainOpen(false)}>Close</button></div>
-            <label style={{ display: "block", marginTop: 18, fontSize: 12, fontWeight: 800 }}>Hostname<input autoFocus value={domainHostname} onChange={(e) => setDomainHostname(e.target.value)} placeholder="academy.com" style={{ width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #d8dee9", marginTop: 5 }} /></label>
-            <div style={{ marginTop: 12, padding: 12, background: "#f8fafc", borderRadius: 12, fontSize: 11, color: "#64748b" }}>Register the domain, configure DNS verification, then record verification and activate TLS after the certificate is ready.</div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}><button style={button(false)} onClick={() => setDomainOpen(false)}>Cancel</button><button disabled={!domainHostname.trim() || !!domainWorking} style={button(true)} onClick={() => void registerDomain()}>{domainWorking === "register" ? "Registering…" : "Register domain"}</button></div>
           </div>
         </div>
       )}
