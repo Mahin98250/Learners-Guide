@@ -10,6 +10,8 @@ import {
   type PlatformInstituteOverview,
   type PlatformStorageOverview,
   getPlatformStorageOverview,
+  type PlatformSystemHealth,
+  getPlatformSystemHealth,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
 
@@ -120,6 +122,8 @@ export default function PlatformOwnerControlPlane() {
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [storageOverview, setStorageOverview] = useState<PlatformStorageOverview | null>(null);
   const [storageLoading, setStorageLoading] = useState(false);
+  const [systemHealth, setSystemHealth] = useState<PlatformSystemHealth | null>(null);
+  const [systemHealthLoading, setSystemHealthLoading] = useState(false);
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -214,6 +218,10 @@ export default function PlatformOwnerControlPlane() {
 
   useEffect(() => {
     if (authenticated === true && activeSection === "storage") void loadStorageOverview();
+  }, [authenticated, activeSection]);
+
+  useEffect(() => {
+    if (authenticated === true && activeSection === "health") void loadSystemHealth();
   }, [authenticated, activeSection]);
 
   useEffect(() => {
@@ -319,6 +327,24 @@ export default function PlatformOwnerControlPlane() {
       getPlatformInstituteStatusCounts().then(setCounts),
     ]);
     setLastRefreshedAt(new Date().toISOString());
+  };
+
+  const loadSystemHealth = async () => {
+    setSystemHealthLoading(true);
+    setError("");
+    try {
+      setSystemHealth(await getPlatformSystemHealth());
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to load system health.");
+    } finally {
+      setSystemHealthLoading(false);
+    }
   };
 
   const loadStorageOverview = async () => {
@@ -747,7 +773,74 @@ export default function PlatformOwnerControlPlane() {
         </section>
       )}
 
-      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "settings" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
+      {activeSection === "health" && (
+        <section className="owner-health-page" style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(16px,4vw,42px) 60px" }}>
+          <div className="owner-health-heading" style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM OPERATIONS</div>
+              <h2 style={{ margin: "5px 0", fontSize: 28 }}>System health</h2>
+              <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Read-only checks for the platform database, tenant registry, domains, storage, configuration, and audit trail.</p>
+            </div>
+            <button style={button(true)} onClick={() => void loadSystemHealth()} disabled={systemHealthLoading}>{systemHealthLoading ? "Checking…" : "↻ Run health check"}</button>
+          </div>
+
+          {error && <div role="alert" style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
+
+          {systemHealthLoading && !systemHealth ? (
+            <div className="owner-section-placeholder" style={{ marginTop: 24 }}><div className="owner-placeholder-icon">♥</div><h2>Checking platform health…</h2><p>Running secure aggregate checks now.</p></div>
+          ) : systemHealth ? (
+            <>
+              <div className="owner-health-hero" style={{ marginTop: 20, padding: 20, borderRadius: 22, background: "#fff", border: "1px solid #e7ebf2", boxShadow: "0 12px 34px rgba(50,58,100,.07)" }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: 1.2, color: "#64748b" }}>OVERALL STATUS</div>
+                  <div className="owner-health-status" data-status={systemHealth.overall}>
+                    <span className="owner-health-dot" /> {systemHealth.overall === "healthy" ? "All monitored systems healthy" : systemHealth.overall === "degraded" ? "Some systems need attention" : "Attention required"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>Last checked {formatDateTime(systemHealth.checked_at)}</div>
+                </div>
+              </div>
+
+              <div className="owner-health-summary" style={{ display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 10, marginTop: 14 }}>
+                {[
+                  ["Institutes", systemHealth.summary.institutes],
+                  ["Active", systemHealth.summary.active_institutes],
+                  ["Domains", systemHealth.summary.registered_domains],
+                  ["Primary domains", systemHealth.summary.primary_domains],
+                  ["Storage buckets", systemHealth.summary.storage_buckets],
+                  ["Audit events", systemHealth.summary.audit_events],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 16, padding: 14 }}>
+                    <div style={{ fontSize: 9, fontWeight: 900, color: "#64748b", textTransform: "uppercase" }}>{label}</div>
+                    <div style={{ marginTop: 5, fontSize: 21, fontWeight: 900 }}>{Number(value)}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="owner-health-checks" style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
+                {systemHealth.checks.map((check) => (
+                  <article key={check.key} className="owner-health-check-card">
+                    <div className="owner-health-check-top">
+                      <div><b>{check.label}</b><div className="owner-health-check-message">{check.message}</div></div>
+                      <span className="owner-health-badge" data-status={check.status}>{check.status}</span>
+                    </div>
+                    <div className="owner-health-check-detail">{check.detail}</div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="owner-health-config" style={{ marginTop: 14, padding: 16, borderRadius: 18, background: "#fff", border: "1px solid #e7ebf2" }}>
+                <b>Platform configuration snapshot</b>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10, marginTop: 10 }}>
+                  <div><div style={{ fontSize: 10, color: "#64748b" }}>Default app domain</div><strong>{systemHealth.configuration.default_app_domain || "Not configured"}</strong></div>
+                  <div><div style={{ fontSize: 10, color: "#64748b" }}>Automatic subdomains</div><strong>{systemHealth.configuration.automatic_subdomains_enabled ? "Enabled" : "Disabled"}</strong></div>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </section>
+      )}
+
+      {activeSection !== "dashboard" && activeSection !== "institutes" && activeSection !== "storage" && activeSection !== "health" && activeSection !== "settings" && <section className="owner-section-placeholder"><div className="owner-placeholder-icon">{activeNav?.icon}</div><h2>{activeNav?.label}</h2><p>This platform section is now part of the Owner navigation. Platform-level controls can be added here without exposing institute-managed users or roles.</p></section>}
 
       {settingsOpen && platformSettings && (
         <div role="dialog" aria-modal="true" onClick={() => { if (!settingsWorking) setSettingsOpen(false); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: 18, zIndex: 1300 }}>
