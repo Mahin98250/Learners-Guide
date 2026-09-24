@@ -205,7 +205,7 @@ begin
           or coalesce(i.slug, '') ilike '%' || v_search || '%'
         )
       order by a.created_at desc, a.id desc
-      limit 1 offset v_limit
+      limit 1 offset greatest(v_limit - 1, 0)
     ) q;
   end if;
 
