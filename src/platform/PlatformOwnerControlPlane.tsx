@@ -71,6 +71,7 @@ export default function PlatformOwnerControlPlane() {
   const [domainHostname, setDomainHostname] = useState("");
   const [domainWorking, setDomainWorking] = useState("");
   const [domainNotice, setDomainNotice] = useState("");
+  const [domainVerificationToken, setDomainVerificationToken] = useState("");
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -176,7 +177,7 @@ export default function PlatformOwnerControlPlane() {
     void getPlatformInstituteStatusCounts().then(setCounts).catch((e) => {
       setError(e instanceof Error ? e.message : "Unable to load institute status counts.");
     });
-    void supabase.rpc("platform_get_settings").then(({ data, error: rpcError }) => {
+    void supabase.from("platform_settings").select("*").eq("id", 1).maybeSingle().then(({ data, error: rpcError }) => {
       if (rpcError) throw rpcError;
       setPlatformSettings((data || null) as PlatformSettings | null);
     }).catch((e) => {
@@ -292,14 +293,16 @@ export default function PlatformOwnerControlPlane() {
 
   const registerDomain = async () => {
     if (!selected || !domainHostname.trim() || domainWorking) return;
-    setDomainWorking("register"); setDomainNotice(""); setError("");
+    setDomainWorking("register"); setDomainNotice(""); setDomainVerificationToken(""); setError("");
     try {
       const result = await supabase.rpc("register_institute_domain", {
         p_institute_id: selected.id, p_hostname: domainHostname.trim().toLowerCase(), p_domain_type: "custom",
       });
       if (result.error) throw result.error;
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
       setDomainHostname(""); setDomainOpen(false);
-      setDomainNotice("Custom domain registered. The verification token is available from the registration response and should be given to the domain owner.");
+      setDomainVerificationToken(String(row?.verification_token || ""));
+      setDomainNotice("Custom domain registered. Give the domain owner the verification token below, then complete DNS verification.");
       await refreshSelected();
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to register domain."); }
     finally { setDomainWorking(""); }
@@ -566,8 +569,8 @@ export default function PlatformOwnerControlPlane() {
                 </div>
 
                 <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #e7ebf2" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><b>Domains</b><button style={button(true)} onClick={() => { setDomainNotice(""); setDomainOpen(true); }}>＋ Add custom domain</button></div>
-                  {domainNotice && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#f0fdf4", color: "#166534", fontSize: 11 }}>{domainNotice}</div>}
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><b>Domains</b><button style={button(true)} onClick={() => { setDomainNotice(""); setDomainVerificationToken(""); setDomainOpen(true); }}>＋ Add custom domain</button></div>
+                  {domainNotice && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#f0fdf4", color: "#166534", fontSize: 11 }}>{domainNotice}{domainVerificationToken && <div style={{ marginTop: 7, fontFamily: "monospace", wordBreak: "break-all", padding: 8, background: "#fff", borderRadius: 8 }}>{domainVerificationToken}</div>}</div>}
                   {detail.domains.length ? detail.domains.map((domain) => (
                     <div key={domain.id} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eef1f6" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", flexWrap: "wrap" }}>
