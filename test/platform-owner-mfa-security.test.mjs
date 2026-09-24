@@ -163,3 +163,15 @@ test("owner MFA reconciles stale duplicate factors before enrollment", () => {
   assert.doesNotMatch(login, /const staleUnverified/);
   assert.doesNotMatch(login, /const staleFactor = \(factors\?\.totp \|\| \[\]\)\.find/);
 });
+
+
+test("owner login keeps the email entry private and uses the backend as the security gate", () => {
+  assert.match(login, /id="owner-email"/);
+  assert.match(login, /type="email"/);
+  assert.match(login, /value={ownerEmail}/);
+  assert.match(login, /login_hint: normalizedEmail/);
+  assert.match(login, /current_platform_roles/);
+  assert.doesNotMatch(login, /const OWNER_EMAIL\s*=/);
+  assert.doesNotMatch(login, /patelmahin140@gmail\.com/);
+  assert.doesNotMatch(login, /AUTHORIZED GOOGLE ACCOUNT/);
+});

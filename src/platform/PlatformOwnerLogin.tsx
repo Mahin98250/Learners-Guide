@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lg/supabase";
 
-const OWNER_EMAIL = "patelmahin140@gmail.com";
-
 type MfaFactor = {
   id: string;
   friendly_name?: string | null;
@@ -33,6 +31,7 @@ export default function PlatformOwnerLogin({
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
   const [code, setCode] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
 
   const startMfa = async () => {
     const { data: aal, error: aalError } =
@@ -206,15 +205,6 @@ export default function PlatformOwnerLogin({
       const session = data.session;
       if (!session?.user) return;
 
-      const email = String(session.user.email || "").trim().toLowerCase();
-      if (email !== OWNER_EMAIL) {
-        await supabase.auth.signOut({ scope: "local" });
-        setError(
-          `Only the authorized owner account (${OWNER_EMAIL}) can access this panel.`,
-        );
-        return;
-      }
-
       const { data: roles, error: roleError } = await supabase.rpc(
         "current_platform_roles",
       );
@@ -256,6 +246,12 @@ export default function PlatformOwnerLogin({
   }, []);
 
   const continueWithGoogle = async () => {
+    const normalizedEmail = ownerEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError("Enter a valid owner email address.");
+      return;
+    }
+
     setBusy(true);
     setError("");
 
@@ -272,6 +268,7 @@ export default function PlatformOwnerLogin({
           queryParams: {
             access_type: "offline",
             prompt: "select_account",
+            login_hint: normalizedEmail,
           },
         },
       });
@@ -557,6 +554,7 @@ export default function PlatformOwnerLogin({
         </p>
 
         <label
+          htmlFor="owner-email"
           style={{
             display: "block",
             marginTop: 16,
@@ -566,20 +564,32 @@ export default function PlatformOwnerLogin({
             letterSpacing: 0.6,
           }}
         >
-          AUTHORIZED GOOGLE ACCOUNT
-          <div
+          OWNER EMAIL
+          <input
+            id="owner-email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void continueWithGoogle();
+            }}
+            placeholder="Enter your Google account email"
+            aria-label="Owner email"
             style={{
+              width: "100%",
+              boxSizing: "border-box",
               marginTop: 7,
               padding: 12,
               borderRadius: 11,
               border: "1px solid #d8dee9",
-              background: "#f8fafc",
+              background: "#fff",
               color: "#14213d",
-              fontWeight: 800,
+              fontWeight: 700,
+              outline: "none",
             }}
-          >
-            {OWNER_EMAIL}
-          </div>
+          />
         </label>
 
         {error && (
@@ -600,7 +610,7 @@ export default function PlatformOwnerLogin({
 
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !ownerEmail.trim()}
           onClick={() => void continueWithGoogle()}
           style={{
             width: "100%",
