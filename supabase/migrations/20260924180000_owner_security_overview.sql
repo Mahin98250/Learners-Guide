@@ -46,7 +46,7 @@ begin
     'owner_membership_present', v_platform_owner_role,
     'mfa_required', true,
     'backend_owner_gate', true,
-    'audit_logging_enabled', v_audit_events >= 0,
+    'audit_logging_enabled', to_regclass('public.audit_logs') is not null,
     'domain_tls_active', v_verified_tls,
     'domain_tls_failed', v_failed_tls,
     'registered_domains', v_domains
