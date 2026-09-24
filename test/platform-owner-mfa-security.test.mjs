@@ -151,3 +151,15 @@ test("platform-level RLS membership helper requires AAL2", () => {
     /grant execute on function public\.is_platform_member\(\) to authenticated/i,
   );
 });
+
+
+test("owner MFA reconciles stale duplicate factors before enrollment", () => {
+  assert.match(login, /const listMfaFactors = async \(\) =>/);
+  assert.match(login, /factors = await listMfaFactors\(\);/);
+  assert.match(login, /const staleFactors = \(factors\?\.totp \|\| \[\]\)\.filter/);
+  assert.match(login, /for \(const staleFactor of staleFactors\)/);
+  assert.match(login, /for \(let attempt = 0; attempt < 2; attempt \+= 1\)/);
+  assert.match(login, /duplicateStaleFactors/);
+  assert.doesNotMatch(login, /const staleUnverified/);
+  assert.doesNotMatch(login, /const staleFactor = \(factors\?\.totp \|\| \[\]\)\.find/);
+});
