@@ -12,6 +12,8 @@ import {
   getPlatformStorageOverview,
   type PlatformSystemHealth,
   getPlatformSystemHealth,
+  type PlatformAnalyticsOverview,
+  getPlatformAnalytics,
 } from "@/platform/platform-tenant-data";
 import { supabase } from "@/lg/supabase";
 
@@ -124,6 +126,9 @@ export default function PlatformOwnerControlPlane() {
   const [storageLoading, setStorageLoading] = useState(false);
   const [systemHealth, setSystemHealth] = useState<PlatformSystemHealth | null>(null);
   const [systemHealthLoading, setSystemHealthLoading] = useState(false);
+  const [analyticsOverview, setAnalyticsOverview] = useState<PlatformAnalyticsOverview | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsDays, setAnalyticsDays] = useState(30);
   const directoryRequestRef = useRef(0);
 
   const loadDirectory = async (next: PlatformInstituteCursor | null = null) => {
@@ -223,6 +228,10 @@ export default function PlatformOwnerControlPlane() {
   useEffect(() => {
     if (authenticated === true && activeSection === "health") void loadSystemHealth();
   }, [authenticated, activeSection]);
+
+  useEffect(() => {
+    if (authenticated === true && activeSection === "analytics") void loadAnalytics(analyticsDays);
+  }, [authenticated, activeSection, analyticsDays]);
 
   useEffect(() => {
     if (authenticated !== true) return;
@@ -347,6 +356,24 @@ export default function PlatformOwnerControlPlane() {
     }
   };
 
+  const loadAnalytics = async (days = analyticsDays) => {
+    setAnalyticsLoading(true);
+    setError("");
+    try {
+      setAnalyticsOverview(await getPlatformAnalytics(days));
+    } catch (e) {
+      if (errorIsUnauthorized(e)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        setAuthenticated(false);
+        setAllowed(false);
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Unable to load platform analytics.");
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   const loadStorageOverview = async () => {
     setStorageLoading(true);
     setError("");
@@ -406,6 +433,18 @@ export default function PlatformOwnerControlPlane() {
   };
 
   const activeNav = OWNER_NAV.flatMap((group) => group.items).find((item) => item.key === activeSection);
+  const sectionCopy: Record<string, { title: string; description: string }> = {
+    dashboard: { title: "Institute Overview", description: "Monitor institute health without changing institute-managed data." },
+    institutes: { title: "Institutes", description: "Read-only institute health and platform-level tenant monitoring." },
+    analytics: { title: "Platform Analytics", description: "Aggregate usage, activity and adoption trends across the platform." },
+    storage: { title: "Storage Overview", description: "Monitor aggregate storage consumption without exposing individual files." },
+    domains: { title: "Domains", description: "Platform domain and tenant-hosting controls." },
+    activity: { title: "Activity & Audit", description: "Review platform-level operational activity and audit history." },
+    health: { title: "System Health", description: "Check the live health of the platform services and configuration." },
+    settings: { title: "Platform Settings", description: "Configure platform-wide product and hosting settings." },
+    security: { title: "Security", description: "Review platform security controls and owner protection." },
+  };
+  const currentSectionCopy = sectionCopy[activeSection] ?? sectionCopy.dashboard;
 
   return (
     <main className="owner-liquid-glass" style={shell}>
@@ -423,8 +462,8 @@ export default function PlatformOwnerControlPlane() {
         <div className="owner-header-inner" style={{ maxWidth: 1280, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.6, opacity: .72 }}>PLATFORM OWNER · CONTROL PLANE</div>
-            <h1 style={{ margin: "5px 0", fontSize: "clamp(28px,4vw,40px)" }}>Institute Overview</h1>
-            <div style={{ opacity: .75 }}>Monitor institute health without changing institute-managed data.</div>
+            <h1 style={{ margin: "5px 0", fontSize: "clamp(28px,4vw,40px)" }}>{currentSectionCopy.title}</h1>
+            <div style={{ opacity: .75 }}>{currentSectionCopy.description}</div>
           </div>
           <div className="owner-header-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => setSettingsOpen(true)} style={{ ...button(false), background: "rgba(255,255,255,.14)", color: "#fff" }}>Platform settings</button>
@@ -698,6 +737,158 @@ export default function PlatformOwnerControlPlane() {
             )}
           </div>
         </div>
+      )}
+
+
+      {activeSection === "analytics" && (
+        <section className="owner-analytics-page" style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(16px,4vw,42px) 60px" }}>
+          <div className="owner-analytics-heading" style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1.2 }}>PLATFORM ANALYTICS</div>
+              <h2 style={{ margin: "5px 0", fontSize: 28 }}>Usage & adoption</h2>
+              <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Aggregate platform activity only — no individual users, messages, or files are exposed.</p>
+            </div>
+            <div className="owner-analytics-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="owner-analytics-range" style={{ display: "flex", gap: 6 }}>
+                {[7, 30, 90].map((days) => (
+                  <button key={days} type="button" onClick={() => setAnalyticsDays(days)} disabled={analyticsLoading} style={{ ...button(days !== analyticsDays), minHeight: 42, padding: "9px 12px" }}>{days}d</button>
+                ))}
+              </div>
+              <button style={button(true)} onClick={() => void loadAnalytics(analyticsDays)} disabled={analyticsLoading}>{analyticsLoading ? "Refreshing…" : "↻ Refresh analytics"}</button>
+            </div>
+          </div>
+
+          {error && <div role="alert" style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "#fff1f2", color: "#b42318", border: "1px solid #fecdd3" }}>{error}</div>}
+
+          {analyticsLoading && !analyticsOverview ? (
+            <div className="owner-section-placeholder" style={{ margin: "24px 0 0" }}><div className="owner-placeholder-icon">↗</div><h2>Loading analytics…</h2><p>Preparing aggregate platform activity for the selected period.</p></div>
+          ) : analyticsOverview ? (
+            <>
+              <div className="owner-analytics-stats" style={{ display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 10, marginTop: 20 }}>
+                {[
+                  ["Institutes", analyticsOverview.summary.institutes],
+                  ["Active institutes", analyticsOverview.summary.active_institutes],
+                  ["New in period", analyticsOverview.summary.new_institutes],
+                  ["Active members", analyticsOverview.summary.active_members],
+                  ["Students", analyticsOverview.summary.students],
+                  ["Teachers", analyticsOverview.summary.teachers],
+                ].map(([label, value]) => (
+                  <div key={String(label)} style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 18, padding: 16 }}>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b", letterSpacing: .6 }}>{label}</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, marginTop: 6, color: "#172554" }}>{Number(value)}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="owner-analytics-layout" style={{ display: "grid", gridTemplateColumns: "minmax(0,1.55fr) minmax(300px,.8fr)", gap: 14, marginTop: 14 }}>
+                <section className="owner-analytics-chart" style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: "#4f46e5", letterSpacing: 1 }}>ACTIVITY TREND</div>
+                      <h3 style={{ margin: "5px 0 2px", fontSize: 20 }}>Last {analyticsOverview.range_days} days</h3>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>Content creation plus attendance records.</div>
+                    </div>
+                    <div className="owner-analytics-chart-total"><b>{analyticsOverview.summary.activity_events}</b><span>events in period</span></div>
+                  </div>
+
+                  {(() => {
+                    const trend = analyticsOverview.trend;
+                    const max = Math.max(1, ...trend.map((point) => point.total_activity));
+                    const points = trend.map((point, index) => {
+                      const x = trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100;
+                      const y = 94 - (point.total_activity / max) * 78;
+                      return { point, x, y };
+                    });
+                    return (
+                      <>
+                        <div className="owner-analytics-svg-wrap">
+                          <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={"Platform activity over the last " + analyticsOverview.range_days + " days"}>
+                            {[20, 40, 60, 80].map((y) => <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#edf0f5" strokeWidth=".6" />)}
+                            <polyline points={points.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" stroke="#4f46e5" strokeWidth="2.4" vectorEffect="non-scaling-stroke" />
+                            {points.map(({ point, x, y }) => (
+                              <circle key={point.day} cx={x} cy={y} r="1.5" fill="#4f46e5">
+                                <title>{new Date(point.day).toLocaleDateString()}: {point.total_activity} total events</title>
+                              </circle>
+                            ))}
+                          </svg>
+                        </div>
+                        <div className="owner-analytics-chart-labels">
+                          {[
+                            analyticsOverview.trend[0],
+                            analyticsOverview.trend[Math.floor(analyticsOverview.trend.length / 2)],
+                            analyticsOverview.trend[analyticsOverview.trend.length - 1],
+                          ].filter(Boolean).map((point, index) => (
+                            <span key={index}>{new Date(point!.day).toLocaleDateString([], { month: "short", day: "numeric" })}</span>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  <div className="owner-analytics-legend">
+                    {[
+                      ["Content", analyticsOverview.summary.content_created],
+                      ["Attendance", analyticsOverview.summary.attendance_records],
+                      ["Engaged institutes", analyticsOverview.summary.engaged_institutes],
+                    ].map(([label, value]) => (
+                      <div key={String(label)}><span>{label}</span><b>{Number(value)}</b></div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="owner-analytics-breakdown" style={{ background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, padding: 18 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: "#64748b", letterSpacing: 1 }}>PERIOD SUMMARY</div>
+                  <div className="owner-analytics-summary-grid">
+                    {[
+                      ["Activity events", analyticsOverview.summary.activity_events],
+                      ["Content created", analyticsOverview.summary.content_created],
+                      ["Attendance records", analyticsOverview.summary.attendance_records],
+                      ["Engaged institutes", analyticsOverview.summary.engaged_institutes],
+                    ].map(([label, value]) => (
+                      <div key={String(label)}><span>{label}</span><b>{Number(value)}</b></div>
+                    ))}
+                  </div>
+                  <div className="owner-analytics-adoption">
+                    <div><span>Active-institute engagement</span><b>{formatPercent(analyticsOverview.summary.active_institutes ? (analyticsOverview.summary.engaged_institutes / analyticsOverview.summary.active_institutes) * 100 : 0)}</b></div>
+                    <div className="owner-analytics-progress"><span style={{ width: Math.min(100, analyticsOverview.summary.active_institutes ? (analyticsOverview.summary.engaged_institutes / analyticsOverview.summary.active_institutes) * 100 : 0) + "%" }} /></div>
+                    <small>Institutes with at least one tracked event in the selected period.</small>
+                  </div>
+                </section>
+              </div>
+
+              <section className="owner-analytics-institutes" style={{ marginTop: 14, background: "#fff", border: "1px solid #e7ebf2", borderRadius: 20, overflow: "hidden" }}>
+                <div className="owner-analytics-institutes-head" style={{ padding: 18, borderBottom: "1px solid #eef1f6", display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div><b>Institute usage</b><div style={{ color: "#64748b", fontSize: 12, marginTop: 3 }}>Aggregate activity for up to 100 institutes in the selected period.</div></div>
+                  <span>{analyticsOverview.institutes.length} shown</span>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="owner-analytics-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", background: "#f8fafc" }}>
+                        {["Institute", "Status", "Members", "Students", "Teachers", "Activity", "Content", "Last activity"].map((heading) => <th key={heading} style={{ padding: 12, fontSize: 10, color: "#64748b" }}>{heading}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analyticsOverview.institutes.map((item) => (
+                        <tr key={item.id} style={{ borderTop: "1px solid #eef1f6" }}>
+                          <td style={{ padding: 13 }}><b>{item.name}</b><div style={{ fontSize: 10, color: "#94a3b8" }}>{item.slug}</div></td>
+                          <td style={{ padding: 13 }}><span style={{ ...statusTone(item.status), padding: "5px 8px", borderRadius: 999, fontSize: 9, fontWeight: 900, textTransform: "uppercase" }}>{item.status}</span></td>
+                          <td style={{ padding: 13, fontWeight: 800 }}>{item.active_members}</td>
+                          <td style={{ padding: 13 }}>{item.students}</td>
+                          <td style={{ padding: 13 }}>{item.teachers}</td>
+                          <td style={{ padding: 13, fontWeight: 900 }}>{item.activity_events}</td>
+                          <td style={{ padding: 13 }}>{item.content_created}</td>
+                          <td style={{ padding: 13, fontSize: 11, color: "#64748b" }}>{item.last_activity_at ? formatDateTime(item.last_activity_at) : "No activity"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!analyticsOverview.institutes.length && <div style={{ padding: 28, color: "#64748b" }}>No institute activity was recorded for the selected period.</div>}
+              </section>
+            </>
+          ) : null}
+        </section>
       )}
 
       {activeSection === "storage" && (
